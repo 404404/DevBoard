@@ -20,6 +20,7 @@ import {
 } from "./package-runtime.mjs";
 import { copyThirdPartyLicenses } from "./third-party-licenses.mjs";
 import { copyCargoLicenses } from "./cargo-licenses.mjs";
+import { copyBundledSkill } from "./package-skills.mjs";
 
 const project = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const desktop = join(project, "apps/desktop");
@@ -95,6 +96,7 @@ for (const directory of ["apps/server", "packages/contracts", "packages/taskctl"
 }
 copyRuntimeDist(join(project, "apps/web/dist"), join(runtime, "apps/web/dist"));
 copyRuntimeScripts(project, runtime);
+copyBundledSkill(project, runtime, version);
 writeFileSync(
   join(runtime, "package.json"),
   JSON.stringify({ name: "taskboard-desktop-runtime", version, type: "module" }),

@@ -89,8 +89,11 @@ test("packaged scripts cover native/backend runtime references without developme
     [...RUNTIME_SCRIPT_FILES].sort(),
   );
 
-  const nativeSource = readFileSync(join(project, "apps/desktop/src-tauri/src/main.rs"), "utf8");
-  const desktopRoots = [...nativeSource.matchAll(/root\.join\("desktop\/([^"/]+\.mjs)"\)/g)].map(
+  const nativeSource = filesUnder(join(project, "apps/desktop/src-tauri/src"))
+    .filter((file) => file.endsWith(".rs"))
+    .map((file) => readFileSync(file, "utf8"))
+    .join("\n");
+  const desktopRoots = [...nativeSource.matchAll(/\b\w+\.join\("desktop\/([^"/]+\.mjs)"\)/g)].map(
     (match) => join(project, "apps/desktop/scripts", match[1]),
   );
   assert.ok(desktopRoots.length > 0, "Native runtime script paths must be checked");

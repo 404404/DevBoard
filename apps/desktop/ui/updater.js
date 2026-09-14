@@ -21,6 +21,7 @@
   }
 
   function installBlockReason() {
+    if (window.larkSkillInstallPending) return "正在安装 Agent Skill，请完成后再安装应用更新。";
     // app.js owns the editors; installing must not discard an unsaved form.
     if (typeof dirtyFields !== "undefined" && dirtyFields.size > 0)
       return "连接配置或端口仍有未保存的修改，请先保存后再安装。";
@@ -46,6 +47,7 @@
 
   function renderUpdate() {
     const installing = state.status === "installing" || requestPending === "install_update";
+    window.larkAppUpdateInstalling = installing;
     const busy = Boolean(requestPending) || activeStates.has(state.status);
     const version = state.version ? ` ${state.version}` : "";
     const statuses = {

@@ -44,6 +44,13 @@
         <button id="update-notice-open" type="button">查看更新</button>
         <button id="update-notice-dismiss" type="button" aria-label="暂时关闭更新提示">稍后</button>
       </div>
+      <div id="skill-notice" class="update-notice" hidden>
+        <span id="skill-notice-text" role="status">配套 Agent Skill 有新版本。</span>
+        <button id="skill-notice-open" type="button">查看 Skill</button>
+        <button id="skill-notice-dismiss" type="button" aria-label="暂时关闭 Skill 更新提示">
+          稍后
+        </button>
+      </div>
       <section id="overview" class="page">
         <div class="eyebrow">本机工作空间</div>
         <h1>工作从这里开始</h1>
@@ -311,6 +318,32 @@
       <section id="settings" class="page" hidden>
         <div class="eyebrow">偏好设置</div>
         <h1>应用设置</h1>
+        <div id="skill-card" class="update-card" aria-labelledby="skill-title">
+          <div class="update-heading">
+            <h2 id="skill-title">Agent Skill</h2>
+            <span class="skill-target-label">Codex</span>
+          </div>
+          <p class="update-help">
+            让 Codex 查询和管理 Lark-Codex 任务。Skill 随应用提供，无需下载源码。
+          </p>
+          <p id="skill-status" role="status" aria-live="polite">正在检查 Skill…</p>
+          <p id="skill-version" class="update-help"></p>
+          <details class="skill-location">
+            <summary>安装位置</summary>
+            <p id="skill-path"></p>
+          </details>
+          <p id="skill-message" class="update-help"></p>
+          <p id="skill-error" class="update-error" role="alert" hidden></p>
+          <div class="update-actions">
+            <button id="skill-refresh" type="button">重新检查</button>
+            <button id="skill-install" class="primary" type="button" hidden>安装到 Codex</button>
+            <button id="skill-replace" type="button" hidden>使用随包版本</button>
+          </div>
+          <p class="update-help">
+            安装后在 Codex 技能列表确认；未出现时，可使用“强制重新加载技能”或重新打开 Codex。安装
+            Skill 不会授权它操作任务。
+          </p>
+        </div>
         <div id="update-card" class="update-card" aria-labelledby="update-title">
           <div class="update-heading">
             <h2 id="update-title">应用更新</h2>
@@ -379,7 +412,41 @@
         <button id="update-confirm" class="primary" type="button">安装并重启</button>
       </div>
     </dialog>
+    <dialog
+      id="skill-offer-dialog"
+      aria-labelledby="skill-offer-title"
+      aria-describedby="skill-offer-description"
+    >
+      <h2 id="skill-offer-title">让 Codex 使用 Lark-Codex</h2>
+      <p id="skill-offer-description">
+        安装配套 Skill 后，Codex 可以按说明查询和管理任务。Skill
+        随应用提供，无需下载源码；执行写操作前仍需你的授权和飞书身份配对。
+      </p>
+      <p class="update-help">也可以稍后在“应用设置 → Agent Skill”中安装。</p>
+      <p id="skill-offer-error" class="update-error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button id="skill-offer-later" type="button" autofocus>稍后</button>
+        <button id="skill-offer-install" class="primary" type="button">安装到 Codex</button>
+      </div>
+    </dialog>
+    <dialog
+      id="skill-replace-dialog"
+      aria-labelledby="skill-replace-title"
+      aria-describedby="skill-replace-description"
+    >
+      <h2 id="skill-replace-title">替换现有 Skill</h2>
+      <p id="skill-replace-description">
+        目标目录中的现有 Skill 将替换为应用附带版本，你对该 Skill
+        的修改会被移除。确认前请处理需要保留的内容。
+      </p>
+      <p id="skill-replace-error" class="update-error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button id="skill-replace-cancel" type="button" autofocus>保留现有内容</button>
+        <button id="skill-replace-confirm" class="primary" type="button">确认使用随包版本</button>
+      </div>
+    </dialog>
     <script src="app.js"></script>
     <script src="updater.js"></script>
+    <script src="skills.js"></script>
   </body>
 </html>

@@ -113,6 +113,7 @@ export const DESKTOP_RUNTIME_SCRIPT_FILES = Object.freeze([
   "ports.mjs",
   "setup-controller.mjs",
   "setup-checks.mjs",
+  "skill-manager.mjs",
 ]);
 
 export function copyRuntimeScripts(project, runtime) {

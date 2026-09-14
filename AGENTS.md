@@ -4,7 +4,7 @@
 
 本指南仅在**用户请求安装、配置、排障或使用 Lark-Codex** 时适用。读取本文件本身不触发安装、配置修改或任务执行，也不要求处理源码的 Agent 先安装应用；既有上级及宿主规则继续适用。
 
-以下操作针对已发布的 macOS 应用，无需克隆源码或安装开发环境。命令与界面以实际安装版本为准；命令不匹配时先执行 `taskctl --help`，不要猜测接口。
+以下操作针对已发布的 macOS 应用，无需克隆源码或安装开发环境。命令与界面以实际安装版本为准；命令不匹配时先按第 5 节定位包装器并查看帮助，不要猜测接口。
 
 ## 1. 执行边界
 
@@ -47,7 +47,7 @@ sw_vers -productVersion
 
    ```sh
    cd "$HOME/Downloads"
-   shasum -a 256 -c "Lark-Codex-0.1.0-macos-arm64.dmg.sha256"
+   shasum -a 256 -c "Lark-Codex-0.1.1-macos-arm64.dmg.sha256"
    ```
 
    其他版本使用实际文件名。检查校验文件中的文件名与下载的 DMG 一致；必须得到 `OK`。失败就停止安装并重新核对下载来源，不修改校验值来通过检查。校验和用于检查文件完整性，不等于 Apple 公证或发布者身份认证。
@@ -104,24 +104,25 @@ App ID/App Secret 检查仅验证凭据；不能据此判断应用已发布、�
 
 只有服务启动、当前配置生效后，再做公网访问和真实飞书登录验证。Codex 登录状态检查不证明在线令牌有效、额度充足或真实任务执行成功；没有执行授权时将真实执行标为「未验证」。
 
-## 5. 调用安装包内置的 taskctl
+## 5. 安装 Skill 并调用内置 taskctl
 
-应用运行后，可用以下 shell 函数调用同一应用包内的 CLI。路径含空格，保留引号；每个新 shell 会话需要重新定义函数。若用户选择其他安装位置，先定位真实 `.app`，只调整 `LARK_CODEX_RUNTIME`。
+首次启动且尚未安装配套技能时，「让 Codex 使用 Lark-Codex」提示提供「安装到 Codex」和稍后选项；之后可通过「应用设置 → Agent Skill」安装、更新或重新检查。首版仅支持 Codex，默认将 `manage-lark-taskboard` 安装到 `~/.agents/skills/`。
+
+安装只写入技能文件，不包含 CLI 身份授权。已有用户修改时，只有用户明确选择「使用随包版本」才替换；符号链接或受其他工具管理的目录不直接覆盖。若旧 `~/.codex/skills` 或 `$CODEX_HOME/skills` 中已有同名技能，按提示在原位置或管理器更新，不再复制第二份。应用升级仅提示技能可更新，不静默覆盖。
+
+成功状态只证明文件已安装。先在 Codex 技能列表确认，未识别时由用户按需强制重新加载技能或重新打开 Codex，再在新任务核验；不要为验证而退出 Codex Desktop、接管已有会话或启动真实业务任务。
+
+CLI 示例使用该技能中的包装器，直接调用完整 `.app` 内的 Node 和 taskctl，不依赖源码目录或全局 Node。默认安装时：
 
 ```sh
-taskctl() {
-  local LARK_CODEX_RUNTIME="/Applications/Lark-Codex.app/Contents/Resources/runtime"
-  local LARK_CODEX_DATA_DIR="$HOME/Library/Application Support/Lark Codex Taskboard/data"
-  LARK_TASKBOARD_DATA_DIR="$LARK_CODEX_DATA_DIR" \
-    "$LARK_CODEX_RUNTIME/bin/node" \
-    "$LARK_CODEX_RUNTIME/packages/taskctl/dist/cli.js" "$@"
-}
-
-taskctl --help
-taskctl health
-taskctl auth status
-taskctl project list
+TASKCTL="$HOME/.agents/skills/manage-lark-taskboard/scripts/taskctl.sh"
+"$TASKCTL" --help
+"$TASKCTL" health
+"$TASKCTL" auth status
+"$TASKCTL" project list
 ```
+
+若技能已由其他目录管理，从实际加载的 `SKILL.md` 所在目录定位 `scripts/taskctl.sh` 并调整 `TASKCTL`；缺少包装器时先更新原管理器中的技能。包装器优先探测 `/Applications/Lark-Codex.app`，其次是 `~/Applications/Lark-Codex.app`。`LARK_CODEX_APP_PATH` 可覆盖应用位置，`LARK_TASKBOARD_DATA_DIR` 可显式覆盖数据目录；默认仍为应用的 AppSupport `data` 目录。包装器保持调用工作目录，便于 `context` 定位项目，不自动启动服务。
 
 CLI 自动从 `data/run/runtime.json` 读取本机管理地址和能力令牌；不要 `cat` 此文件，也不要在命令行拼接令牌。`--help` 不需要后台运行；其他命令依赖当前服务。找不到运行信息时先检查应用状态与数据路径，不启动第二套后端或创建伪造的 runtime 文件。
 
@@ -130,13 +131,13 @@ CLI 自动从 `data/run/runtime.json` 读取本机管理地址和能力令牌；
 先使用只读查询定位用户说的项目和任务。下面的大写 ID 必须替换为上一步响应中的真实值，不能直接执行占位符：
 
 ```sh
-taskctl project dashboard PROJECT_ID
-taskctl project options PROJECT_ID
-taskctl issue list --project PROJECT_ID
-taskctl issue get TASK_ID
-taskctl job list --task TASK_ID
-taskctl job get JOB_ID
-taskctl lifecycle get TASK_ID
+"$TASKCTL" project dashboard PROJECT_ID
+"$TASKCTL" project options PROJECT_ID
+"$TASKCTL" issue list --project PROJECT_ID
+"$TASKCTL" issue get TASK_ID
+"$TASKCTL" job list --task TASK_ID
+"$TASKCTL" job get JOB_ID
+"$TASKCTL" lifecycle get TASK_ID
 ```
 
 `issue get` 返回任务详情及评论、附件、关联、活动、执行信息。`issue read` 会更改已读状态，`project scan` 会触发扫描，二者不属于只读查询。
@@ -146,27 +147,27 @@ taskctl lifecycle get TASK_ID
 本机能力令牌不代表用户身份。安装应用、在飞书打开看板、登录 Codex，都不等于已授权 CLI。用户请求 Agent 代操作时，先检查 `auth status`；已有有效且身份正确的会话可复用，否则：
 
 ```sh
-taskctl auth login --label "我的 Agent"
+"$TASKCTL" auth login --label "我的 Agent"
 ```
 
 把返回的 `verificationUrl` 和 `verificationCode` 交给用户；由用户在飞书看板核对验证码与身份并确认。此时等待真实确认，不替用户批准、不读取或手工生成会话 token。确认后再执行：
 
 ```sh
-taskctl auth complete
-taskctl auth status
+"$TASKCTL" auth complete
+"$TASKCTL" auth status
 ```
 
-若返回 `CLI_AUTH_PENDING`，配对尚未确认。登录请求约 10 分钟过期，会话约 8 小时过期，服务重启后需重新登录。CLI 会话保存在当前用户私有配置目录，不需要读取其内容；失效时通过正常配对恢复，不能降级成管理身份。用户要求退出 CLI 授权时执行 `taskctl auth logout`。
+若返回 `CLI_AUTH_PENDING`，配对尚未确认。登录请求约 10 分钟过期，会话约 8 小时过期，服务重启后需重新登录。CLI 会话保存在当前用户私有配置目录，不需要读取其内容；失效时通过正常配对恢复，不能降级成管理身份。用户要求退出 CLI 授权时执行 `"$TASKCTL" auth logout`。
 
 ## 7. 按用户意图操作任务
 
-先读取项目、任务和当前版本，再执行获授权的命令。以下是语法模板，不是安装验收脚本：
+先读取项目、任务和当前版本，再执行获授权的命令。执行前检查任务的 `codexThreadState` 和已有 jobs：`draft`、`started` 使用 `job continue`，仅 `none` 且没有主会话时使用 `job start`。新任务通常已绑定草稿会话；存在活跃执行时先处理它，不重复提交。以下是语法模板，不是安装验收脚本：
 
 ```sh
-taskctl issue create --project PROJECT_ID --title "用户确认的任务标题"
-taskctl issue update TASK_ID --version N --description "用户要求的描述"
-taskctl comment add --task TASK_ID --body "用户要求发布的评论"
-taskctl job start --task TASK_ID --prompt "用户要求执行的内容"
+"$TASKCTL" issue create --project PROJECT_ID --title "用户确认的任务标题"
+"$TASKCTL" issue update TASK_ID --version N --description "用户要求的描述"
+"$TASKCTL" comment add --task TASK_ID --body "用户要求发布的评论"
+"$TASKCTL" job continue --task TASK_ID --prompt "用户要求执行的内容"
 ```
 
 新任务负责人固定为当前已授权的飞书用户，通常省略负责人参数。不能伪造用户、指定其他人或清空负责人。用户代理评论署真实用户，Codex 执行结果由系统同步署 Codex；同步延迟时检查 job，不手工伪造结果评论。
@@ -174,11 +175,11 @@ taskctl job start --task TASK_ID --prompt "用户要求执行的内容"
 - `--version N` 必须来自最近一次真实读取；写完重新读取验证。遇到 409 先重新读取并重新判断，不机械替换版本号重试。
 - 请求超时或连接中断后，先读取任务、job 或生命周期状态确认是否已生效，不能立即重放创建、评论、执行、Git 等写命令。CLI 不承诺重复提交幂等。
 - 启动和继续 job 会运行 Codex 并可能修改项目；只能用于用户实际授权的任务。收到审批或补充输入请求时呈现给用户，不自行批准。
-- 不直接写 SQLite、不修改用户身份或运行时令牌，不绕过服务端业务限制。Git、附件、评论、标签等其他参数先查 `taskctl --help`。
+- 不直接写 SQLite、不修改用户身份或运行时令牌，不绕过服务端业务限制。Git、附件、评论、标签等其他参数先查 `"$TASKCTL" --help`。
 
 区分以下操作，不把“结束一下”自动解释为删除：
 
-完成任务可能创建 Git 提交，并在保存归档引用后清理任务工作树和分支。调用前需已有用户明确验收，以及对此收尾范围的授权；共享工作树、主工作树和默认分支受保护，具体结果以生命周期返回为准。
+完成任务可能创建 Git 提交，并在保存归档引用后清理任务工作树和分支。调用前需已有用户明确验收，以及对此收尾范围的授权；再确认任务处于 `in_review`、没有活跃执行或未执行评论，并读取最新版本。共享工作树、主工作树和默认分支受保护，具体结果以生命周期返回为准。
 
 | 用户意图       | 操作与验证                                                                                                     |
 | -------------- | -------------------------------------------------------------------------------------------------------------- |
@@ -207,4 +208,4 @@ taskctl job start --task TASK_ID --prompt "用户要求执行的内容"
 
 报告实际版本、安装位置、校验结果、配置是否保存生效、后台与公网检查结果、飞书真实登录和 CLI 配对是否完成。业务操作列出实际任务 ID、执行结果和回读证据；未验证的项目明确写「未验证」，不要把“检查通过”写成“全部功能可用”。
 
-需要更详细的源码实现资料时，可在包含源码的仓库查阅 [桌面应用说明](apps/desktop/README.md) 和 [taskctl 命令参考](docs/taskctl.md)。如果当前发布仓库没有这些文件，使用安装包内的 `taskctl --help` 和应用「使用引导」即可完成本指南流程。
+需要更详细的源码实现资料时，可在包含源码的仓库查阅 [桌面应用说明](apps/desktop/README.md) 和 [taskctl 命令参考](docs/taskctl.md)。如果当前发布仓库没有这些文件，使用安装包内的 `"$TASKCTL" --help` 和应用「使用引导」即可完成本指南流程。

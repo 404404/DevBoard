@@ -1,5 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod updater;
+mod skills;
+mod skills_commit;
 use serde_json::{json, Value};
 use std::{
     fs::{File, OpenOptions},
@@ -184,6 +186,9 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 fn main() {
+    if let Some(code) = skills::handle_commit_cli() {
+        std::process::exit(code);
+    }
     let app=tauri::Builder::default().plugin(tauri_plugin_updater::Builder::new().build()).setup(|app|{
   let home=std::env::var("HOME")?;let data=PathBuf::from(home).join("Library/Application Support/Lark Codex Taskboard");std::fs::create_dir_all(&data)?;
   let lock=OpenOptions::new().read(true).write(true).create(true).truncate(false).open(data.join("instance.lock"))?;
@@ -195,6 +200,7 @@ fn main() {
   }
   if !acquired {return Err("Lark-Codex 已在运行".into())}
   app.manage(updater::Updates::new(app.package_info().version.to_string(), &data));
+  app.manage(skills::Skills::default());
   setup_tray(app)?;
   let root=app.path().resource_dir()?.join("runtime");
   let mut child=Command::new(root.join("bin/node")).arg(root.join("desktop/runtime.mjs")).arg(&root).arg(&data).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn()?;
@@ -202,7 +208,7 @@ fn main() {
   let update_stop_ack=Arc::new(Mutex::new(None));let ack=update_stop_ack.clone();
   std::thread::spawn(move||{for line in BufReader::new(output).lines().map_while(Result::ok){if let Ok(value)=serde_json::from_str::<Value>(&line){if let (Some(id),Some(ok))=(value["id"].as_u64(),value["ok"].as_bool()) { if id>=2 { *ack.lock().unwrap()=Some((id,ok)); } } if value["event"]=="state"{*copy.lock().unwrap()=value["data"].clone()}else if value["ok"]==false{copy.lock().unwrap()["message"]=value["error"].clone()}}}let mut s=copy.lock().unwrap();s["phase"]=json!("error");s["message"]=json!("服务管理器已退出，请重新打开应用");});
   app.manage(Controller{child:Mutex::new(child),input:Mutex::new(input),snapshot,quitting:AtomicBool::new(false),installing:AtomicBool::new(false),update_stop_ack,_lock:lock});Ok(())
- }).invoke_handler(tauri::generate_handler![snapshot,control,open_board,updater::update_status,updater::check_updates,updater::download_update,updater::install_update]).on_window_event(|window,event|{if let tauri::WindowEvent::CloseRequested{api,..}=event{api.prevent_close();let _ = window.hide();
+ }).invoke_handler(tauri::generate_handler![snapshot,control,open_board,updater::update_status,updater::check_updates,updater::download_update,updater::install_update,skills::skill_status,skills::install_skill,skills::dismiss_skill_offer]).on_window_event(|window,event|{if let tauri::WindowEvent::CloseRequested{api,..}=event{api.prevent_close();let _ = window.hide();
     #[cfg(target_os = "macos")]
     let _ = window.app_handle().set_activation_policy(tauri::ActivationPolicy::Accessory);}}).build(tauri::generate_context!()).expect("无法启动 Lark-Codex");
     app.run(|app, event| {
