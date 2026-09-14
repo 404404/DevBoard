@@ -1,5 +1,7 @@
 # Lark-Codex
 
+**简体中文** · [English](README.en.md)
+
 在飞书里管理任务，让 Mac 上的 Codex 参与执行。
 
 **用户指南** · [给 Agent 的操作指南](AGENTS.md)
