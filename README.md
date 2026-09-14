@@ -111,9 +111,11 @@ HTTPS 入口需要公网 443 能到达本机 Caddy。HTTP 和 TCP 模式使用�
 
 退出 Lark-Codex 不会关闭 Codex Desktop，但应在更新或停止服务前处理好看板中的执行任务。
 
-## 让 Agent 帮你配置或操作
+## 安装与使用 Codex Skill
 
-首次启动且尚未安装配套技能时，应用会显示 **让 Codex 使用 Lark-Codex** 提示，可以选择 **安装到 Codex**，也可以稍后从 **应用设置 → Agent Skill** 安装。应用会把随包的 `manage-lark-codex` 技能安装到 `~/.agents/skills/manage-lark-codex`，用于通过内置命令行查询、修改任务和协助执行，无需克隆源码或安装 Node.js。
+配套 Skill 让 Codex 通过应用内置命令行查询、修改任务和协助执行，无需克隆源码或安装 Node.js。目前支持安装到 Codex，技能名称为 `manage-lark-codex`。
+
+首次启动且尚未安装配套技能时，应用会显示 **让 Codex 使用 Lark-Codex** 提示，可以选择 **安装到 Codex**，也可以稍后从 **应用设置 → Agent Skill** 安装。安装位置为 `~/.agents/skills/manage-lark-codex`。
 
 卡片会显示文件安装状态，可用“重新检查”刷新。应用升级后会提示有新版技能，点击更新后才替换；已有用户修改时，须明确选择“使用随包版本”。符号链接、由其他工具管理的目录、旧版名称的技能或旧技能目录中的同名技能，会提示回到原位置或管理器处理，避免重复安装。
 
@@ -123,7 +125,9 @@ HTTPS 入口需要公网 443 能到达本机 Caddy。HTTP 和 TCP 模式使用�
 
 技能安装不等于飞书写入授权。Agent 首次代操作时仍需你在飞书中完成配对确认。
 
-把本仓库的 [AGENTS.md](AGENTS.md)交给 Agent，并说明你要完成的事情，例如：
+## 让 Agent 协助安装与配置
+
+需要 Agent 帮你安装应用、完成配置或排查问题时，把本仓库的 [AGENTS.md](AGENTS.md)交给它，并说明你要完成的事情，例如：
 
 > 请阅读 AGENTS.md，检查我的 Mac 是否满足要求，帮我安装并配置 Lark-Codex。需要我登录或在飞书后台确认的步骤，请明确告诉我。
 
