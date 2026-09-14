@@ -1,9 +1,9 @@
-import { identityKey } from "@lark-taskboard/contracts";
+import { identityKey } from "@lark-codex/contracts";
 import {
   TEMPORARY_PROJECT_ID,
   type CreateTaskCommand,
   type TaskMutationResult,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 
 import type { CodexThreadProvisioner, ExecutionQueue } from "../execution/index.js";
 import type { ProjectRegistry } from "../project-registry/index.js";

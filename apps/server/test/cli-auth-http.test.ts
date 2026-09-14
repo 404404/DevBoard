@@ -2,11 +2,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  identityKey,
-  TEMPORARY_PROJECT_ID,
-  type FeishuIdentityRef,
-} from "@lark-taskboard/contracts";
+import { identityKey, TEMPORARY_PROJECT_ID, type FeishuIdentityRef } from "@lark-codex/contracts";
 import type { FastifyInstance } from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
 import { appControl, createApp } from "../src/app.js";
@@ -28,15 +24,15 @@ function setup() {
   const root = mkdtempSync(join(tmpdir(), "taskctl-pairing-http-"));
   const database = initializeDatabase(":memory:");
   const config = loadConfig({
-    LARK_TASKBOARD_ENV: "test",
-    LARK_TASKBOARD_AUTH_MODE: "feishu",
-    LARK_TASKBOARD_ORIGIN: "https://tasks.example.com",
-    LARK_TASKBOARD_ALLOWED_HOSTS: "tasks.example.com",
-    LARK_TASKBOARD_FEISHU_APP_ID: "cli_test",
-    LARK_TASKBOARD_FEISHU_APP_SECRET: "test-secret",
-    LARK_TASKBOARD_DATA_DIR: root,
-    LARK_TASKBOARD_WORKSPACE_ROOTS: root,
-    LARK_TASKBOARD_TEMPORARY_PROJECT_ROOT: root,
+    LARK_CODEX_ENV: "test",
+    LARK_CODEX_AUTH_MODE: "feishu",
+    LARK_CODEX_ORIGIN: "https://tasks.example.com",
+    LARK_CODEX_ALLOWED_HOSTS: "tasks.example.com",
+    LARK_CODEX_FEISHU_APP_ID: "cli_test",
+    LARK_CODEX_FEISHU_APP_SECRET: "test-secret",
+    LARK_CODEX_DATA_DIR: root,
+    LARK_CODEX_WORKSPACE_ROOTS: root,
+    LARK_CODEX_TEMPORARY_PROJECT_ROOT: root,
   });
   database
     .prepare(
@@ -70,13 +66,13 @@ function setup() {
     const login = await publicApp.inject({
       method: "POST",
       url: "/api/v1/auth/feishu/exchange",
-      headers: { host: "tasks.example.com", origin: config.LARK_TASKBOARD_ORIGIN },
+      headers: { host: "tasks.example.com", origin: config.LARK_CODEX_ORIGIN },
       payload: { code: "valid-feishu-code" },
     });
     expect(login.statusCode).toBe(201);
     return {
       host: "tasks.example.com",
-      origin: config.LARK_TASKBOARD_ORIGIN,
+      origin: config.LARK_CODEX_ORIGIN,
       cookie: login.cookies.map((c) => `${c.name}=${c.value}`).join("; "),
       "x-csrf-token": login.json().data.csrfToken as string,
     };

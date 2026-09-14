@@ -1,6 +1,7 @@
-import { ALL_PROJECT_ID, BoardEventSchema, type BoardEvent } from "@lark-taskboard/contracts";
+import { ALL_PROJECT_ID, BoardEventSchema, type BoardEvent } from "@lark-codex/contracts";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { readLarkCodexStorage } from "./brand-storage";
 
 export type RealtimeState = "connecting" | "live" | "reconnecting" | "offline";
 
@@ -77,7 +78,7 @@ const LABEL_EVENT_TYPES = [
 ] as const;
 
 function cursorKey(projectId: string): string {
-  return `lark-taskboard:event-revision:${projectId}`;
+  return `lark-codex:event-revision:${projectId}`;
 }
 
 type QueryKey = readonly unknown[];
@@ -239,7 +240,8 @@ export function useProjectEvents(projectId: string | undefined): RealtimeState {
         return;
       }
       setState("connecting");
-      const afterRevision = window.sessionStorage.getItem(cursorKey(projectId)) ?? "0";
+      const afterRevision =
+        readLarkCodexStorage(window.sessionStorage, `event-revision:${projectId}`) ?? "0";
       source = new EventSource(
         `/api/v1/events?projectId=${encodeURIComponent(projectId)}&afterRevision=${encodeURIComponent(afterRevision)}`,
       );

@@ -1,4 +1,4 @@
-import { identityKey } from "@lark-taskboard/contracts";
+import { identityKey } from "@lark-codex/contracts";
 import { seedFeishuTestActor, TEST_FEISHU_ACTOR } from "./helpers/identity.js";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -9,7 +9,7 @@ import {
   CreateTaskCommandSchema,
   DeleteTaskCommandSchema,
   type PrincipalView,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { AttachmentVault } from "../src/modules/attachments/index.js";
@@ -71,7 +71,7 @@ afterEach(() => {
 function setup(status: "done" | "canceled" = "canceled") {
   const database = initializeDatabase(":memory:");
   openDatabases.push(database);
-  const root = mkdtempSync(join(tmpdir(), "lark-taskboard-delete-"));
+  const root = mkdtempSync(join(tmpdir(), "lark-codex-delete-"));
   temporaryDirectories.push(root);
   const vault = new AttachmentVault({ rootDirectory: root });
   const identityService = new IdentityService({

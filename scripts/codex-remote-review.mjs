@@ -1,4 +1,4 @@
-import { remoteTurnDiff } from "@lark-taskboard/contracts";
+import { remoteTurnDiff } from "@lark-codex/contracts";
 import { execFile } from "node:child_process";
 import { constants } from "node:fs";
 import { lstat, open, readlink, realpath } from "node:fs/promises";

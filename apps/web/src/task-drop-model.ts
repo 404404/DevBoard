@@ -1,4 +1,4 @@
-import type { TaskStatus, TaskView } from "@lark-taskboard/contracts";
+import type { TaskStatus, TaskView } from "@lark-codex/contracts";
 
 import type { ActiveBoardStatus } from "./task-status";
 import {

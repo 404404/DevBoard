@@ -8,8 +8,8 @@ use std::{
     path::{Component, Path},
 };
 
-const TARGET: &str = "manage-lark-taskboard";
-const STAGING_PREFIX: &str = ".manage-lark-taskboard.install-";
+const TARGET: &str = "manage-lark-codex";
+const STAGING_PREFIX: &str = ".manage-lark-codex.install-";
 
 fn open_directory(parent: RawFd, name: &OsStr) -> Result<OwnedFd, String> {
     let name = CString::new(name.as_bytes()).map_err(|_| "Skill 目录名称无效")?;
@@ -141,7 +141,7 @@ mod tests {
         time::{SystemTime, UNIX_EPOCH},
     };
 
-    const STAGE: &str = ".manage-lark-taskboard.install-test";
+    const STAGE: &str = ".manage-lark-codex.install-test";
 
     struct Fixture {
         root: PathBuf,
@@ -277,18 +277,13 @@ mod tests {
             TARGET,
             STAGING_PREFIX,
             "../escape",
-            ".manage-lark-taskboard.install-a/b",
-            ".manage-lark-taskboard.install-a\\b",
-            ".manage-lark-taskboard.install-a\0b",
+            ".manage-lark-codex.install-a/b",
+            ".manage-lark-codex.install-a\\b",
+            ".manage-lark-codex.install-a\0b",
         ] {
             assert!(atomic_install(&fixture.home, name, None).is_err());
         }
-        assert!(atomic_install(
-            &fixture.home,
-            ".manage-lark-taskboard.install-missing",
-            None
-        )
-        .is_err());
+        assert!(atomic_install(&fixture.home, ".manage-lark-codex.install-missing", None).is_err());
         assert_eq!(fixture.text(STAGE), "new");
         assert!(!fixture.skills.join(TARGET).exists());
     }

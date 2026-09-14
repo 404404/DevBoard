@@ -1,6 +1,6 @@
 import { QueryNotice } from "./query-notice";
 import { userErrorMessage } from "./user-error";
-import { sameIdentity } from "@lark-taskboard/contracts";
+import { sameIdentity } from "@lark-codex/contracts";
 import { Notice } from "./notification-center";
 import type {
   PrincipalView,
@@ -8,7 +8,7 @@ import type {
   AttachmentView,
   CommentView,
   TaskView,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LoaderCircle, Paperclip, Trash2 } from "./icons";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -696,7 +696,7 @@ function AttachmentsSection({
   onChanged,
   label = "描述附件",
 }: {
-  readonly attachments: readonly import("@lark-taskboard/contracts").AttachmentView[];
+  readonly attachments: readonly import("@lark-codex/contracts").AttachmentView[];
   readonly csrfToken: string;
   readonly writable: boolean;
   readonly onChanged: () => void;
@@ -764,7 +764,7 @@ function ImagePreview({
   attachment,
   onClose,
 }: {
-  readonly attachment: import("@lark-taskboard/contracts").AttachmentView;
+  readonly attachment: import("@lark-codex/contracts").AttachmentView;
   readonly onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);

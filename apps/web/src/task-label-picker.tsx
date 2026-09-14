@@ -1,4 +1,4 @@
-import type { GlobalLabelView } from "@lark-taskboard/contracts";
+import type { GlobalLabelView } from "@lark-codex/contracts";
 import { Tag } from "./icons";
 import { useEffect, useRef, useState } from "react";
 

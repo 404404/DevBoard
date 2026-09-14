@@ -5,7 +5,7 @@ import {
   EventStreamMessageSchema,
   RevisionSchema,
   type EventStreamMessage,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import type { AppConfig } from "../../config.js";
@@ -27,7 +27,7 @@ function authenticate(
   config: AppConfig,
   identityService: IdentityService,
 ): SessionContext {
-  const names = sessionCookieNames(config);
+  const names = sessionCookieNames(config, request.cookies);
   return identityService.authenticate(request.cookies[names.session]);
 }
 
@@ -123,16 +123,16 @@ async function streamEvents(
     if (
       !(await writeChunk(
         response,
-        `retry: ${config.LARK_TASKBOARD_SSE_RETRY_MS}\n\n`,
+        `retry: ${config.LARK_CODEX_SSE_RETRY_MS}\n\n`,
         controller.signal,
-        config.LARK_TASKBOARD_SSE_WRITE_TIMEOUT_MS,
+        config.LARK_CODEX_SSE_WRITE_TIMEOUT_MS,
       ))
     ) {
       return;
     }
     let nextMessage = iterator.next();
     while (!controller.signal.aborted) {
-      const heartbeatWait = heartbeat(config.LARK_TASKBOARD_SSE_HEARTBEAT_MS);
+      const heartbeatWait = heartbeat(config.LARK_CODEX_SSE_HEARTBEAT_MS);
       const result = await Promise.race([
         nextMessage.then((value) => ({ kind: "message" as const, value })),
         heartbeatWait.promise.then(() => ({ kind: "heartbeat" as const })),
@@ -144,7 +144,7 @@ async function streamEvents(
           response,
           `: heartbeat ${Date.now()}\n\n`,
           controller.signal,
-          config.LARK_TASKBOARD_SSE_WRITE_TIMEOUT_MS,
+          config.LARK_CODEX_SSE_WRITE_TIMEOUT_MS,
         );
         if (!writable) {
           return;
@@ -158,7 +158,7 @@ async function streamEvents(
         response,
         serializeSseMessage(result.value.value),
         controller.signal,
-        config.LARK_TASKBOARD_SSE_WRITE_TIMEOUT_MS,
+        config.LARK_CODEX_SSE_WRITE_TIMEOUT_MS,
       );
       if (!writable || result.value.value.kind === "refresh_required") {
         return;

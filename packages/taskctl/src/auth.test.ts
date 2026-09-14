@@ -4,12 +4,14 @@ import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   credentialPaths,
+  authFileLocations,
+  compatibleCredentialStore,
   defaultCredentialStore,
   PendingCredentialSchema,
   readCredential,
   runtimeScope,
 } from "./auth.js";
-import type { RuntimeDescriptor } from "@lark-taskboard/contracts";
+import type { RuntimeDescriptor } from "@lark-codex/contracts";
 
 const runtime: RuntimeDescriptor = {
   descriptorVersion: 1,
@@ -30,6 +32,76 @@ async function temporary() {
 }
 
 describe("private CLI credential files", () => {
+  it("preserves explicit auth paths and prefers new variables even when empty", () => {
+    expect(authFileLocations({ LARK_TASKBOARD_AUTH_FILE: "/old/auth" }, "/fake/home")).toEqual({
+      current: "/old/auth",
+    });
+    expect(
+      authFileLocations(
+        { LARK_TASKBOARD_AUTH_FILE: "/old/auth", LARK_CODEX_AUTH_FILE: "/new/auth" },
+        "/fake/home",
+      ),
+    ).toEqual({ current: "/new/auth" });
+    expect(() =>
+      authFileLocations({ LARK_TASKBOARD_AUTH_FILE: "/old/auth", LARK_CODEX_AUTH_FILE: "" }),
+    ).toThrow("LARK_CODEX_AUTH_FILE 不能为空");
+  });
+
+  it("reads only matching legacy scopes and logout removes both generations", async () => {
+    const root = await temporary();
+    const locations = authFileLocations({ XDG_CONFIG_HOME: root }, root);
+    const current = credentialPaths(runtime, locations.current);
+    const legacy = credentialPaths(runtime, locations.legacy!);
+    const different = credentialPaths(
+      { ...runtime, publicBaseUrl: "https://other.example" },
+      locations.current,
+    );
+    const store = compatibleCredentialStore(locations);
+    const payload = JSON.stringify({
+      scope: current.scope,
+      requestId: "synthetic-request",
+      claimSecret: "synthetic-claim",
+      expiresAt: "2099-01-01T00:00:00Z",
+    });
+    await defaultCredentialStore.write(legacy.pending, payload);
+    expect(
+      await readCredential(store, current.pending, PendingCredentialSchema, current.scope, 0),
+    ).toMatchObject({ requestId: "synthetic-request" });
+    expect(await store.read(different.pending)).toBeNull();
+    expect(await defaultCredentialStore.read(current.pending)).toBeNull();
+    await store.write(current.pending, "invalid-new-file");
+    await expect(
+      readCredential(store, current.pending, PendingCredentialSchema, current.scope, 0),
+    ).rejects.toMatchObject({ code: "CLI_AUTH_FILE_INVALID" });
+    await store.remove(current.pending);
+    expect(await defaultCredentialStore.read(legacy.pending)).toBeNull();
+    expect(await store.read(current.pending)).toBeNull();
+  });
+
+  it("does not fall back through unsafe new credentials or a mismatched legacy identity scope", async () => {
+    const root = await temporary();
+    const locations = authFileLocations({ XDG_CONFIG_HOME: root }, root);
+    const paths = credentialPaths(runtime, locations.current);
+    const old = credentialPaths(runtime, locations.legacy!);
+    const store = compatibleCredentialStore(locations);
+    await defaultCredentialStore.write(
+      old.pending,
+      JSON.stringify({
+        scope: "different-runtime",
+        requestId: "synthetic-request",
+        claimSecret: "synthetic-claim",
+        expiresAt: "2099-01-01T00:00:00Z",
+      }),
+    );
+    await expect(
+      readCredential(store, paths.pending, PendingCredentialSchema, paths.scope, 0),
+    ).rejects.toMatchObject({ code: "CLI_AUTH_RUNTIME_MISMATCH" });
+    await defaultCredentialStore.write(paths.pending, "new");
+    await chmod(paths.pending, 0o644);
+    await expect(store.read(paths.pending)).rejects.toMatchObject({
+      code: "CLI_AUTH_FILE_PERMISSIONS",
+    });
+  });
   it("creates and replaces credentials with mode 0600, reads them and removes them", async () => {
     const root = await temporary();
     const path = join(root, "config", "auth.json");

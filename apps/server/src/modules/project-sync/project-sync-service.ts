@@ -1,10 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
-import {
-  ALL_PROJECT_ID,
-  TEMPORARY_PROJECT_ID,
-  type ProjectSyncState,
-} from "@lark-taskboard/contracts";
+import { ALL_PROJECT_ID, TEMPORARY_PROJECT_ID, type ProjectSyncState } from "@lark-codex/contracts";
 import { z } from "zod";
 
 import { withTransaction, type SqliteDatabase } from "../database/index.js";

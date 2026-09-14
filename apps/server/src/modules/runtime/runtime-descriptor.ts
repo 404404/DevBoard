@@ -15,7 +15,7 @@ import {
   RuntimeCapabilitySchema,
   RuntimeDescriptorSchema,
   type RuntimeDescriptor,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 
 import { AppError } from "../../app-error.js";
 import type { AppConfig } from "../../config.js";
@@ -43,7 +43,7 @@ export function publishRuntimeDescriptor(
   capabilityToken: string,
   now: () => Date = () => new Date(),
 ): RuntimeDescriptorHandle {
-  const runDirectory = join(config.LARK_TASKBOARD_DATA_DIR, "run");
+  const runDirectory = join(config.LARK_CODEX_DATA_DIR, "run");
   const descriptorPath = join(runDirectory, "runtime.json");
   const temporaryPath = join(runDirectory, `.runtime-${process.pid}-${randomUUID()}.tmp`);
 
@@ -58,8 +58,8 @@ export function publishRuntimeDescriptor(
       descriptorVersion: 1,
       pid: process.pid,
       generatedAt: now().toISOString(),
-      publicBaseUrl: config.LARK_TASKBOARD_ORIGIN,
-      localAdminBaseUrl: `http://${config.LARK_TASKBOARD_ADMIN_HOST}:${config.LARK_TASKBOARD_ADMIN_PORT}`,
+      publicBaseUrl: config.LARK_CODEX_ORIGIN,
+      localAdminBaseUrl: `http://${config.LARK_CODEX_ADMIN_HOST}:${config.LARK_CODEX_ADMIN_PORT}`,
       capabilityToken,
     });
     writeFileSync(temporaryPath, `${JSON.stringify(descriptor, null, 2)}\n`, {

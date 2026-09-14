@@ -51,7 +51,7 @@
     const busy = Boolean(requestPending) || activeStates.has(state.status);
     const version = state.version ? ` ${state.version}` : "";
     const statuses = {
-      idle: "每天在后台检查一次更新。",
+      idle: "",
       checking: "正在检查更新…",
       available: `发现新版本${version}，可下载后选择安装时间。`,
       downloading: `正在下载新版本${version}…`,
@@ -61,6 +61,7 @@
       upToDate: "当前已是最新版本。",
     };
     text("update-status", statuses[state.status] ?? "正在读取更新状态…");
+    element("update-status").hidden = state.status === "idle";
     if (state.currentVersion) {
       text("update-current-version", `当前版本 ${state.currentVersion}`);
     }
@@ -69,7 +70,7 @@
       "update-last-checked",
       checked > 0 && Number.isFinite(checked)
         ? `上次检查：${new Date(checked).toLocaleString("zh-CN")}`
-        : "每天在后台检查一次，也可以手动检查。",
+        : "尚未检查更新。",
     );
     text(
       "update-check",

@@ -4,7 +4,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSy
 import { join, resolve } from "node:path";
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import type { IdentityRef } from "@lark-taskboard/contracts";
+import type { IdentityRef } from "@lark-codex/contracts";
 import {
   e2eOrigin,
   establishSyntheticFeishuSession,
@@ -321,22 +321,22 @@ interface ProjectSnapshot {
 }
 
 function temporaryProjectRoot(): string {
-  const root = process.env.LARK_TASKBOARD_TEMPORARY_PROJECT_ROOT;
-  if (!root) throw new Error("LARK_TASKBOARD_TEMPORARY_PROJECT_ROOT is required for E2E tests");
+  const root = process.env.LARK_CODEX_TEMPORARY_PROJECT_ROOT;
+  if (!root) throw new Error("LARK_CODEX_TEMPORARY_PROJECT_ROOT is required for E2E tests");
   return root;
 }
 
 function taskctl(...args: string[]): { data: Record<string, unknown> } {
-  const dataDirectory = process.env.LARK_TASKBOARD_DATA_DIR;
-  if (!dataDirectory) throw new Error("LARK_TASKBOARD_DATA_DIR is required");
+  const dataDirectory = process.env.LARK_CODEX_DATA_DIR;
+  if (!dataDirectory) throw new Error("LARK_CODEX_DATA_DIR is required");
   const output = execFileSync(
     process.execPath,
     [resolve("node_modules/tsx/dist/cli.mjs"), resolve("packages/taskctl/src/cli.ts"), ...args],
     {
       env: {
         ...process.env,
-        LARK_TASKBOARD_DATA_DIR: dataDirectory,
-        LARK_TASKBOARD_AUTH_FILE: syntheticAuthFile(),
+        LARK_CODEX_DATA_DIR: dataDirectory,
+        LARK_CODEX_AUTH_FILE: syntheticAuthFile(),
       },
       encoding: "utf8",
     },
@@ -352,12 +352,12 @@ function uniqueProjectKey(prefix: string): string {
 }
 
 function snapshotPath(): string {
-  const dataDirectory = process.env.LARK_TASKBOARD_DATA_DIR;
+  const dataDirectory = process.env.LARK_CODEX_DATA_DIR;
   if (!dataDirectory) {
-    throw new Error("LARK_TASKBOARD_DATA_DIR is required for isolated E2E tests");
+    throw new Error("LARK_CODEX_DATA_DIR is required for isolated E2E tests");
   }
   return (
-    process.env.LARK_TASKBOARD_CODEX_PROJECT_SNAPSHOT_FILE ??
+    process.env.LARK_CODEX_CODEX_PROJECT_SNAPSHOT_FILE ??
     resolve(dataDirectory, "run/codex-projects.json")
   );
 }
@@ -382,7 +382,7 @@ function updateProjectSnapshot(
 }
 
 async function localProjects(): Promise<readonly RegisteredProject[]> {
-  const dataDirectory = process.env.LARK_TASKBOARD_DATA_DIR as string;
+  const dataDirectory = process.env.LARK_CODEX_DATA_DIR as string;
   const descriptorPath = resolve(dataDirectory, "run/runtime.json");
   await expect.poll(() => existsSync(descriptorPath)).toBe(true);
   const descriptor = JSON.parse(readFileSync(descriptorPath, "utf8")) as RuntimeDescriptor;
@@ -395,7 +395,7 @@ async function localProjects(): Promise<readonly RegisteredProject[]> {
 }
 
 async function localAdminRequest<Data>(path: string, init?: RequestInit): Promise<Data> {
-  const dataDirectory = process.env.LARK_TASKBOARD_DATA_DIR as string;
+  const dataDirectory = process.env.LARK_CODEX_DATA_DIR as string;
   const descriptorPath = resolve(dataDirectory, "run/runtime.json");
   await expect.poll(() => existsSync(descriptorPath)).toBe(true);
   const descriptor = JSON.parse(readFileSync(descriptorPath, "utf8")) as RuntimeDescriptor;
@@ -491,7 +491,7 @@ async function mutateGlobalLabel(
 }
 
 async function registerProject(prefix: string, displayName?: string): Promise<RegisteredProject> {
-  const dataDirectory = process.env.LARK_TASKBOARD_DATA_DIR as string;
+  const dataDirectory = process.env.LARK_CODEX_DATA_DIR as string;
   const codexProjectId = randomUUID();
   const name = displayName ?? `界面验收 ${uniqueProjectKey(prefix)}`;
   const rootPath = join(dataDirectory, `repository-${randomUUID()}`);
@@ -1475,7 +1475,7 @@ test("新增任务分支选项与本地 Worktree 实时同步并按分支去重"
   const project = await registerExecutableProject("BRANCHSYNC");
   const featureBranch = "feature/task-dialog-sync";
   const featureWorktree = join(
-    process.env.LARK_TASKBOARD_DATA_DIR as string,
+    process.env.LARK_CODEX_DATA_DIR as string,
     `worktree-${randomUUID()}`,
   );
   execFileSync("git", ["-C", project.rootPath, "branch", featureBranch]);
@@ -1936,7 +1936,7 @@ test("新增任务完整选项真实持久化且双客户端关系同步", async
   const project = await registerExecutableProject("CREATEFULL");
   const featureBranch = "feature/create-options";
   const featureWorktree = join(
-    process.env.LARK_TASKBOARD_DATA_DIR as string,
+    process.env.LARK_CODEX_DATA_DIR as string,
     `worktree-${randomUUID()}`,
   );
   execFileSync("git", ["-C", project.rootPath, "branch", featureBranch]);
@@ -2141,7 +2141,7 @@ test("已认证合成用户打开工作台后只提供中文项目视图", async
   page.on("pageerror", (error) => browserErrors.push(error.message));
 
   await page.addInitScript(() => {
-    window.localStorage.setItem("lark-taskboard:locale", "en");
+    window.localStorage.setItem("lark-codex:locale", "en");
   });
   await openWorkspace(page);
   await selectProject(page, project);
@@ -2183,7 +2183,7 @@ test("已认证合成用户打开工作台后只提供中文项目视图", async
   await expect(page.getByRole("button", { name: "English", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "中文", exact: true })).toHaveCount(0);
   await expect(
-    page.evaluate(() => window.localStorage.getItem("lark-taskboard:locale")),
+    page.evaluate(() => window.localStorage.getItem("lark-codex:locale")),
   ).resolves.toBeNull();
   await expect(page.getByRole("button", { name: "退出" })).toHaveCount(0);
   await expect(page.getByText("PROJECTS", { exact: true })).toHaveCount(0);
@@ -2435,7 +2435,7 @@ test("键盘筛选并选择临时项目后焦点返回项目触发器", async ({
 });
 
 test("长项目名在窄屏省略且右侧 Key 与目录保持两行可见", async ({ page }) => {
-  const project = await registerProject("LONGPROJECT", "lark-taskboard-responsive-interactions");
+  const project = await registerProject("LONGPROJECT", "lark-codex-responsive-interactions");
   await openWorkspace(page);
   await selectProject(page, project);
 
@@ -4822,10 +4822,7 @@ test("详情修复：相邻状态、活动实时更新、评论菜单和图片�
 test("详情静态显示真实负责人且不提供用户创建入口", async ({ page }) => {
   const project = await registerProject("OWNER");
   const descriptor = JSON.parse(
-    readFileSync(
-      resolve(process.env.LARK_TASKBOARD_DATA_DIR as string, "run/runtime.json"),
-      "utf8",
-    ),
+    readFileSync(resolve(process.env.LARK_CODEX_DATA_DIR as string, "run/runtime.json"), "utf8"),
   ) as RuntimeDescriptor;
   const removedBootstrap = await fetch(
     `${descriptor.localAdminBaseUrl}/api/v1/local/projects/${project.id}/members/bootstrap`,
@@ -5050,7 +5047,7 @@ test("详情分支在项目前显示，执行前自动保存、执行后无下�
     project.rootPath,
     "worktree",
     "add",
-    join(process.env.LARK_TASKBOARD_DATA_DIR as string, `branch-property-${randomUUID()}`),
+    join(process.env.LARK_CODEX_DATA_DIR as string, `branch-property-${randomUUID()}`),
     branch,
   ]);
   await localAdminRequest(`/api/v1/local/projects/${project.id}/contexts/scan`, {

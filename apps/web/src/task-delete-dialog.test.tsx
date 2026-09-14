@@ -1,4 +1,4 @@
-import type { TaskView } from "@lark-taskboard/contracts";
+import type { TaskView } from "@lark-codex/contracts";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";

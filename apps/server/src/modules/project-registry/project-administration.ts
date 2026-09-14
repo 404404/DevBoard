@@ -6,7 +6,7 @@ import {
   type CreateProjectCommand,
   type LocalProjectView,
   type UpdateProjectCommand,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import { z } from "zod";
 
 import { AppError } from "../../app-error.js";

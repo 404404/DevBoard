@@ -157,7 +157,7 @@ test("file reads reflect changed frpc domain while preserving the editable inval
 });
 test("first launch creates credentials and token once without env files", (t) => {
   const f = fixture(t);
-  const token = desktopPaths(f.dir).LARK_TASKBOARD_CODEX_TOKEN_FILE;
+  const token = desktopPaths(f.dir).LARK_CODEX_CODEX_TOKEN_FILE;
   const before = readFileSync(token, "utf8");
   initializeDeployment(f.dir);
   assert.equal(readFileSync(token, "utf8"), before);
@@ -184,10 +184,21 @@ test("migrates legacy credentials once before removing old files", (t) => {
   assert.equal(existsSync(oldProd), false);
   assert.equal(existsSync(oldSecret), false);
 });
+test("conflicting renamed credential keys preserve the complete legacy configuration", (t) => {
+  const f = fixture(t);
+  const oldProd = join(f.dir, "production.env");
+  const body = "LARK_CODEX_FEISHU_APP_ID=cli_new\nLARK_TASKBOARD_FEISHU_APP_ID=cli_old\n";
+  writeFileSync(oldProd, body);
+  const before = readFileSync(f.credentials);
+  assert.throws(() => initializeDeployment(f.dir), /不一致/);
+  assert.equal(readFileSync(oldProd, "utf8"), body);
+  assert.deepEqual(readFileSync(f.credentials), before);
+});
+
 test("malformed new credential file does not erase legacy data", (t) => {
   const f = fixture(t);
   const oldProd = join(f.dir, "production.env");
-  writeFileSync(oldProd, "LARK_TASKBOARD_FEISHU_APP_ID=cli_old\n");
+  writeFileSync(oldProd, "LARK_CODEX_FEISHU_APP_ID=cli_old\n");
   writeFileSync(f.credentials, "invalid secret-value");
   assert.throws(() => initializeDeployment(f.dir), /凭据/);
   assert.equal(existsSync(oldProd), true);
@@ -217,7 +228,7 @@ test("extra credential JSON fields are reported consistently with the backend", 
 test("an explicit save resolves conflicting legacy credentials without retaining old files", async (t) => {
   const f = fixture(t);
   const legacy = join(f.dir, "production.env");
-  writeFileSync(legacy, "LARK_TASKBOARD_FEISHU_APP_ID=cli_conflict\n");
+  writeFileSync(legacy, "LARK_CODEX_FEISHU_APP_ID=cli_conflict\n");
   assert.throws(() => initializeDeployment(f.dir), /不一致/);
   await saveDeploymentConfiguration(
     f.dir,

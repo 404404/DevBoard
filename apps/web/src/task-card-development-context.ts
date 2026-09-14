@@ -1,4 +1,4 @@
-import type { TaskView, ProjectTaskCreationOptionsView } from "@lark-taskboard/contracts";
+import type { TaskView, ProjectTaskCreationOptionsView } from "@lark-codex/contracts";
 
 export function taskCardDevelopmentContext(
   task: Pick<TaskView, "developmentContextId">,

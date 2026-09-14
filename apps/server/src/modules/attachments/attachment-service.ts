@@ -1,4 +1,4 @@
-import { identityKey, identityFromKey, IdentityKeySchema } from "@lark-taskboard/contracts";
+import { identityKey, identityFromKey, IdentityKeySchema } from "@lark-codex/contracts";
 import { createHash, randomUUID } from "node:crypto";
 
 import {
@@ -8,7 +8,7 @@ import {
   type AttachmentView,
   type TaskView,
   type WorkspaceMutationResult,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import { z } from "zod";
 
 import { AppError } from "../../app-error.js";

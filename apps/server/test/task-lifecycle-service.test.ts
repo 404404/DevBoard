@@ -1,4 +1,4 @@
-import { identityKey } from "@lark-taskboard/contracts";
+import { identityKey } from "@lark-codex/contracts";
 import { seedFeishuTestActor, TEST_FEISHU_ACTOR } from "./helpers/identity.js";
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
@@ -9,7 +9,7 @@ import {
   CreateTaskCommandSchema,
   CreateCommentCommandSchema,
   type PrincipalView,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import { afterEach, expect, it, vi } from "vitest";
 import { initializeDatabase, type SqliteDatabase } from "../src/modules/database/index.js";
 import {

@@ -4,14 +4,21 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-const webPort = Number.parseInt(process.env.LARK_TASKBOARD_WEB_PORT ?? "5173", 10);
-const apiProxyTarget = process.env.LARK_TASKBOARD_WEB_API_TARGET ?? "http://127.0.0.1:47823";
+// Existing development launch profiles can keep their old variable names.
+const webPort = Number.parseInt(
+  process.env.LARK_CODEX_WEB_PORT ?? process.env.LARK_TASKBOARD_WEB_PORT ?? "5173",
+  10,
+);
+const apiProxyTarget =
+  process.env.LARK_CODEX_WEB_API_TARGET ??
+  process.env.LARK_TASKBOARD_WEB_API_TARGET ??
+  "http://127.0.0.1:47823";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      "@lark-taskboard/contracts": fileURLToPath(
+      "@lark-codex/contracts": fileURLToPath(
         new URL("../../packages/contracts/src/index.ts", import.meta.url),
       ),
     },

@@ -1,4 +1,4 @@
-import type { InteractionDecision } from "@lark-taskboard/contracts";
+import type { InteractionDecision } from "@lark-codex/contracts";
 import { randomUUID } from "node:crypto";
 import { isAbsolute, join } from "node:path";
 import { z } from "zod";
@@ -165,7 +165,7 @@ export class AppServerCodexExecutor implements CodexExecutor, CodexThreadProvisi
     const root = this.#temporaryProjectRoot;
     if (!root || !isAbsolute(root)) {
       throw new Error(
-        "临时项目根目录不可用，请配置 LARK_TASKBOARD_TEMPORARY_PROJECT_ROOT 为宿主机绝对路径",
+        "临时项目根目录不可用，请配置 LARK_CODEX_TEMPORARY_PROJECT_ROOT 为宿主机绝对路径",
       );
     }
     // Use the same host root for workspace creation and the project header.

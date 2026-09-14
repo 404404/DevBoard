@@ -1,4 +1,4 @@
-import type { TaskView } from "@lark-taskboard/contracts";
+import type { TaskView } from "@lark-codex/contracts";
 import { describe, expect, it } from "vitest";
 
 import {

@@ -4,7 +4,7 @@ export const ComponentHealthSchema = z.enum(["ok", "degraded", "unavailable"]);
 
 export const HealthResponseSchema = z.object({
   status: z.enum(["ok", "degraded"]),
-  service: z.literal("lark-taskboard-server"),
+  service: z.enum(["lark-codex-server", "lark-taskboard-server"]),
   version: z.string().min(1),
   timestamp: z.string().datetime(),
   checks: z.object({

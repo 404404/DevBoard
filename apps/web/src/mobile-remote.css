@@ -1724,9 +1724,6 @@
   background: transparent;
 }
 
-.remote-new-footer > .remote-upload-status {
-  margin: 8px 20px 0;
-}
 .remote-new-footer {
   width: 100%;
   max-width: 760px;
@@ -1740,21 +1737,13 @@
 .remote-new-footer:has(.remote-rich-composer.is-expanded) .remote-new-options {
   padding-inline: 26px;
 }
-.remote-new-footer > .remote-upload-status {
-  margin-inline: 48px;
-  transition: margin-inline 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-.remote-new-footer:has(.remote-rich-composer.is-expanded) > .remote-upload-status {
-  margin-inline: 26px;
-}
 @media (prefers-reduced-motion: reduce) {
   .remote-thinking {
     background: none;
     -webkit-text-fill-color: currentColor;
   }
 
-  .remote-new-footer .remote-new-options,
-  .remote-new-footer > .remote-upload-status {
+  .remote-new-footer .remote-new-options {
     transition: none;
   }
 }

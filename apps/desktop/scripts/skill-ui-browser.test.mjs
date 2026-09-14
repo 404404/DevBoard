@@ -20,7 +20,7 @@ async function fixture(browser, state = {}) {
       installedVersion: null,
       offerDismissed: false,
       status: "notInstalled",
-      targetPath: "/Users/example/.agents/skills/manage-lark-taskboard",
+      targetPath: "/Users/example/.agents/skills/manage-lark-codex",
       fingerprint: "original",
       message: "",
       canInstall: true,

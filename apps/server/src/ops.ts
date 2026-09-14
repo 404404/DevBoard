@@ -5,7 +5,7 @@ import { readIdentityAudit } from "./modules/identity/index.js";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { BackupManifestSchema, RuntimeDescriptorSchema } from "@lark-taskboard/contracts";
+import { BackupManifestSchema, RuntimeDescriptorSchema } from "@lark-codex/contracts";
 import { z } from "zod";
 
 import { loadConfig } from "./config.js";
@@ -98,13 +98,13 @@ export async function runOperations(
     const config = loadConfig(environment);
     if (command === "restore") {
       if (!target) throw new Error("restore 缺少备份目录");
-      const result = await BackupService.restore(target, config.LARK_TASKBOARD_DATA_DIR);
+      const result = await BackupService.restore(target, config.LARK_CODEX_DATA_DIR);
       emit(output, { ok: true, command, ...result });
       return 0;
     }
 
     const requestedDestination = optionValue(arguments_, "--output");
-    const runtimePath = join(config.LARK_TASKBOARD_DATA_DIR, "run", "runtime.json");
+    const runtimePath = join(config.LARK_CODEX_DATA_DIR, "run", "runtime.json");
     if (existsSync(runtimePath)) {
       const runtimeStat = lstatSync(runtimePath);
       if (runtimeStat.isSymbolicLink() || !runtimeStat.isFile()) {
@@ -116,8 +116,8 @@ export async function runOperations(
       const adminUrl = new URL(runtime.localAdminBaseUrl);
       if (
         adminUrl.protocol !== "http:" ||
-        adminUrl.hostname !== config.LARK_TASKBOARD_ADMIN_HOST ||
-        Number(adminUrl.port || 80) !== config.LARK_TASKBOARD_ADMIN_PORT ||
+        adminUrl.hostname !== config.LARK_CODEX_ADMIN_HOST ||
+        Number(adminUrl.port || 80) !== config.LARK_CODEX_ADMIN_PORT ||
         adminUrl.username ||
         adminUrl.password ||
         adminUrl.href !== `${adminUrl.origin}/`
@@ -147,7 +147,7 @@ export async function runOperations(
             command,
             mode: "online",
             backupId: result.data.backupId,
-            directory: join(config.LARK_TASKBOARD_DATA_DIR, "backups", result.data.backupId),
+            directory: join(config.LARK_CODEX_DATA_DIR, "backups", result.data.backupId),
             schemaVersion: result.data.manifest.schemaVersion,
             attachmentCount: result.data.manifest.attachments.length,
           });
@@ -156,15 +156,15 @@ export async function runOperations(
       }
     }
 
-    const databasePath = join(config.LARK_TASKBOARD_DATA_DIR, "taskboard.sqlite");
+    const databasePath = join(config.LARK_CODEX_DATA_DIR, "taskboard.sqlite");
     if (!existsSync(databasePath)) throw new Error("数据库不存在，无法备份");
-    const dataLock = acquireDataDirectoryLock(config.LARK_TASKBOARD_DATA_DIR, "backup");
+    const dataLock = acquireDataDirectoryLock(config.LARK_CODEX_DATA_DIR, "backup");
     let database: ReturnType<typeof openDatabase> | undefined;
     try {
       database = openDatabase(databasePath);
       const service = new BackupService({
         database,
-        dataDirectory: config.LARK_TASKBOARD_DATA_DIR,
+        dataDirectory: config.LARK_CODEX_DATA_DIR,
       });
       const destination = requestedDestination ?? service.automaticDestination();
       const manifest = await service.create(destination);

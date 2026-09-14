@@ -18,7 +18,7 @@ import * as codexBridge from "./run-codex-app-server.mjs";
 const { buildCodexArguments, validateCodexBridgeOptions } = codexBridge;
 
 function fixture() {
-  const directory = mkdtempSync(join(tmpdir(), "lark-taskboard-codex-bridge-"));
+  const directory = mkdtempSync(join(tmpdir(), "lark-codex-codex-bridge-"));
   const codexPath = join(directory, "codex");
   const tokenFile = join(directory, "codex-token");
   const projectStateFile = join(directory, ".codex-global-state.json");

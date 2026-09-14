@@ -1,5 +1,5 @@
 ---
-name: manage-lark-taskboard
+name: manage-lark-codex
 description: 通过已安装的 Lark-Codex 应用查询和管理飞书任务看板、任务附件、Codex 执行及任务收尾；当用户要求操作该看板时使用，不用于一般项目开发或普通 Git 操作。
 ---
 
@@ -12,14 +12,14 @@ description: 通过已安装的 Lark-Codex 应用查询和管理飞书任务看�
 先从本次加载的 `SKILL.md` 路径定位同目录下的包装器，将 `TASKCTL` 设为它的实际绝对路径。下面的路径是占位符，替换后再执行；在项目原有工作目录调用，不要为了运行 CLI 切换到技能目录。
 
 ```sh
-TASKCTL="/实际安装目录/manage-lark-taskboard/scripts/taskctl.sh"
+TASKCTL="/实际安装目录/manage-lark-codex/scripts/taskctl.sh"
 "$TASKCTL" --help
 "$TASKCTL" health
 "$TASKCTL" context
 "$TASKCTL" project list
 ```
 
-包装器依次寻找 `/Applications/Lark-Codex.app`、`~/Applications/Lark-Codex.app`，只调用所选应用内的 Node 和 taskctl。自定义安装位置可通过 `LARK_CODEX_APP_PATH` 指定；显式路径无效就报错，不回退到其他应用。默认数据目录是 `~/Library/Application Support/Lark Codex Taskboard/data`，显式 `LARK_TASKBOARD_DATA_DIR` 覆盖该目录。两个覆盖变量均不接受空值。
+包装器依次寻找 `/Applications/Lark-Codex.app`、`~/Applications/Lark-Codex.app`，只调用所选应用内的 Node 和 taskctl。自定义安装位置可通过 `LARK_CODEX_APP_PATH` 指定；显式路径无效就报错，不回退到其他应用。默认数据目录是 `~/Library/Application Support/Lark-Codex/data`，显式 `LARK_CODEX_DATA_DIR` 覆盖该目录；仅未设置新变量时兼容旧版数据目录覆盖。覆盖变量不接受空值。旧版数据迁移由应用启动时处理，包装器不移动数据。
 
 ```sh
 LARK_CODEX_APP_PATH="/实际位置/Lark-Codex.app" "$TASKCTL" --help

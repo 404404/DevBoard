@@ -1,9 +1,9 @@
-import { identityKey } from "@lark-taskboard/contracts";
+import { identityKey } from "@lark-codex/contracts";
 import {
   CreateGitResourceCommandSchema,
   DeleteGitResourceCommandSchema,
   EntityIdSchema,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { AppError } from "../../app-error.js";
@@ -22,7 +22,7 @@ export function registerGitManagementRoutes(
   },
 ) {
   function authorize(request: FastifyRequest, mutation = false) {
-    const names = sessionCookieNames(options.config);
+    const names = sessionCookieNames(options.config, request.cookies);
     const session = options.identityService.authenticate(request.cookies[names.session]);
     options.identityService.assertBoardAccess(session.actor);
     if (mutation) {

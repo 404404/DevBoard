@@ -13,7 +13,7 @@ import type {
   RemoteThread,
   RemoteThreadSummary,
   SessionView,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import { BoardPage } from "./board";
 import { listProjects } from "./api";
 import {
@@ -712,9 +712,6 @@ function NewRemoteTask({
           placeholder="有什么需要帮忙？"
           onSubmit={() => create.mutate()}
         />
-        <RemoteNotice className="remote-upload-status" role="status">
-          创建后可在对话中发送
-        </RemoteNotice>
       </footer>
     </section>
   );

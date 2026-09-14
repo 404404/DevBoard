@@ -1,4 +1,4 @@
-import type { TaskPriority, TaskStatus, TaskView } from "@lark-taskboard/contracts";
+import type { TaskPriority, TaskStatus, TaskView } from "@lark-codex/contracts";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useReducer, useRef } from "react";
 

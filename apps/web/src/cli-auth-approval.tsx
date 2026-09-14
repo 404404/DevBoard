@@ -1,5 +1,5 @@
 import { userErrorMessage } from "./user-error";
-import type { SessionView } from "@lark-taskboard/contracts";
+import type { SessionView } from "@lark-codex/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { approveCliRequest, readCliRequest } from "./cli-auth-api";
 

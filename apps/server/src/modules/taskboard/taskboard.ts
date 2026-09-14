@@ -5,7 +5,7 @@ import {
   IdentityKeySchema,
   FeishuIdentityRefSchema,
   type FeishuIdentityRef,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import { createHash, randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
@@ -36,7 +36,7 @@ import {
   type TaskStatus,
   type TaskView,
   type UpdateTaskCommand,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import { z } from "zod";
 
 import { AppError } from "../../app-error.js";

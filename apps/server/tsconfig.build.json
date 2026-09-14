@@ -9,7 +9,7 @@
     "outDir": "dist",
     "types": ["node"],
     "paths": {
-      "@lark-taskboard/contracts": ["./../../packages/contracts/dist/index.d.ts"]
+      "@lark-codex/contracts": ["./../../packages/contracts/dist/index.d.ts"]
     }
   },
   "include": ["src/**/*.ts"],

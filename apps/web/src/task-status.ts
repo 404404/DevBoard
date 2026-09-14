@@ -1,4 +1,4 @@
-import type { TaskStatus, TaskView } from "@lark-taskboard/contracts";
+import type { TaskStatus, TaskView } from "@lark-codex/contracts";
 
 export const TASK_STATUS_ORDER = [
   "backlog",

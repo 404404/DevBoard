@@ -15,22 +15,22 @@ import {
 
 try {
   const config = loadConfig();
-  const dataLock = acquireDataDirectoryLock(config.LARK_TASKBOARD_DATA_DIR, "migration");
+  const dataLock = acquireDataDirectoryLock(config.LARK_CODEX_DATA_DIR, "migration");
   let database: ReturnType<typeof openDatabase> | undefined;
 
   try {
-    recoverInterruptedRestore(config.LARK_TASKBOARD_DATA_DIR);
-    database = openDatabase(join(config.LARK_TASKBOARD_DATA_DIR, "taskboard.sqlite"));
+    recoverInterruptedRestore(config.LARK_CODEX_DATA_DIR);
+    database = openDatabase(join(config.LARK_CODEX_DATA_DIR, "taskboard.sqlite"));
     const result = await runMigrationsWithBackup(
       database,
       identityMigrations(
         await resolveLegacyIdentities(database, {
-          appId: config.LARK_TASKBOARD_FEISHU_APP_ID,
-          appSecret: config.LARK_TASKBOARD_FEISHU_APP_SECRET,
-          apiBaseUrl: config.LARK_TASKBOARD_FEISHU_API_BASE_URL,
+          appId: config.LARK_CODEX_FEISHU_APP_ID,
+          appSecret: config.LARK_CODEX_FEISHU_APP_SECRET,
+          apiBaseUrl: config.LARK_CODEX_FEISHU_API_BASE_URL,
         }),
       ),
-      new BackupService({ database, dataDirectory: config.LARK_TASKBOARD_DATA_DIR }),
+      new BackupService({ database, dataDirectory: config.LARK_CODEX_DATA_DIR }),
     );
     process.stdout.write(`${JSON.stringify({ ok: true, ...result })}\n`);
   } finally {

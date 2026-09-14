@@ -11,10 +11,9 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { initializeDatabase, type SqliteDatabase } from "../src/modules/database/index.js";
 import {
@@ -34,7 +33,7 @@ afterEach(() => {
 });
 
 function temporaryDirectory(): string {
-  const directory = mkdtempSync(join("/private/tmp", "lark-taskboard-backup-"));
+  const directory = mkdtempSync(join("/private/tmp", "lark-codex-backup-"));
   temporaryDirectories.push(directory);
   return directory;
 }
@@ -574,9 +573,8 @@ describe("BackupService", () => {
     const backupDirectory = join(dataDirectory, "backups", "corrupt");
     await new BackupService({ database, dataDirectory }).create(backupDirectory);
     database.close();
-    const temporaryBefore = readdirSync(tmpdir()).filter((name) =>
-      name.startsWith("lark-taskboard-verify-"),
-    );
+    const inspectionRoot = join(dataDirectory, "inspection");
+    mkdirSync(inspectionRoot);
     const backupDatabase = join(backupDirectory, "taskboard.sqlite");
     writeFileSync(backupDatabase, "not a sqlite database");
     const manifestPath = join(backupDirectory, "manifest.json");
@@ -585,9 +583,14 @@ describe("BackupService", () => {
     manifest.database.sha256 = createHash("sha256").update("not a sqlite database").digest("hex");
     writeFileSync(manifestPath, JSON.stringify(manifest));
 
-    expect(() => BackupService.verify(backupDirectory)).toThrow();
-    expect(
-      readdirSync(tmpdir()).filter((name) => name.startsWith("lark-taskboard-verify-")),
-    ).toEqual(temporaryBefore);
+    // Other test workers also validate backups. Isolate this synchronous call
+    // instead of comparing a shared tmp directory that those workers may clean.
+    vi.stubEnv("TMPDIR", inspectionRoot);
+    try {
+      expect(() => BackupService.verify(backupDirectory)).toThrow(/file is not a database/);
+      expect(readdirSync(inspectionRoot)).toEqual([]);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

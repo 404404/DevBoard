@@ -37,11 +37,8 @@ const webSocketServer = stdio ? new EventEmitter() : new WebSocketServer({ serve
 const turns = new Map();
 const archiveConflicts = new Set();
 const archiveConflictPath = (threadId) =>
-  process.env.LARK_TASKBOARD_DATA_DIR
-    ? join(
-        process.env.LARK_TASKBOARD_DATA_DIR,
-        `fake-archive-conflict-${encodeURIComponent(threadId)}`,
-      )
+  process.env.LARK_CODEX_DATA_DIR
+    ? join(process.env.LARK_CODEX_DATA_DIR, `fake-archive-conflict-${encodeURIComponent(threadId)}`)
     : null;
 let primaryThreadId;
 

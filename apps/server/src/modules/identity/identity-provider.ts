@@ -1,4 +1,4 @@
-import type { IdentityRef } from "@lark-taskboard/contracts";
+import type { IdentityRef } from "@lark-codex/contracts";
 
 export interface ExternalIdentity {
   readonly identity: IdentityRef;

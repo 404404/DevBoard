@@ -4,7 +4,7 @@ import {
   type ProjectView,
   type SessionView,
   type TaskView,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -64,7 +64,7 @@ describe("Codex 项目同步界面规则", () => {
   it("固定把全部项目、临时项目排在 Codex 项目前面", () => {
     const codex = project({
       id: "10000000-0000-4000-8000-000000000001",
-      name: "Lark Taskboard",
+      name: "Lark-Codex",
       kind: "codex",
     });
     const temporary = project({ id: TEMPORARY_PROJECT_ID, name: "临时项目", kind: "temporary" });

@@ -4,7 +4,7 @@ import {
   InteractionDecisionSchema,
   SubmitExecutionCommandSchema,
   TEMPORARY_PROJECT_ID,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { isAbsolute } from "node:path";
 import { z } from "zod";
@@ -32,7 +32,7 @@ interface ExecutionRoutesOptions {
 }
 
 function session(request: FastifyRequest, config: AppConfig, identityService: IdentityService) {
-  const names = sessionCookieNames(config);
+  const names = sessionCookieNames(config, request.cookies);
   return identityService.authenticate(request.cookies[names.session]);
 }
 
@@ -41,7 +41,7 @@ function mutationContext(
   config: AppConfig,
   identityService: IdentityService,
 ): JobRequestContext {
-  const names = sessionCookieNames(config);
+  const names = sessionCookieNames(config, request.cookies);
   const current = identityService.authenticate(request.cookies[names.session]);
   const csrfHeader = request.headers["x-csrf-token"];
   identityService.assertCsrf(

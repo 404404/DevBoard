@@ -5,7 +5,7 @@ import {
   type ProjectView,
   type SessionView,
   type TaskView,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 
 export function orderProjectViews(projects: readonly ProjectView[]): ProjectView[] {
   const rank = (project: ProjectView) =>

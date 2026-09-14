@@ -19,7 +19,7 @@ afterEach(() => {
 
 describe("ProjectSnapshotWatcher", () => {
   it("coalesces refreshes, keeps valid state on errors and closes its resources", async () => {
-    const directory = mkdtempSync(join(tmpdir(), "lark-taskboard-project-watcher-"));
+    const directory = mkdtempSync(join(tmpdir(), "lark-codex-project-watcher-"));
     temporaryDirectories.push(directory);
     const snapshotFile = join(directory, "codex-projects.json");
     const database = initializeDatabase(":memory:");

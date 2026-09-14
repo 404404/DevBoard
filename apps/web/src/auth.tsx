@@ -1,5 +1,5 @@
 import { QueryNotice } from "./query-notice";
-import type { SessionView } from "@lark-taskboard/contracts";
+import type { SessionView } from "@lark-codex/contracts";
 import { useQuery } from "@tanstack/react-query";
 import { LoaderCircle } from "./icons";
 import type { ReactNode } from "react";

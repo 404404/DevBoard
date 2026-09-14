@@ -19,7 +19,7 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { createSkillManager } from "./skill-manager.mjs";
 
-const NAME = "manage-lark-taskboard";
+const NAME = "manage-lark-codex";
 const digest = (value) => createHash("sha256").update(value).digest("hex");
 function write(path, value, mode = 0o644) {
   mkdirSync(dirname(path), { recursive: true });
@@ -33,7 +33,7 @@ function fixture(t, overrides = {}) {
   const home = join(directory, "home");
   mkdirSync(home);
   const runtimeRoot = join(directory, "runtime");
-  const appData = join(home, "Library/Application Support/Lark Codex Taskboard");
+  const appData = join(home, "Library/Application Support/Lark-Codex");
   const target = join(home, ".agents/skills", NAME);
   const source = join(runtimeRoot, "skills", NAME);
   const stateFile = join(appData, "skill-install-state.json");
@@ -107,7 +107,7 @@ function fixture(t, overrides = {}) {
     staging: () =>
       existsSync(dirname(target))
         ? readdirSync(dirname(target)).filter((name) =>
-            name.startsWith(".manage-lark-taskboard.install-"),
+            name.startsWith(".manage-lark-codex.install-"),
           )
         : [],
   };
@@ -302,6 +302,45 @@ test("target changes immediately before commit reject the stale confirmation", a
   assert.equal(f.commits(), 0);
   assert.equal(readFileSync(join(f.target, "SKILL.md"), "utf8"), "concurrent edit");
   assert.deepEqual(f.staging(), []);
+});
+
+test("pre-rename Skill directories remain untouched and block duplicate installation", async (t) => {
+  for (const location of ["agents", "codex", "custom"]) {
+    const f = fixture(t);
+    const root =
+      location === "agents"
+        ? join(f.home, ".agents")
+        : location === "codex"
+          ? join(f.home, ".codex")
+          : join(f.directory, "custom-codex");
+    const old = join(root, "skills/manage-lark-taskboard");
+    write(join(old, "SKILL.md"), "personal pre-rename skill");
+    const manager = f.managerWith({ codexHome: location === "custom" ? root : undefined });
+    assert.equal(manager.status().status, "managed");
+    assert.equal((await manager.install({ replaceModified: true })).status, "error");
+    assert.equal(readFileSync(join(old, "SKILL.md"), "utf8"), "personal pre-rename skill");
+    assert.equal(existsSync(f.target), false);
+  }
+});
+
+test("a legacy receipt owner at the renamed target remains protected as modified", async (t) => {
+  const f = fixture(t);
+  await f.manager.install();
+  const receiptFile = join(f.target, ".lark-codex-skill.json");
+  const receipt = JSON.parse(readFileSync(receiptFile));
+  receipt.owner = "cn.rocyan.taskboard.desktop";
+  const bytes = JSON.stringify(receipt) + "\n";
+  write(receiptFile, bytes);
+  const state = JSON.parse(readFileSync(f.stateFile));
+  state.installed.receiptSha256 = digest(bytes);
+  write(f.stateFile, JSON.stringify(state), 0o600);
+  const before = f.manager.status();
+  assert.equal(before.status, "modified");
+  assert.equal(
+    (await f.manager.install({ expectedFingerprint: before.fingerprint })).status,
+    "error",
+  );
+  assert.equal(readFileSync(receiptFile, "utf8"), bytes);
 });
 
 test("failed native commit preserves old content and removes only this operation staging", async (t) => {

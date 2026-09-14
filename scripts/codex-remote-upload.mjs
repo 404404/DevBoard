@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile, lstat } from "node:fs/promises";
 import { join } from "node:path";
 
-import { REMOTE_UPLOAD_MAX_BYTES } from "@lark-taskboard/contracts";
+import { REMOTE_UPLOAD_MAX_BYTES } from "@lark-codex/contracts";
 const maxBytes = REMOTE_UPLOAD_MAX_BYTES;
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 const validName = (name) =>

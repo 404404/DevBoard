@@ -1,4 +1,4 @@
-import type { ProjectView } from "@lark-taskboard/contracts";
+import type { ProjectView } from "@lark-codex/contracts";
 import { useEffect, useRef, useState } from "react";
 
 import { SfSymbol } from "./sf-symbol";

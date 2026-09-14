@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { chmodSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-const skillName = "manage-lark-taskboard";
+const skillName = "manage-lark-codex";
 const bundledFiles = [
   ["SKILL.md", 0o644],
   ["scripts/taskctl.sh", 0o755],
@@ -23,7 +23,7 @@ export function copyBundledSkill(project, runtime, version) {
     const stat = lstatSync(file);
     if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`Skill 文件无效：${path}`);
     const contents = readFileSync(file);
-    if (path === "SKILL.md" && !/^name: manage-lark-taskboard\s*$/m.test(contents.toString()))
+    if (path === "SKILL.md" && !/^name: manage-lark-codex\s*$/m.test(contents.toString()))
       throw new Error("Skill 名称与安装目录不一致");
     const destination = join(target, path);
     mkdirSync(dirname(destination), { recursive: true });

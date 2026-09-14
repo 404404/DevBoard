@@ -16,7 +16,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const skill = fileURLToPath(new URL("../../../skills/manage-lark-taskboard/", import.meta.url));
+const skill = fileURLToPath(new URL("../../../skills/manage-lark-codex/", import.meta.url));
 const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
 
 function fixture(t) {
@@ -42,7 +42,7 @@ function fixture(t) {
     writeFileSync(node, `#!/bin/sh\nexec ${quote(process.execPath)} "$@"\n`, { mode: 0o755 });
     writeFileSync(
       cli,
-      `console.log(JSON.stringify({app:${JSON.stringify(name)},args:process.argv.slice(2),cwd:process.cwd(),data:process.env.LARK_TASKBOARD_DATA_DIR}));process.exit(${exitCode});\n`,
+      `console.log(JSON.stringify({app:${JSON.stringify(name)},args:process.argv.slice(2),cwd:process.cwd(),data:process.env.LARK_CODEX_DATA_DIR,legacyData:process.env.LARK_TASKBOARD_DATA_DIR}));process.exit(${exitCode});\n`,
     );
     return path;
   }
@@ -88,7 +88,7 @@ test("copied Skill runs bundled taskctl without source, global Node, or cwd chan
     app: "fixture",
     args,
     cwd: f.cwd,
-    data: join(f.userHome, "Library/Application Support/Lark Codex Taskboard/data"),
+    data: join(f.userHome, "Library/Application Support/Lark-Codex/data"),
   });
   assert.equal(existsSync(marker), false);
   assert.equal(existsSync(join(f.installed, "packages")), false);
@@ -101,10 +101,31 @@ test("explicit data directory is preserved, including caller-relative paths", (t
   for (const data of [join(f.root, "custom data"), "relative-data"])
     assert.equal(
       JSON.parse(
-        f.run({ LARK_CODEX_APP_PATH: appPath, LARK_TASKBOARD_DATA_DIR: data }, ["context"]).stdout,
+        f.run({ LARK_CODEX_APP_PATH: appPath, LARK_CODEX_DATA_DIR: data }, ["context"]).stdout,
       ).data,
       data,
     );
+});
+
+test("renamed data variable takes priority while legacy-only callers retain their source", (t) => {
+  const f = fixture(t);
+  const appPath = f.app(join(f.root, "explicit.app"));
+  const both = f.run({
+    LARK_CODEX_APP_PATH: appPath,
+    LARK_CODEX_DATA_DIR: "new-data",
+    LARK_TASKBOARD_DATA_DIR: "old-data",
+  });
+  assert.equal(both.status, 0, both.stderr);
+  assert.equal(JSON.parse(both.stdout).data, "new-data");
+  const old = f.run({ LARK_CODEX_APP_PATH: appPath, LARK_TASKBOARD_DATA_DIR: "old-data" });
+  assert.equal(old.status, 0, old.stderr);
+  assert.equal(JSON.parse(old.stdout).data, undefined);
+  assert.equal(JSON.parse(old.stdout).legacyData, "old-data");
+  for (const vars of [
+    { LARK_CODEX_DATA_DIR: "", LARK_TASKBOARD_DATA_DIR: "old-data" },
+    { LARK_TASKBOARD_DATA_DIR: "" },
+  ])
+    assert.notEqual(f.run({ LARK_CODEX_APP_PATH: appPath, ...vars }).status, 0);
 });
 
 test("automatic discovery prefers a complete system app then falls back to the user's Applications", (t) => {
@@ -143,7 +164,7 @@ test("empty explicit overrides are rejected rather than silently targeting a dif
   const appPath = f.app(join(f.root, "valid.app"));
   for (const env of [
     { LARK_CODEX_APP_PATH: "" },
-    { LARK_CODEX_APP_PATH: appPath, LARK_TASKBOARD_DATA_DIR: "" },
+    { LARK_CODEX_APP_PATH: appPath, LARK_CODEX_DATA_DIR: "" },
   ]) {
     const result = f.run(env, ["--help"]);
     assert.equal(result.status, 2);

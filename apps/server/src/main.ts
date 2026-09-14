@@ -47,7 +47,7 @@ interface RunningServers {
 
 async function startServer(): Promise<RunningServers> {
   const config = loadConfig();
-  const dataLock = acquireDataDirectoryLock(config.LARK_TASKBOARD_DATA_DIR, "server");
+  const dataLock = acquireDataDirectoryLock(config.LARK_CODEX_DATA_DIR, "server");
   let database: ReturnType<typeof openDatabase> | undefined;
   let codexSupervisor: CodexAppServerSupervisor | undefined;
   let codexClient: CodexJsonRpcClient | undefined;
@@ -60,49 +60,49 @@ async function startServer(): Promise<RunningServers> {
   let localAdminApp: FastifyInstance | undefined;
   let runtimeDescriptor: RuntimeDescriptorHandle | undefined;
   try {
-    recoverInterruptedRestore(config.LARK_TASKBOARD_DATA_DIR);
-    database = openDatabase(join(config.LARK_TASKBOARD_DATA_DIR, "taskboard.sqlite"));
+    recoverInterruptedRestore(config.LARK_CODEX_DATA_DIR);
+    database = openDatabase(join(config.LARK_CODEX_DATA_DIR, "taskboard.sqlite"));
     await runMigrationsWithBackup(
       database,
       identityMigrations(
         await resolveLegacyIdentities(database, {
-          appId: config.LARK_TASKBOARD_FEISHU_APP_ID,
-          appSecret: config.LARK_TASKBOARD_FEISHU_APP_SECRET,
-          apiBaseUrl: config.LARK_TASKBOARD_FEISHU_API_BASE_URL,
+          appId: config.LARK_CODEX_FEISHU_APP_ID,
+          appSecret: config.LARK_CODEX_FEISHU_APP_SECRET,
+          apiBaseUrl: config.LARK_CODEX_FEISHU_API_BASE_URL,
         }),
       ),
-      new BackupService({ database, dataDirectory: config.LARK_TASKBOARD_DATA_DIR }),
+      new BackupService({ database, dataDirectory: config.LARK_CODEX_DATA_DIR }),
     );
-    const codexSocketPath = join(config.LARK_TASKBOARD_DATA_DIR, "codex-app-server.sock");
-    if (config.LARK_TASKBOARD_CODEX_TRANSPORT === "managed-unix") {
+    const codexSocketPath = join(config.LARK_CODEX_DATA_DIR, "codex-app-server.sock");
+    if (config.LARK_CODEX_CODEX_TRANSPORT === "managed-unix") {
       codexSupervisor = new CodexAppServerSupervisor({
         socketPath: codexSocketPath,
-        codexCommand: config.LARK_TASKBOARD_CODEX_COMMAND,
+        codexCommand: config.LARK_CODEX_CODEX_COMMAND,
       });
       await codexSupervisor.start();
     }
-    if (config.LARK_TASKBOARD_CODEX_TRANSPORT === "embedded") {
+    if (config.LARK_CODEX_CODEX_TRANSPORT === "embedded") {
       embeddedBridge = await startEmbeddedCodexBridge(config);
     }
     codexClient = new CodexJsonRpcClient({
       transport:
-        config.LARK_TASKBOARD_CODEX_TRANSPORT !== "managed-unix"
+        config.LARK_CODEX_CODEX_TRANSPORT !== "managed-unix"
           ? new TcpWebSocketTransport({
-              endpoint: config.LARK_TASKBOARD_CODEX_ENDPOINT,
-              tokenFile: config.LARK_TASKBOARD_CODEX_TOKEN_FILE as string,
+              endpoint: config.LARK_CODEX_CODEX_ENDPOINT,
+              tokenFile: config.LARK_CODEX_CODEX_TOKEN_FILE as string,
             })
           : new UnixWebSocketTransport({ socketPath: codexSocketPath }),
     });
     const codexExecutor = new AppServerCodexExecutor(
       codexClient,
-      config.LARK_TASKBOARD_TEMPORARY_PROJECT_ROOT,
+      config.LARK_CODEX_TEMPORARY_PROJECT_ROOT,
     );
     const capabilityToken = createRuntimeCapability();
     publicApp = createApp({
       config,
       database,
       logger: true,
-      logLevel: config.LARK_TASKBOARD_LOG_LEVEL,
+      logLevel: config.LARK_CODEX_LOG_LEVEL,
       closeDatabaseOnClose: false,
       codexExecutor,
       remoteClient: codexClient,
@@ -124,19 +124,19 @@ async function startServer(): Promise<RunningServers> {
       database,
       capabilityToken,
       logger: true,
-      logLevel: config.LARK_TASKBOARD_LOG_LEVEL,
+      logLevel: config.LARK_CODEX_LOG_LEVEL,
       scheduleExecution: control.scheduleExecution,
       onRevisionCommitted: control.notifyRevisionCommitted,
       services: control.services,
-      backupRunner: new BackgroundBackupRunner(config.LARK_TASKBOARD_DATA_DIR),
+      backupRunner: new BackgroundBackupRunner(config.LARK_CODEX_DATA_DIR),
     });
     await publicApp.listen({
-      host: config.LARK_TASKBOARD_HOST,
-      port: config.LARK_TASKBOARD_PORT,
+      host: config.LARK_CODEX_HOST,
+      port: config.LARK_CODEX_PORT,
     });
     await localAdminApp.listen({
-      host: config.LARK_TASKBOARD_ADMIN_HOST,
-      port: config.LARK_TASKBOARD_ADMIN_PORT,
+      host: config.LARK_CODEX_ADMIN_HOST,
+      port: config.LARK_CODEX_ADMIN_PORT,
     });
     runtimeDescriptor = publishRuntimeDescriptor(config, capabilityToken);
     let shutdownPromise: Promise<void> | undefined;
@@ -166,8 +166,8 @@ async function startServer(): Promise<RunningServers> {
     process.once("SIGTERM", () => void shutdown("SIGTERM"));
     publicApp.log.info(
       {
-        publicAddress: `${config.LARK_TASKBOARD_HOST}:${config.LARK_TASKBOARD_PORT}`,
-        localAdminAddress: `${config.LARK_TASKBOARD_ADMIN_HOST}:${config.LARK_TASKBOARD_ADMIN_PORT}`,
+        publicAddress: `${config.LARK_CODEX_HOST}:${config.LARK_CODEX_PORT}`,
+        localAdminAddress: `${config.LARK_CODEX_ADMIN_HOST}:${config.LARK_CODEX_ADMIN_PORT}`,
         runtimeDescriptor: runtimeDescriptor.path,
       },
       "Public and local admin listeners are ready",

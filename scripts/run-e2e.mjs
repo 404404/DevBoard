@@ -4,10 +4,17 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-const dataDirectory = mkdtempSync(join(tmpdir(), "lark-taskboard-e2e-"));
+const dataDirectory = mkdtempSync(join(tmpdir(), "lark-codex-e2e-"));
 const temporaryProjectRoot = join(dataDirectory, "temporary-project-root");
 mkdirSync(temporaryProjectRoot);
 const fakeCodexCommand = resolve("scripts/fake-codex-app-server.mjs");
+// Both naming generations may be configured in a developer's shell. Keep
+// deployment endpoints, credentials and directories out of synthetic tests.
+const testEnvironment = Object.fromEntries(
+  Object.entries(process.env).filter(
+    ([key]) => !key.startsWith("LARK_CODEX_") && !key.startsWith("LARK_TASKBOARD_"),
+  ),
+);
 
 async function allocateLoopbackPorts(count) {
   const reservations = [];
@@ -41,7 +48,11 @@ const [publicPort, adminPort, webPort] = await allocateLoopbackPorts(3);
 
 const fakeCodexHome = join(dataDirectory, "codex-home");
 const desktop = fork(resolve("scripts/fake-codex-desktop.mjs"), [], {
-  env: { ...process.env, FAKE_CODEX_HOME: fakeCodexHome, FAKE_CODEX_INTERRUPT_DELAY_MS: "1500" },
+  env: {
+    ...testEnvironment,
+    FAKE_CODEX_HOME: fakeCodexHome,
+    FAKE_CODEX_INTERRUPT_DELAY_MS: "1500",
+  },
   stdio: ["ignore", "inherit", "inherit", "ipc"],
 });
 try {
@@ -56,18 +67,23 @@ try {
     {
       stdio: "inherit",
       env: {
-        ...process.env,
+        ...testEnvironment,
         FAKE_CODEX_HOME: fakeCodexHome,
-        LARK_TASKBOARD_DATA_DIR: dataDirectory,
-        LARK_TASKBOARD_TEMPORARY_PROJECT_ROOT: temporaryProjectRoot,
-        LARK_TASKBOARD_WORKSPACE_ROOTS: dataDirectory,
-        LARK_TASKBOARD_CODEX_COMMAND: fakeCodexCommand,
-        LARK_TASKBOARD_PORT: String(publicPort),
-        LARK_TASKBOARD_ADMIN_PORT: String(adminPort),
-        LARK_TASKBOARD_ALLOWED_HOSTS: `127.0.0.1:${publicPort},localhost:${publicPort}`,
-        LARK_TASKBOARD_ORIGIN: `http://127.0.0.1:${webPort}`,
-        LARK_TASKBOARD_WEB_PORT: String(webPort),
-        LARK_TASKBOARD_WEB_API_TARGET: `http://127.0.0.1:${publicPort}`,
+        LARK_CODEX_ENV: "test",
+        LARK_CODEX_AUTH_MODE: "development",
+        LARK_CODEX_HOST: "127.0.0.1",
+        LARK_CODEX_ADMIN_HOST: "127.0.0.1",
+        LARK_CODEX_CODEX_TRANSPORT: "managed-unix",
+        LARK_CODEX_DATA_DIR: dataDirectory,
+        LARK_CODEX_TEMPORARY_PROJECT_ROOT: temporaryProjectRoot,
+        LARK_CODEX_WORKSPACE_ROOTS: dataDirectory,
+        LARK_CODEX_CODEX_COMMAND: fakeCodexCommand,
+        LARK_CODEX_PORT: String(publicPort),
+        LARK_CODEX_ADMIN_PORT: String(adminPort),
+        LARK_CODEX_ALLOWED_HOSTS: `127.0.0.1:${publicPort},localhost:${publicPort}`,
+        LARK_CODEX_ORIGIN: `http://127.0.0.1:${webPort}`,
+        LARK_CODEX_WEB_PORT: String(webPort),
+        LARK_CODEX_WEB_API_TARGET: `http://127.0.0.1:${publicPort}`,
         FAKE_CODEX_INTERRUPT_DELAY_MS: "1500",
       },
     },

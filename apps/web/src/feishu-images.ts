@@ -1,4 +1,4 @@
-import { FeishuJsapiConfigSchema, REMOTE_UPLOAD_MAX_BYTES } from "@lark-taskboard/contracts";
+import { FeishuJsapiConfigSchema, REMOTE_UPLOAD_MAX_BYTES } from "@lark-codex/contracts";
 import { z } from "zod";
 import { apiRequest } from "./api";
 import { loadFeishuH5Sdk } from "./feishu";

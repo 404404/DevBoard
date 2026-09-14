@@ -12,7 +12,7 @@ import {
   type DragMoveEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import type { GlobalLabelView } from "@lark-taskboard/contracts";
+import type { GlobalLabelView } from "@lark-codex/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { GripVertical, Plus, Tags, X } from "./icons";
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";

@@ -1,6 +1,6 @@
 import { userErrorMessage } from "./user-error";
 import { Notice } from "./notification-center";
-import type { ProjectKind, TaskRelationView, TaskView } from "@lark-taskboard/contracts";
+import type { ProjectKind, TaskRelationView, TaskView } from "@lark-codex/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState } from "react";
 import {

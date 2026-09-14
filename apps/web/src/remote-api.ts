@@ -11,7 +11,7 @@ import {
   RemoteAttachmentSchema,
   type RemoteAction,
   type RemoteReviewScope,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import { z } from "zod";
 import { ApiError, apiRequest, mutationHeaders } from "./api";
 import { createUuid } from "./random-id";

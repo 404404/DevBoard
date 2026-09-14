@@ -3,7 +3,7 @@ import {
   type ActorRole,
   type FeishuIdentityRef,
   type ProjectMemberRole,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import type { SqliteDatabase } from "../../src/modules/database/index.js";
 
 interface ProjectMemberFixture {

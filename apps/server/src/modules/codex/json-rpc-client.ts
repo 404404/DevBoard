@@ -67,8 +67,8 @@ export class CodexJsonRpcClient {
     this.#transport = options.transport;
     this.#requestTimeoutMs = options.requestTimeoutMs ?? 30_000;
     this.#clientInfo = options.clientInfo ?? {
-      name: "lark_taskboard",
-      title: "Lark Codex Taskboard",
+      name: "lark_codex",
+      title: "Lark-Codex",
       version: "0.1.0",
     };
   }

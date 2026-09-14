@@ -2,11 +2,11 @@
 mod updater;
 mod skills;
 mod skills_commit;
+mod app_data;
 use serde_json::{json, Value};
 use std::{
-    fs::{File, OpenOptions},
+    fs::File,
     io::{BufRead, BufReader, Write},
-    os::fd::AsRawFd,
     path::PathBuf,
     process::{Child, ChildStdin, Command, Stdio},
     sync::{
@@ -189,16 +189,17 @@ fn main() {
     if let Some(code) = skills::handle_commit_cli() {
         std::process::exit(code);
     }
-    let app=tauri::Builder::default().plugin(tauri_plugin_updater::Builder::new().build()).setup(|app|{
-  let home=std::env::var("HOME")?;let data=PathBuf::from(home).join("Library/Application Support/Lark Codex Taskboard");std::fs::create_dir_all(&data)?;
-  let lock=OpenOptions::new().read(true).write(true).create(true).truncate(false).open(data.join("instance.lock"))?;
-  let attempts = if std::env::args().any(|arg| arg == "--lark-codex-updated") { 300 } else { 1 };
-  let mut acquired = false;
-  for attempt in 0..attempts {
-    if unsafe {libc::flock(lock.as_raw_fd(),libc::LOCK_EX|libc::LOCK_NB)} == 0 { acquired=true;break; }
-    if attempt+1<attempts {std::thread::sleep(Duration::from_millis(100));}
-  }
-  if !acquired {return Err("Lark-Codex 已在运行".into())}
+    let attempts = if std::env::args().any(|arg| arg == "--lark-codex-updated") { 300 } else { 1 };
+    let prepared = std::env::var_os("HOME")
+        .ok_or_else(|| "无法定位当前用户目录".to_string())
+        .and_then(|home| app_data::open(&PathBuf::from(home), attempts));
+    let (data, lock) = prepared.unwrap_or_else(|message| {
+        let _ = Command::new("/usr/bin/osascript")
+            .args(["-e", "on run argv\n display alert \"无法启动 Lark-Codex\" message (item 1 of argv) as critical\nend run", &message])
+            .stdout(Stdio::null()).stderr(Stdio::null()).status();
+        std::process::exit(1);
+    });
+    let app=tauri::Builder::default().plugin(tauri_plugin_updater::Builder::new().build()).setup(move |app|{
   app.manage(updater::Updates::new(app.package_info().version.to_string(), &data));
   app.manage(skills::Skills::default());
   setup_tray(app)?;

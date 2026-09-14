@@ -8,7 +8,7 @@ import {
   type EventFeedQuery,
   type EventPage,
   type EventStreamMessage,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import { z } from "zod";
 
 import { AppError } from "../../app-error.js";

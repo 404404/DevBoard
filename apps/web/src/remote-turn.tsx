@@ -9,7 +9,7 @@ import {
   type RemoteCommandAction,
 } from "./remote-turn-model";
 import { useEffect, useState, type ReactNode } from "react";
-import type { RemoteThread } from "@lark-taskboard/contracts";
+import type { RemoteThread } from "@lark-codex/contracts";
 
 type Turn = RemoteThread["turns"][number];
 type Item = Turn["items"][number];

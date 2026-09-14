@@ -17,26 +17,26 @@
 
 ```bash
 npm install
-npm run dev
+LARK_CODEX_DATA_DIR="$PWD/.data" npm run dev
 ```
 
 - Web：<http://localhost:5173>
 - API：<http://localhost:47823/api/health>
 - 本机管理监听器：`127.0.0.1:47824`（仅接受运行时 capability，不向浏览器开放）
 
-服务成功启动后会生成权限为 `0600` 的 `.data/run/runtime.json`。本地工具通过该文件发现业务/管理端口和短期运行时 capability；不要复制、提交或记录其中内容。
+上述开发命令显式使用仓库内独立的 `.data`，避免连接已安装应用的数据目录。服务成功启动后会生成权限为 `0600` 的 `.data/run/runtime.json`。本地工具通过该文件发现业务/管理端口和短期运行时 capability；不要复制、提交或记录其中内容。
 
-项目目录只能从 `LARK_TASKBOARD_WORKSPACE_ROOTS` 指定的绝对根目录登记。未配置时仅允许当前仓库父目录；多个根目录使用逗号分隔。
+项目目录只能从 `LARK_CODEX_WORKSPACE_ROOTS` 指定的绝对根目录登记。未配置时仅允许当前仓库父目录；多个根目录使用逗号分隔。
 
 业务端提供项目列表、项目看板、任务详情及任务创建、编辑、移动、归档和恢复接口。所有写请求都需要有效会话、`X-CSRF-Token` 与 `Idempotency-Key`；编辑、移动、归档和恢复还必须携带当前 `expectedVersion`，版本冲突会返回 `VERSION_CONFLICT` 和可安全重试的当前任务摘要。
 
 任务详情中的“Codex 执行”可启动、继续或取消与已登记工作目录绑定的 Codex Thread。开发模式由服务监管专用 `codex app-server`，并通过数据目录中的 Unix Socket WebSocket 通信；生产模式由桌面应用启动内嵌 Codex 桥接的后端。作业、Thread/Turn 映射、进度事件、审批和用户输入都持久化到 SQLite，服务重启时只恢复未领取作业，对无法证明安全续接的运行中作业失败关闭并提示重试。一次性审批需要有效登录会话，不提供永久放行；正常完成最多把任务推进到 `in_review`。
 
-Codex 协议基线固定为 `codex-cli 0.154.0`，`npm run codex:protocol:check` 会重新生成官方 Schema 并检查所用方法和决定是否漂移。可用 `LARK_TASKBOARD_CODEX_COMMAND` 覆盖应用测试环境的可执行文件；协议检查使用 PATH 中的 `codex`。
+Codex 协议基线固定为 `codex-cli 0.154.0`，`npm run codex:protocol:check` 会重新生成官方 Schema 并检查所用方法和决定是否漂移。可用 `LARK_CODEX_CODEX_COMMAND` 覆盖应用测试环境的可执行文件；协议检查使用 PATH 中的 `codex`。
 
 `GET /api/v1/events?projectId=<id>&afterRevision=<revision>` 返回项目范围的修订事件页；带 `Accept: text/event-stream` 时建立 SSE。浏览器重连可通过 `Last-Event-ID` 补读断线期间的修订；收到 `refresh-required` 表示游标已超出历史窗口或领先于当前数据库，必须全量刷新项目数据。SSE 使用注释心跳和 `cursor` 事件推进没有项目变更时的全局游标，并禁用代理缓冲。
 
-事件历史窗口、心跳、重试和慢连接写超时可分别通过 `LARK_TASKBOARD_EVENT_HISTORY_LIMIT`、`LARK_TASKBOARD_SSE_HEARTBEAT_MS`、`LARK_TASKBOARD_SSE_RETRY_MS` 和 `LARK_TASKBOARD_SSE_WRITE_TIMEOUT_MS` 调整。
+事件历史窗口、心跳、重试和慢连接写超时可分别通过 `LARK_CODEX_EVENT_HISTORY_LIMIT`、`LARK_CODEX_SSE_HEARTBEAT_MS`、`LARK_CODEX_SSE_RETRY_MS` 和 `LARK_CODEX_SSE_WRITE_TIMEOUT_MS` 调整。
 
 首次启动会自动执行数据库迁移，也可以显式运行：
 
@@ -112,11 +112,11 @@ Tauri 应用打开时启动服务，关闭窗口后保留菜单栏并继续运�
 | `deploy/desktop/`                          | 不含真实凭据的配置示例                                              |
 | `e2e/`、各模块测试文件                     | 回归测试源码，保留用于后续维护                                      |
 | `docs/`                                    | 功能与开发说明；公开发布不含个人记忆、历史验收或部署记录            |
-| `skills/manage-lark-taskboard/`            | 通过 taskctl 管理看板的配套 Skill                                   |
+| `skills/manage-lark-codex/`                | 通过 taskctl 管理看板的配套 Skill                                   |
 
 执行 `npm run build:desktop` 生成 `apps/desktop/dist/Lark-Codex.app`。发布只分发构建后的应用，不复制整个工作目录。当前脚本不自动生成 DMG，也尚未配置 Developer ID 签名和公证，详见 [构建与分发](../apps/desktop/README.md#构建)。
 
-`node_modules/`、各包 `dist/`、桌面 `.cache/` 和 Rust `target/` 是依赖或可重建产物；`coverage/`、`test-results/`、`playwright-report/` 是测试输出。仓库 `.data/` 和应用的 `~/Library/Application Support/Lark Codex Taskboard/` 可能包含实际数据库、附件与凭据，不属于通用缓存清理范围，也不应随应用分发。
+`node_modules/`、各包 `dist/`、桌面 `.cache/` 和 Rust `target/` 是依赖或可重建产物；`coverage/`、`test-results/`、`playwright-report/` 是测试输出。仓库 `.data/` 和应用的 `~/Library/Application Support/Lark-Codex/` 可能包含实际数据库、附件与凭据，不属于通用缓存清理范围，也不应随应用分发。
 
 ## 发布带应用内更新的 macOS 版本
 

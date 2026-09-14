@@ -11,7 +11,7 @@ import {
   type GitEntry,
   type GitCreationOrigin,
   type GitManagementView,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import { AppError } from "../../app-error.js";
 import type { SqliteDatabase } from "../database/index.js";
 import type { WorkspaceCommandRunner } from "../taskboard/task-git-finalizer.js";

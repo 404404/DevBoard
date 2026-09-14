@@ -13,7 +13,7 @@ import {
   type LocalDevelopmentContextView,
   type RegisterWorkspaceCommand,
   type WorkspaceRegistrationResult,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import { z } from "zod";
 
 import { AppError } from "../../app-error.js";

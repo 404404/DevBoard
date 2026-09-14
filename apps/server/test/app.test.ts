@@ -1,4 +1,4 @@
-import { ErrorEnvelopeSchema, HealthResponseSchema } from "@lark-taskboard/contracts";
+import { ErrorEnvelopeSchema, HealthResponseSchema } from "@lark-codex/contracts";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,7 +14,7 @@ const temporaryDirectories: string[] = [];
 
 function createTestApp() {
   return createApp({
-    config: loadConfig({ LARK_TASKBOARD_ENV: "test" }),
+    config: loadConfig({ LARK_CODEX_ENV: "test" }),
     database: initializeDatabase(":memory:"),
   });
 }
@@ -41,7 +41,7 @@ describe("HTTP application", () => {
     expect(response.statusCode).toBe(200);
     expect(HealthResponseSchema.parse(payload)).toMatchObject({
       status: "ok",
-      service: "lark-taskboard-server",
+      service: "lark-codex-server",
       checks: { http: "ok", sqlite: "ok" },
     });
   });
@@ -62,7 +62,7 @@ describe("HTTP application", () => {
   });
 
   it("starts project snapshot reconciliation with the app lifecycle", async () => {
-    const directory = mkdtempSync(join(tmpdir(), "lark-taskboard-app-project-sync-"));
+    const directory = mkdtempSync(join(tmpdir(), "lark-codex-app-project-sync-"));
     temporaryDirectories.push(directory);
     const snapshotFile = join(directory, "codex-projects.json");
     writeFileSync(
@@ -83,8 +83,8 @@ describe("HTTP application", () => {
     );
     const app = createApp({
       config: loadConfig({
-        LARK_TASKBOARD_ENV: "test",
-        LARK_TASKBOARD_CODEX_PROJECT_SNAPSHOT_FILE: snapshotFile,
+        LARK_CODEX_ENV: "test",
+        LARK_CODEX_CODEX_PROJECT_SNAPSHOT_FILE: snapshotFile,
       }),
       database: initializeDatabase(":memory:"),
     });

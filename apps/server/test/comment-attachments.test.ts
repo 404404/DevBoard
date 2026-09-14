@@ -1,4 +1,4 @@
-import { identityKey } from "@lark-taskboard/contracts";
+import { identityKey } from "@lark-codex/contracts";
 import { TEST_FEISHU_ACTOR, seedFeishuTestActor } from "./helpers/identity.js";
 import { exec } from "node:child_process";
 import { createServer } from "node:http";
@@ -11,7 +11,7 @@ import {
   CreateCommentCommandSchema,
   CreateTaskCommandSchema,
   type PrincipalView,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import { afterEach, expect, it, vi } from "vitest";
 import { AttachmentService, AttachmentVault } from "../src/modules/attachments/index.js";
 import { initializeDatabase } from "../src/modules/database/index.js";
@@ -383,7 +383,7 @@ it("runs the snapshotted CLI from another cwd with runtime auth and no global ta
   }[];
   const command = snapshot[0]!.downloadCommand;
   expect(command).toContain("/packages/taskctl/dist/cli.js'");
-  expect(command).toContain(`LARK_TASKBOARD_DATA_DIR='${s.root}'`);
+  expect(command).toContain(`LARK_CODEX_DATA_DIR='${s.root}'`);
   const capabilityToken = "a".repeat(64);
   let authorized = false;
   const server = createServer((request, response) => {
@@ -432,7 +432,7 @@ it("uses executor-visible paths for attachments when the server runs in Docker",
   const attachment = s.upload();
   const queue = new ExecutionQueue({
     database: s.database,
-    dataDirectory: "/var/lib/lark-taskboard",
+    dataDirectory: "/var/lib/lark-codex",
     executorNodePath: "/opt/homebrew/bin/node",
     executorTaskctlPath: "/Users/example/Task Board/packages/taskctl/dist/cli.js",
     executorDataDirectory: "/Users/example/Library/Application Support/Taskboard/data",
@@ -451,12 +451,12 @@ it("uses executor-visible paths for attachments when the server runs in Docker",
     "'/opt/homebrew/bin/node' '/Users/example/Task Board/packages/taskctl/dist/cli.js'",
   );
   expect(prompt).toContain(
-    "LARK_TASKBOARD_DATA_DIR='/Users/example/Library/Application Support/Taskboard/data'",
+    "LARK_CODEX_DATA_DIR='/Users/example/Library/Application Support/Taskboard/data'",
   );
   expect(queue.listTaskJobs(s.task.id)[0]!.workContext.attachmentSnapshot).toEqual([
     expect.objectContaining({ originalAttachmentId: attachment.id }),
   ]);
-  expect(prompt).not.toContain("/var/lib/lark-taskboard");
+  expect(prompt).not.toContain("/var/lib/lark-codex");
 });
 
 it("attachment changes invalidate an in-flight comment snapshot and become locked only after current-version success", () => {

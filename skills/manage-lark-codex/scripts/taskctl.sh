@@ -26,13 +26,18 @@ else
   [ -n "$lark_app" ] || fail "未找到完整的 Lark-Codex.app；请安装到 /Applications 或 ~/Applications，或设置 LARK_CODEX_APP_PATH。"
 fi
 
-if [ "${LARK_TASKBOARD_DATA_DIR+x}" = x ]; then
-  [ -n "$LARK_TASKBOARD_DATA_DIR" ] || fail "LARK_TASKBOARD_DATA_DIR 不能为空。"
+if [ "${LARK_CODEX_DATA_DIR+x}" = x ]; then
+  [ -n "$LARK_CODEX_DATA_DIR" ] || fail "LARK_CODEX_DATA_DIR 不能为空。"
+  export LARK_CODEX_DATA_DIR
+elif [ "${LARK_TASKBOARD_DATA_DIR+x}" = x ]; then
+  # Preserve the legacy source so taskctl can recognize migrated default paths.
+  [ -n "$LARK_TASKBOARD_DATA_DIR" ] || fail "旧版数据目录覆盖变量不能为空。"
+  export LARK_TASKBOARD_DATA_DIR
 else
-  [ -n "${HOME:-}" ] || fail "无法确定用户目录，请设置 HOME 或显式指定 LARK_TASKBOARD_DATA_DIR。"
-  LARK_TASKBOARD_DATA_DIR="$HOME/Library/Application Support/Lark Codex Taskboard/data"
+  [ -n "${HOME:-}" ] || fail "无法确定用户目录，请设置 HOME 或显式指定 LARK_CODEX_DATA_DIR。"
+  LARK_CODEX_DATA_DIR="$HOME/Library/Application Support/Lark-Codex/data"
+  export LARK_CODEX_DATA_DIR
 fi
-export LARK_TASKBOARD_DATA_DIR
 
 # Preserve the caller's cwd so taskctl context resolves the intended project.
 exec "$lark_app/Contents/Resources/runtime/bin/node" \

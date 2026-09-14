@@ -1,4 +1,4 @@
-import { ALL_PROJECT_ID, type BoardEvent } from "@lark-taskboard/contracts";
+import { ALL_PROJECT_ID, type BoardEvent } from "@lark-codex/contracts";
 import { describe, expect, it } from "vitest";
 
 import {

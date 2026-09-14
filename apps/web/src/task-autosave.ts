@@ -3,7 +3,7 @@ import {
   FeishuIdentityRefSchema,
   type FeishuIdentityRef,
   type TaskView,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 
 export const EDITABLE_TASK_FIELDS = [
   "title",

@@ -3,15 +3,15 @@ import assert from "node:assert/strict";
 import { parseEnv, nativeEnvironment, assertPortsFree, stopChildren } from "./runtime.mjs";
 import net from "node:net";
 test("configured ports reach the backend, admin listener and embedded bridge", () => {
-  const result = nativeEnvironment({}, { LARK_TASKBOARD_DATA_DIR: "/data" }, "/bundle", {
+  const result = nativeEnvironment({}, { LARK_CODEX_DATA_DIR: "/data" }, "/bundle", {
     api: 48023,
     admin: 48024,
     bridge: 48025,
     caddy: 9443,
   });
-  assert.equal(result.LARK_TASKBOARD_PORT, "48023");
-  assert.equal(result.LARK_TASKBOARD_ADMIN_PORT, "48024");
-  assert.equal(result.LARK_TASKBOARD_CODEX_ENDPOINT, "ws://127.0.0.1:48025");
+  assert.equal(result.LARK_CODEX_PORT, "48023");
+  assert.equal(result.LARK_CODEX_ADMIN_PORT, "48024");
+  assert.equal(result.LARK_CODEX_CODEX_ENDPOINT, "ws://127.0.0.1:48025");
 });
 test("dotenv parser preserves quoted spaces, never evaluates shell code", () => {
   assert.deepEqual(parseEnv('A="a b"\nB=$(echo secret)\n# hi\nC=plain'), {
@@ -23,27 +23,25 @@ test("dotenv parser preserves quoted spaces, never evaluates shell code", () => 
 test("native config replaces container paths without leaking inherited secrets", () => {
   const result = nativeEnvironment(
     {
-      LARK_TASKBOARD_ENV: "production",
-      LARK_TASKBOARD_CODEX_PROJECT_SNAPSHOT_FILE: "/var/lib/lark-taskboard/run/codex-projects.json",
+      LARK_CODEX_ENV: "production",
+      LARK_CODEX_CODEX_PROJECT_SNAPSHOT_FILE: "/var/lib/lark-codex/run/codex-projects.json",
     },
     {
-      LARK_TASKBOARD_DATA_DIR: "/Users/example/data",
-      LARK_TASKBOARD_FEISHU_CREDENTIALS_FILE: "/secrets/feishu",
-      LARK_TASKBOARD_CODEX_TOKEN_FILE: "/secrets/codex",
+      LARK_CODEX_DATA_DIR: "/Users/example/data",
+      LARK_CODEX_FEISHU_CREDENTIALS_FILE: "/secrets/feishu",
+      LARK_CODEX_CODEX_TOKEN_FILE: "/secrets/codex",
     },
     "/app/runtime",
   );
-  assert.equal(result.LARK_TASKBOARD_CODEX_TRANSPORT, "embedded");
-  assert.ok(
-    result.LARK_TASKBOARD_CODEX_PROJECT_STATE_FILE.endsWith(".codex/.codex-global-state.json"),
-  );
-  assert.equal(result.LARK_TASKBOARD_CODEX_ENDPOINT, "ws://127.0.0.1:58980");
+  assert.equal(result.LARK_CODEX_CODEX_TRANSPORT, "embedded");
+  assert.ok(result.LARK_CODEX_CODEX_PROJECT_STATE_FILE.endsWith(".codex/.codex-global-state.json"));
+  assert.equal(result.LARK_CODEX_CODEX_ENDPOINT, "ws://127.0.0.1:58980");
   assert.equal(
-    result.LARK_TASKBOARD_CODEX_PROJECT_SNAPSHOT_FILE,
+    result.LARK_CODEX_CODEX_PROJECT_SNAPSHOT_FILE,
     "/Users/example/data/run/codex-projects.json",
   );
-  assert.equal(result.LARK_TASKBOARD_WEB_ROOT, "/app/runtime/apps/web/dist");
-  assert.equal(result.LARK_TASKBOARD_FEISHU_CREDENTIALS_FILE, "/secrets/feishu");
+  assert.equal(result.LARK_CODEX_WEB_ROOT, "/app/runtime/apps/web/dist");
+  assert.equal(result.LARK_CODEX_FEISHU_CREDENTIALS_FILE, "/secrets/feishu");
 });
 test("occupied ports are rejected without stopping their owner", async () => {
   const s = net.createServer();
@@ -59,13 +57,13 @@ test("occupied ports are rejected without stopping their owner", async () => {
 import { spawn } from "node:child_process";
 test("native task execution uses bundled CLI instead of Docker", () => {
   const env = nativeEnvironment(
-    { LARK_TASKBOARD_EXECUTOR_TASKCTL_PATH: "/old/taskctl-docker.mjs" },
-    { LARK_TASKBOARD_DATA_DIR: "/data", LARK_TASKBOARD_WORKSPACE_ROOT: "/project" },
+    { LARK_CODEX_EXECUTOR_TASKCTL_PATH: "/old/taskctl-docker.mjs" },
+    { LARK_CODEX_DATA_DIR: "/data", LARK_CODEX_WORKSPACE_ROOT: "/project" },
     "/bundle",
   );
-  assert.equal(env.LARK_TASKBOARD_EXECUTOR_TASKCTL_PATH, "/bundle/packages/taskctl/dist/cli.js");
-  assert.equal(env.LARK_TASKBOARD_EXECUTOR_NODE_PATH, "/bundle/bin/node");
-  assert.equal(env.LARK_TASKBOARD_WORKSPACE_ROOTS, "/project");
+  assert.equal(env.LARK_CODEX_EXECUTOR_TASKCTL_PATH, "/bundle/packages/taskctl/dist/cli.js");
+  assert.equal(env.LARK_CODEX_EXECUTOR_NODE_PATH, "/bundle/bin/node");
+  assert.equal(env.LARK_CODEX_WORKSPACE_ROOTS, "/project");
 });
 test("stopping services waits for owned children and leaves unrelated processes alone", async () => {
   const child = spawn(process.execPath, ["-e", "setInterval(()=>{},1000)"], {
@@ -210,27 +208,27 @@ test("health checks use fresh connections across backend restarts", async () => 
 test("desktop owns internal settings even when legacy values are present", () => {
   const env = nativeEnvironment(
     {
-      LARK_TASKBOARD_ENV: "development",
-      LARK_TASKBOARD_AUTH_MODE: "development",
-      LARK_TASKBOARD_ORIGIN: "https://tasks.example.test",
-      LARK_TASKBOARD_ALLOWED_HOSTS: "stale.example.test",
-      LARK_TASKBOARD_HOST: "0.0.0.0",
-      LARK_TASKBOARD_PORT: "9000",
-      LARK_TASKBOARD_ADMIN_PORT: "9001",
-      LARK_TASKBOARD_CODEX_PROJECT_SNAPSHOT_FILE: "/legacy/snapshot.json",
-      LARK_TASKBOARD_TEMPORARY_PROJECT_ROOT: "/old/user/location",
+      LARK_CODEX_ENV: "development",
+      LARK_CODEX_AUTH_MODE: "development",
+      LARK_CODEX_ORIGIN: "https://tasks.example.test",
+      LARK_CODEX_ALLOWED_HOSTS: "stale.example.test",
+      LARK_CODEX_HOST: "0.0.0.0",
+      LARK_CODEX_PORT: "9000",
+      LARK_CODEX_ADMIN_PORT: "9001",
+      LARK_CODEX_CODEX_PROJECT_SNAPSHOT_FILE: "/legacy/snapshot.json",
+      LARK_CODEX_TEMPORARY_PROJECT_ROOT: "/old/user/location",
     },
-    { LARK_TASKBOARD_DATA_DIR: "/data" },
+    { LARK_CODEX_DATA_DIR: "/data" },
     "/bundle",
   );
-  assert.equal(env.LARK_TASKBOARD_ENV, "production");
-  assert.equal(env.LARK_TASKBOARD_AUTH_MODE, "feishu");
-  assert.equal(env.LARK_TASKBOARD_HOST, "127.0.0.1");
-  assert.equal(env.LARK_TASKBOARD_PORT, "58978");
-  assert.equal(env.LARK_TASKBOARD_ADMIN_PORT, "58979");
-  assert.equal(env.LARK_TASKBOARD_ALLOWED_HOSTS, "tasks.example.test");
-  assert.equal(env.LARK_TASKBOARD_CODEX_PROJECT_SNAPSHOT_FILE, "/data/run/codex-projects.json");
-  assert.equal(env.LARK_TASKBOARD_TEMPORARY_PROJECT_ROOT, undefined);
+  assert.equal(env.LARK_CODEX_ENV, "production");
+  assert.equal(env.LARK_CODEX_AUTH_MODE, "feishu");
+  assert.equal(env.LARK_CODEX_HOST, "127.0.0.1");
+  assert.equal(env.LARK_CODEX_PORT, "58978");
+  assert.equal(env.LARK_CODEX_ADMIN_PORT, "58979");
+  assert.equal(env.LARK_CODEX_ALLOWED_HOSTS, "tasks.example.test");
+  assert.equal(env.LARK_CODEX_CODEX_PROJECT_SNAPSHOT_FILE, "/data/run/codex-projects.json");
+  assert.equal(env.LARK_CODEX_TEMPORARY_PROJECT_ROOT, undefined);
 });
 
 test("HTTP proxy preserves public port and does not enable TLS", async () => {

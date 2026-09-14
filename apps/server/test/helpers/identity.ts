@@ -1,4 +1,4 @@
-import { identityKey, type FeishuIdentityRef, type PrincipalView } from "@lark-taskboard/contracts";
+import { identityKey, type FeishuIdentityRef, type PrincipalView } from "@lark-codex/contracts";
 import { randomUUID } from "node:crypto";
 import type { SqliteDatabase } from "../../src/modules/database/index.js";
 

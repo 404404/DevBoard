@@ -1,4 +1,4 @@
-import type { TaskPriority, TaskStatus, TaskView } from "@lark-taskboard/contracts";
+import type { TaskPriority, TaskStatus, TaskView } from "@lark-codex/contracts";
 
 export interface TaskFilters {
   readonly query: string;

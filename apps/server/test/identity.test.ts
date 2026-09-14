@@ -3,7 +3,7 @@ import {
   SessionViewSchema,
   identityKey,
   type FeishuIdentityRef,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import type { FastifyInstance } from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -33,7 +33,7 @@ afterEach(async () => {
 
 function developmentApp(): FastifyInstance {
   const app = createApp({
-    config: loadConfig({ LARK_TASKBOARD_ENV: "test" }),
+    config: loadConfig({ LARK_CODEX_ENV: "test" }),
     database: initializeDatabase(":memory:"),
   });
   openApps.push(app);
@@ -82,7 +82,7 @@ describe("identity HTTP boundary", () => {
 
     expect(login.statusCode).toBe(201);
     expect(sessionView.actor.role).toBe("admin");
-    expect(login.cookies.find((cookie) => cookie.name === "lark_taskboard_session")?.httpOnly).toBe(
+    expect(login.cookies.find((cookie) => cookie.name === "lark_codex_session")?.httpOnly).toBe(
       true,
     );
 
@@ -162,12 +162,12 @@ describe("identity HTTP boundary", () => {
     const database = initializeDatabase(":memory:");
     const app = createApp({
       config: loadConfig({
-        LARK_TASKBOARD_ENV: "test",
-        LARK_TASKBOARD_AUTH_MODE: "feishu",
-        LARK_TASKBOARD_ORIGIN: "https://tasks.example.com",
-        LARK_TASKBOARD_ALLOWED_HOSTS: "tasks.example.com",
-        LARK_TASKBOARD_FEISHU_APP_ID: "cli_test",
-        LARK_TASKBOARD_FEISHU_APP_SECRET: "secret-for-test",
+        LARK_CODEX_ENV: "test",
+        LARK_CODEX_AUTH_MODE: "feishu",
+        LARK_CODEX_ORIGIN: "https://tasks.example.com",
+        LARK_CODEX_ALLOWED_HOSTS: "tasks.example.com",
+        LARK_CODEX_FEISHU_APP_ID: "cli_test",
+        LARK_CODEX_FEISHU_APP_SECRET: "secret-for-test",
       }),
       database,
       identityProvider: provider,
@@ -203,27 +203,27 @@ describe("identity HTTP boundary", () => {
     {
       origin: "https://tasks.example.com",
       host: "tasks.example.com",
-      sessionName: "__Host-lark_taskboard_session",
-      csrfName: "__Host-lark_taskboard_csrf",
+      sessionName: "__Host-lark_codex_session",
+      csrfName: "__Host-lark_codex_csrf",
       secure: true,
     },
     {
       origin: "http://1.1.1.1:47823",
       host: "1.1.1.1:47823",
-      sessionName: "lark_taskboard_session",
-      csrfName: "lark_taskboard_csrf",
+      sessionName: "lark_codex_session",
+      csrfName: "lark_codex_csrf",
       secure: false,
     },
   ])("uses $origin cookie security for Feishu login, CSRF and logout", async (scenario) => {
     const database = initializeDatabase(":memory:");
     const app = createApp({
       config: loadConfig({
-        LARK_TASKBOARD_ENV: "test",
-        LARK_TASKBOARD_AUTH_MODE: "feishu",
-        LARK_TASKBOARD_ORIGIN: scenario.origin,
-        LARK_TASKBOARD_ALLOWED_HOSTS: scenario.host,
-        LARK_TASKBOARD_FEISHU_APP_ID: "cli_test",
-        LARK_TASKBOARD_FEISHU_APP_SECRET: "secret-for-test",
+        LARK_CODEX_ENV: "test",
+        LARK_CODEX_AUTH_MODE: "feishu",
+        LARK_CODEX_ORIGIN: scenario.origin,
+        LARK_CODEX_ALLOWED_HOSTS: scenario.host,
+        LARK_CODEX_FEISHU_APP_ID: "cli_test",
+        LARK_CODEX_FEISHU_APP_SECRET: "secret-for-test",
       }),
       database,
       identityProvider: {
@@ -296,7 +296,12 @@ describe("identity HTTP boundary", () => {
     });
     expect(logout.statusCode).toBe(204);
     expect(logout.cookies.map((cookie) => cookie.name).sort()).toEqual(
-      [scenario.csrfName, scenario.sessionName].sort(),
+      [
+        scenario.csrfName,
+        scenario.sessionName,
+        scenario.csrfName.replace("lark_codex_", "lark_taskboard_"),
+        scenario.sessionName.replace("lark_codex_", "lark_taskboard_"),
+      ].sort(),
     );
     expect(logout.cookies.every((cookie) => Boolean(cookie.secure) === scenario.secure)).toBe(true);
 

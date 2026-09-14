@@ -1,4 +1,4 @@
-import type { RemoteReviewFile } from "@lark-taskboard/contracts";
+import type { RemoteReviewFile } from "@lark-codex/contracts";
 import { parseRemoteDiff, type RemoteDiffLine } from "./remote-diff";
 
 export interface ReviewHunk {

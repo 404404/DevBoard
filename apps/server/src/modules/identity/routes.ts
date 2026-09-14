@@ -8,7 +8,7 @@ import {
   ExchangeFeishuCodeSchema,
   SessionViewSchema,
   type SessionView,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import type { FastifyInstance, FastifyReply } from "fastify";
 
 import type { AppConfig } from "../../config.js";
@@ -25,12 +25,23 @@ interface CookieNames {
   readonly csrf: string;
 }
 
-export function sessionCookieNames(config: AppConfig): CookieNames {
-  const prefix = new URL(config.LARK_TASKBOARD_ORIGIN).protocol === "https:" ? "__Host-" : "";
-  return {
-    session: `${prefix}lark_taskboard_session`,
-    csrf: `${prefix}lark_taskboard_csrf`,
+export function sessionCookieNames(
+  config: AppConfig,
+  cookies?: Readonly<Record<string, string | undefined>>,
+): CookieNames {
+  const prefix = new URL(config.LARK_CODEX_ORIGIN).protocol === "https:" ? "__Host-" : "";
+  const current = {
+    session: `${prefix}lark_codex_session`,
+    csrf: `${prefix}lark_codex_csrf`,
   };
+  // Do not combine a new identity with a legacy CSRF token. Even an empty new
+  // cookie selects the new pair and must fail normal authentication checks.
+  if (cookies && !Object.hasOwn(cookies, current.session) && !Object.hasOwn(cookies, current.csrf))
+    return {
+      session: `${prefix}lark_taskboard_session`,
+      csrf: `${prefix}lark_taskboard_csrf`,
+    };
+  return current;
 }
 
 function setSessionCookies(
@@ -39,8 +50,8 @@ function setSessionCookies(
   grant: SessionGrant,
 ): SessionView {
   const names = sessionCookieNames(config);
-  const secure = new URL(config.LARK_TASKBOARD_ORIGIN).protocol === "https:";
-  const maxAge = config.LARK_TASKBOARD_SESSION_TTL_SECONDS;
+  const secure = new URL(config.LARK_CODEX_ORIGIN).protocol === "https:";
+  const maxAge = config.LARK_CODEX_SESSION_TTL_SECONDS;
   const common = {
     path: "/",
     secure,
@@ -68,18 +79,18 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
   const { config, service, cliAuth } = options;
   const names = sessionCookieNames(config);
   const jsapi =
-    config.LARK_TASKBOARD_AUTH_MODE === "feishu" &&
-    config.LARK_TASKBOARD_FEISHU_APP_ID &&
-    config.LARK_TASKBOARD_FEISHU_APP_SECRET
+    config.LARK_CODEX_AUTH_MODE === "feishu" &&
+    config.LARK_CODEX_FEISHU_APP_ID &&
+    config.LARK_CODEX_FEISHU_APP_SECRET
       ? new FeishuJsapiService({
-          appId: config.LARK_TASKBOARD_FEISHU_APP_ID,
-          appSecret: config.LARK_TASKBOARD_FEISHU_APP_SECRET,
-          apiBaseUrl: config.LARK_TASKBOARD_FEISHU_API_BASE_URL,
-          origin: config.LARK_TASKBOARD_ORIGIN,
+          appId: config.LARK_CODEX_FEISHU_APP_ID,
+          appSecret: config.LARK_CODEX_FEISHU_APP_SECRET,
+          apiBaseUrl: config.LARK_CODEX_FEISHU_API_BASE_URL,
+          origin: config.LARK_CODEX_ORIGIN,
         })
       : null;
   app.get("/api/v1/auth/feishu/jsapi-config", async (request, reply) => {
-    service.authenticate(request.cookies[names.session]);
+    service.authenticate(request.cookies[sessionCookieNames(config, request.cookies).session]);
     reply.header("Cache-Control", "no-store");
     if (!jsapi) throw new AppError("INVALID_REQUEST", 400, "当前环境未配置飞书图片功能");
     const { url } = z
@@ -91,19 +102,23 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
 
   const requestParams = z.object({ requestId: z.string().min(1).max(200) });
   app.get("/api/v1/auth/cli/requests/:requestId", async (request, reply) => {
-    const session = service.authenticate(request.cookies[names.session]);
+    const session = service.authenticate(
+      request.cookies[sessionCookieNames(config, request.cookies).session],
+    );
     service.authenticatedFeishuPrincipal(session.actor.identity);
     const { requestId } = requestParams.parse(request.params);
     reply.header("Cache-Control", "no-store");
     return { data: cliAuthOperation(() => cliAuth.inspect(requestId)) };
   });
   app.post("/api/v1/auth/cli/requests/:requestId/approve", async (request, reply) => {
-    const session = service.authenticate(request.cookies[names.session]);
+    const session = service.authenticate(
+      request.cookies[sessionCookieNames(config, request.cookies).session],
+    );
     const header = request.headers["x-csrf-token"];
     service.assertCsrf(
       session,
       typeof header === "string" ? header : undefined,
-      request.cookies[names.csrf],
+      request.cookies[sessionCookieNames(config, request.cookies).csrf],
     );
     z.object({})
       .strict()
@@ -121,13 +136,13 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
 
   app.get("/api/v1/auth/config", async () => ({
     data: AuthBootstrapSchema.parse({
-      authMode: config.LARK_TASKBOARD_AUTH_MODE,
+      authMode: config.LARK_CODEX_AUTH_MODE,
       feishuAppId:
-        config.LARK_TASKBOARD_AUTH_MODE === "feishu" ? config.LARK_TASKBOARD_FEISHU_APP_ID : null,
+        config.LARK_CODEX_AUTH_MODE === "feishu" ? config.LARK_CODEX_FEISHU_APP_ID : null,
     }),
   }));
 
-  if (config.LARK_TASKBOARD_AUTH_MODE === "development") {
+  if (config.LARK_CODEX_AUTH_MODE === "development") {
     app.post("/api/v1/auth/development", async (_request, reply) => {
       const grant = await service.loginDevelopment();
       await reply.code(201).send({ data: setSessionCookies(reply, config, grant) });
@@ -141,8 +156,10 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
   }
 
   app.get("/api/v1/session", async (request) => {
-    const context = service.authenticate(request.cookies[names.session]);
-    const csrfToken = request.cookies[names.csrf];
+    const context = service.authenticate(
+      request.cookies[sessionCookieNames(config, request.cookies).session],
+    );
+    const csrfToken = request.cookies[sessionCookieNames(config, request.cookies).csrf];
 
     return {
       data: SessionViewSchema.parse({
@@ -154,18 +171,23 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
   });
 
   app.post("/api/v1/session/logout", async (request, reply) => {
-    const context = service.authenticate(request.cookies[names.session]);
+    const context = service.authenticate(
+      request.cookies[sessionCookieNames(config, request.cookies).session],
+    );
     const headerToken = request.headers["x-csrf-token"];
     service.assertCsrf(
       context,
       typeof headerToken === "string" ? headerToken : undefined,
-      request.cookies[names.csrf],
+      request.cookies[sessionCookieNames(config, request.cookies).csrf],
     );
     service.revoke(context);
 
-    const secure = new URL(config.LARK_TASKBOARD_ORIGIN).protocol === "https:";
+    const secure = new URL(config.LARK_CODEX_ORIGIN).protocol === "https:";
     reply.clearCookie(names.session, { path: "/", secure, sameSite: "lax" });
     reply.clearCookie(names.csrf, { path: "/", secure, sameSite: "lax" });
+    const legacy = sessionCookieNames(config, {});
+    reply.clearCookie(legacy.session, { path: "/", secure, sameSite: "lax" });
+    reply.clearCookie(legacy.csrf, { path: "/", secure, sameSite: "lax" });
     await reply.code(204).send();
   });
 }

@@ -5,6 +5,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 
 import { z } from "zod";
 import { isIP } from "node:net";
+import { normalizeLarkCodexEnvironment } from "@lark-codex/contracts";
 
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 
@@ -62,27 +63,27 @@ function isLocalDevelopmentOrigin(origin: string): boolean {
 
 const AppConfigSchema = z
   .object({
-    LARK_TASKBOARD_ENV: z.enum(["development", "test", "production"]).default("development"),
-    LARK_TASKBOARD_AUTH_MODE: z.enum(["development", "feishu"]).default("development"),
-    LARK_TASKBOARD_HOST: z.string().min(1).default("127.0.0.1"),
-    LARK_TASKBOARD_PORT: z.coerce.number().int().min(1).max(65_535).default(47_823),
-    LARK_TASKBOARD_ADMIN_HOST: z.literal("127.0.0.1").default("127.0.0.1"),
-    LARK_TASKBOARD_ADMIN_PORT: z.coerce.number().int().min(1).max(65_535).default(47_824),
-    LARK_TASKBOARD_ORIGIN: z.url().default("http://localhost:5173"),
-    LARK_TASKBOARD_ALLOWED_HOSTS: z
+    LARK_CODEX_ENV: z.enum(["development", "test", "production"]).default("development"),
+    LARK_CODEX_AUTH_MODE: z.enum(["development", "feishu"]).default("development"),
+    LARK_CODEX_HOST: z.string().min(1).default("127.0.0.1"),
+    LARK_CODEX_PORT: z.coerce.number().int().min(1).max(65_535).default(47_823),
+    LARK_CODEX_ADMIN_HOST: z.literal("127.0.0.1").default("127.0.0.1"),
+    LARK_CODEX_ADMIN_PORT: z.coerce.number().int().min(1).max(65_535).default(47_824),
+    LARK_CODEX_ORIGIN: z.url().default("http://localhost:5173"),
+    LARK_CODEX_ALLOWED_HOSTS: z
       .string()
       .default("127.0.0.1:47823,localhost:47823")
       .transform((hosts) =>
         [...new Set(hosts.split(",").map((host) => host.trim().toLowerCase()))].filter(Boolean),
       )
       .pipe(z.array(z.string().min(1)).min(1)),
-    LARK_TASKBOARD_DATA_DIR: z
+    LARK_CODEX_DATA_DIR: z
       .string()
       .trim()
       .min(1)
       .default(".data")
       .transform((directory) => resolve(REPOSITORY_ROOT, directory)),
-    LARK_TASKBOARD_WORKSPACE_ROOTS: z
+    LARK_CODEX_WORKSPACE_ROOTS: z
       .string()
       .default(dirname(REPOSITORY_ROOT))
       .transform((roots) =>
@@ -96,58 +97,43 @@ const AppConfigSchema = z
             message: "允许的工作区根目录必须全部使用绝对路径",
           }),
       ),
-    LARK_TASKBOARD_TEMPORARY_PROJECT_ROOT: z
+    LARK_CODEX_TEMPORARY_PROJECT_ROOT: z
       .string()
       .trim()
       .default("")
       .refine((path) => path === "" || isAbsolute(path), "临时项目展示目录必须使用绝对路径"),
-    LARK_TASKBOARD_LOG_LEVEL: z
+    LARK_CODEX_LOG_LEVEL: z
       .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
       .default("info"),
-    LARK_TASKBOARD_SESSION_TTL_SECONDS: z.coerce
-      .number()
-      .int()
-      .min(300)
-      .max(86_400)
-      .default(28_800),
-    LARK_TASKBOARD_EVENT_HISTORY_LIMIT: z.coerce
-      .number()
-      .int()
-      .min(10)
-      .max(1_000_000)
-      .default(10_000),
-    LARK_TASKBOARD_SSE_HEARTBEAT_MS: z.coerce.number().int().min(1_000).max(60_000).default(15_000),
-    LARK_TASKBOARD_SSE_RETRY_MS: z.coerce.number().int().min(1_000).max(60_000).default(3_000),
-    LARK_TASKBOARD_SSE_WRITE_TIMEOUT_MS: z.coerce
-      .number()
-      .int()
-      .min(1_000)
-      .max(60_000)
-      .default(10_000),
-    LARK_TASKBOARD_FEISHU_APP_ID: z.string().trim().min(1).optional(),
-    LARK_TASKBOARD_FEISHU_APP_SECRET: z.string().trim().min(1).optional(),
-    LARK_TASKBOARD_FEISHU_CREDENTIALS_FILE: z
+    LARK_CODEX_SESSION_TTL_SECONDS: z.coerce.number().int().min(300).max(86_400).default(28_800),
+    LARK_CODEX_EVENT_HISTORY_LIMIT: z.coerce.number().int().min(10).max(1_000_000).default(10_000),
+    LARK_CODEX_SSE_HEARTBEAT_MS: z.coerce.number().int().min(1_000).max(60_000).default(15_000),
+    LARK_CODEX_SSE_RETRY_MS: z.coerce.number().int().min(1_000).max(60_000).default(3_000),
+    LARK_CODEX_SSE_WRITE_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(60_000).default(10_000),
+    LARK_CODEX_FEISHU_APP_ID: z.string().trim().min(1).optional(),
+    LARK_CODEX_FEISHU_APP_SECRET: z.string().trim().min(1).optional(),
+    LARK_CODEX_FEISHU_CREDENTIALS_FILE: z
       .string()
       .trim()
       .min(1)
       .refine(isAbsolute, "飞书凭据文件必须使用绝对路径")
       .optional(),
-    LARK_TASKBOARD_FEISHU_APP_SECRET_FILE: z
+    LARK_CODEX_FEISHU_APP_SECRET_FILE: z
       .string()
       .trim()
       .min(1)
       .refine(isAbsolute, "飞书 App Secret 文件必须使用绝对路径")
       .optional(),
-    LARK_TASKBOARD_FEISHU_API_BASE_URL: z.url().default("https://open.feishu.cn"),
+    LARK_CODEX_FEISHU_API_BASE_URL: z.url().default("https://open.feishu.cn"),
     // Paths as seen by the Codex executor (which may run outside this container).
-    LARK_TASKBOARD_EXECUTOR_NODE_PATH: z.string().trim().min(1).refine(isAbsolute).optional(),
-    LARK_TASKBOARD_EXECUTOR_TASKCTL_PATH: z.string().trim().min(1).refine(isAbsolute).optional(),
-    LARK_TASKBOARD_EXECUTOR_DATA_DIR: z.string().trim().min(1).refine(isAbsolute).optional(),
-    LARK_TASKBOARD_CODEX_COMMAND: z.string().trim().min(1).default("codex"),
-    LARK_TASKBOARD_CODEX_TRANSPORT: z
+    LARK_CODEX_EXECUTOR_NODE_PATH: z.string().trim().min(1).refine(isAbsolute).optional(),
+    LARK_CODEX_EXECUTOR_TASKCTL_PATH: z.string().trim().min(1).refine(isAbsolute).optional(),
+    LARK_CODEX_EXECUTOR_DATA_DIR: z.string().trim().min(1).refine(isAbsolute).optional(),
+    LARK_CODEX_CODEX_COMMAND: z.string().trim().min(1).default("codex"),
+    LARK_CODEX_CODEX_TRANSPORT: z
       .enum(["managed-unix", "websocket", "embedded"])
       .default("managed-unix"),
-    LARK_TASKBOARD_CODEX_ENDPOINT: z
+    LARK_CODEX_CODEX_ENDPOINT: z
       .url()
       .default("ws://127.0.0.1:47825")
       .transform((endpoint, context) => {
@@ -158,31 +144,31 @@ const AppConfigSchema = z
           return z.NEVER;
         }
       }),
-    LARK_TASKBOARD_CODEX_TOKEN_FILE: z
+    LARK_CODEX_CODEX_TOKEN_FILE: z
       .string()
       .trim()
       .min(1)
       .refine(isAbsolute, "Codex capability token 文件必须使用绝对路径")
       .optional(),
-    LARK_TASKBOARD_CODEX_PROJECT_STATE_FILE: z.string().trim().min(1).refine(isAbsolute).optional(),
-    LARK_TASKBOARD_CODEX_PROJECT_SNAPSHOT_FILE: z
+    LARK_CODEX_CODEX_PROJECT_STATE_FILE: z.string().trim().min(1).refine(isAbsolute).optional(),
+    LARK_CODEX_CODEX_PROJECT_SNAPSHOT_FILE: z
       .string()
       .trim()
       .default("")
       .refine((path) => path === "" || isAbsolute(path), "Codex 项目快照文件必须使用绝对路径"),
-    LARK_TASKBOARD_PROJECT_SYNC_RECONCILE_MS: z.coerce
+    LARK_CODEX_PROJECT_SYNC_RECONCILE_MS: z.coerce
       .number()
       .int()
       .min(50)
       .max(300_000)
       .default(30_000),
-    LARK_TASKBOARD_ATTACHMENT_MAX_BYTES: z.coerce
+    LARK_CODEX_ATTACHMENT_MAX_BYTES: z.coerce
       .number()
       .int()
       .min(1_024)
       .max(100 * 1024 * 1024)
       .default(25 * 1024 * 1024),
-    LARK_TASKBOARD_WEB_ROOT: z
+    LARK_CODEX_WEB_ROOT: z
       .string()
       .trim()
       .min(1)
@@ -190,104 +176,104 @@ const AppConfigSchema = z
       .transform((directory) => resolve(REPOSITORY_ROOT, directory)),
   })
   .superRefine((config, context) => {
-    if (config.LARK_TASKBOARD_HOST !== "127.0.0.1") {
+    if (config.LARK_CODEX_HOST !== "127.0.0.1") {
       context.addIssue({
         code: "custom",
-        path: ["LARK_TASKBOARD_HOST"],
+        path: ["LARK_CODEX_HOST"],
         message: "业务监听地址必须是本机回环地址",
       });
     }
 
     if (
-      config.LARK_TASKBOARD_HOST === config.LARK_TASKBOARD_ADMIN_HOST &&
-      config.LARK_TASKBOARD_PORT === config.LARK_TASKBOARD_ADMIN_PORT
+      config.LARK_CODEX_HOST === config.LARK_CODEX_ADMIN_HOST &&
+      config.LARK_CODEX_PORT === config.LARK_CODEX_ADMIN_PORT
     ) {
       context.addIssue({
         code: "custom",
-        path: ["LARK_TASKBOARD_ADMIN_PORT"],
+        path: ["LARK_CODEX_ADMIN_PORT"],
         message: "本机管理端口不能与业务端口相同",
       });
     }
 
     if (
-      config.LARK_TASKBOARD_FEISHU_CREDENTIALS_FILE &&
-      (config.LARK_TASKBOARD_FEISHU_APP_ID ||
-        config.LARK_TASKBOARD_FEISHU_APP_SECRET ||
-        config.LARK_TASKBOARD_FEISHU_APP_SECRET_FILE)
+      config.LARK_CODEX_FEISHU_CREDENTIALS_FILE &&
+      (config.LARK_CODEX_FEISHU_APP_ID ||
+        config.LARK_CODEX_FEISHU_APP_SECRET ||
+        config.LARK_CODEX_FEISHU_APP_SECRET_FILE)
     ) {
       context.addIssue({
         code: "custom",
-        path: ["LARK_TASKBOARD_FEISHU_CREDENTIALS_FILE"],
+        path: ["LARK_CODEX_FEISHU_CREDENTIALS_FILE"],
         message: "统一飞书凭据文件不能与单独的 App ID、App Secret 或 Secret 文件同时配置",
       });
     }
 
-    if (config.LARK_TASKBOARD_AUTH_MODE === "feishu") {
-      if (!config.LARK_TASKBOARD_FEISHU_APP_ID && !config.LARK_TASKBOARD_FEISHU_CREDENTIALS_FILE) {
+    if (config.LARK_CODEX_AUTH_MODE === "feishu") {
+      if (!config.LARK_CODEX_FEISHU_APP_ID && !config.LARK_CODEX_FEISHU_CREDENTIALS_FILE) {
         context.addIssue({
           code: "custom",
-          path: ["LARK_TASKBOARD_FEISHU_APP_ID"],
+          path: ["LARK_CODEX_FEISHU_APP_ID"],
           message: "飞书认证模式需要 App ID",
         });
       }
       if (
-        !config.LARK_TASKBOARD_FEISHU_APP_SECRET &&
-        !config.LARK_TASKBOARD_FEISHU_APP_SECRET_FILE &&
-        !config.LARK_TASKBOARD_FEISHU_CREDENTIALS_FILE
+        !config.LARK_CODEX_FEISHU_APP_SECRET &&
+        !config.LARK_CODEX_FEISHU_APP_SECRET_FILE &&
+        !config.LARK_CODEX_FEISHU_CREDENTIALS_FILE
       ) {
         context.addIssue({
           code: "custom",
-          path: ["LARK_TASKBOARD_FEISHU_APP_SECRET"],
+          path: ["LARK_CODEX_FEISHU_APP_SECRET"],
           message: "飞书认证模式需要 App Secret",
         });
       }
       if (
-        new URL(config.LARK_TASKBOARD_ORIGIN).protocol !== "https:" &&
-        !isPublicHttpOrigin(config.LARK_TASKBOARD_ORIGIN)
+        new URL(config.LARK_CODEX_ORIGIN).protocol !== "https:" &&
+        !isPublicHttpOrigin(config.LARK_CODEX_ORIGIN)
       ) {
         context.addIssue({
           code: "custom",
-          path: ["LARK_TASKBOARD_ORIGIN"],
+          path: ["LARK_CODEX_ORIGIN"],
           message: "飞书认证模式必须使用 HTTPS Origin 或公网域名或规范公网 IPv4 HTTP Origin",
         });
       }
     }
 
     if (
-      config.LARK_TASKBOARD_AUTH_MODE === "development" &&
-      (config.LARK_TASKBOARD_ENV === "production" ||
-        !isLocalDevelopmentOrigin(config.LARK_TASKBOARD_ORIGIN))
+      config.LARK_CODEX_AUTH_MODE === "development" &&
+      (config.LARK_CODEX_ENV === "production" ||
+        !isLocalDevelopmentOrigin(config.LARK_CODEX_ORIGIN))
     ) {
       context.addIssue({
         code: "custom",
-        path: ["LARK_TASKBOARD_AUTH_MODE"],
+        path: ["LARK_CODEX_AUTH_MODE"],
         message: "开发身份适配器只能用于 localhost HTTP 开发环境",
       });
     }
 
-    if (config.LARK_TASKBOARD_CODEX_TRANSPORT === "embedded") {
-      if (!isAbsolute(config.LARK_TASKBOARD_CODEX_COMMAND)) {
+    if (config.LARK_CODEX_CODEX_TRANSPORT === "embedded") {
+      if (!isAbsolute(config.LARK_CODEX_CODEX_COMMAND)) {
         context.addIssue({
           code: "custom",
-          path: ["LARK_TASKBOARD_CODEX_COMMAND"],
+          path: ["LARK_CODEX_CODEX_COMMAND"],
           message: "内嵌桥接需要 Codex 程序的绝对路径",
         });
       }
-      if (!config.LARK_TASKBOARD_CODEX_PROJECT_STATE_FILE) {
+      if (!config.LARK_CODEX_CODEX_PROJECT_STATE_FILE) {
         context.addIssue({
           code: "custom",
-          path: ["LARK_TASKBOARD_CODEX_PROJECT_STATE_FILE"],
+          path: ["LARK_CODEX_CODEX_PROJECT_STATE_FILE"],
           message: "内嵌桥接需要 Codex 项目状态文件",
         });
       }
     }
 
-    if (config.LARK_TASKBOARD_CODEX_TRANSPORT !== "managed-unix") {
-      const endpoint = URL.parse(config.LARK_TASKBOARD_CODEX_ENDPOINT);
+    if (config.LARK_CODEX_CODEX_TRANSPORT !== "managed-unix") {
+      const endpoint = URL.parse(config.LARK_CODEX_CODEX_ENDPOINT);
       if (!endpoint) {
         context.addIssue({
           code: "custom",
-          path: ["LARK_TASKBOARD_CODEX_ENDPOINT"],
+          path: ["LARK_CODEX_CODEX_ENDPOINT"],
           message: "Codex Endpoint URL 无效",
         });
         return;
@@ -305,33 +291,33 @@ const AppConfigSchema = z
       ) {
         context.addIssue({
           code: "custom",
-          path: ["LARK_TASKBOARD_CODEX_ENDPOINT"],
+          path: ["LARK_CODEX_CODEX_ENDPOINT"],
           message: "Codex Endpoint 必须是 ws://127.0.0.1:<1-65535>，不能包含凭据、路径、查询或片段",
         });
       }
-      if (!config.LARK_TASKBOARD_CODEX_TOKEN_FILE) {
+      if (!config.LARK_CODEX_CODEX_TOKEN_FILE) {
         context.addIssue({
           code: "custom",
-          path: ["LARK_TASKBOARD_CODEX_TOKEN_FILE"],
+          path: ["LARK_CODEX_CODEX_TOKEN_FILE"],
           message: "外部 Codex WebSocket 需要 capability token 文件",
         });
       }
     }
 
     if (
-      config.LARK_TASKBOARD_ENV === "production" &&
-      config.LARK_TASKBOARD_CODEX_TRANSPORT === "managed-unix"
+      config.LARK_CODEX_ENV === "production" &&
+      config.LARK_CODEX_CODEX_TRANSPORT === "managed-unix"
     ) {
       context.addIssue({
         code: "custom",
-        path: ["LARK_TASKBOARD_CODEX_TRANSPORT"],
+        path: ["LARK_CODEX_CODEX_TRANSPORT"],
         message: "生产环境必须使用受鉴权保护的外部或内嵌 Codex 桥接",
       });
     }
   });
 
 export type AppConfig = z.infer<typeof AppConfigSchema>;
-export type LogLevel = AppConfig["LARK_TASKBOARD_LOG_LEVEL"];
+export type LogLevel = AppConfig["LARK_CODEX_LOG_LEVEL"];
 
 export class ConfigError extends Error {
   readonly issues: readonly string[];
@@ -344,7 +330,7 @@ export class ConfigError extends Error {
 }
 
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppConfig {
-  const result = AppConfigSchema.safeParse(environment);
+  const result = AppConfigSchema.safeParse(normalizeLarkCodexEnvironment(environment));
 
   if (!result.success) {
     throw new ConfigError(
@@ -352,26 +338,26 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     );
   }
   const config = result.data;
-  if (isPublicHttpOrigin(config.LARK_TASKBOARD_ORIGIN)) {
-    config.LARK_TASKBOARD_ORIGIN = new URL(config.LARK_TASKBOARD_ORIGIN).origin;
+  if (isPublicHttpOrigin(config.LARK_CODEX_ORIGIN)) {
+    config.LARK_CODEX_ORIGIN = new URL(config.LARK_CODEX_ORIGIN).origin;
   }
-  if (!config.LARK_TASKBOARD_CODEX_PROJECT_SNAPSHOT_FILE) {
-    config.LARK_TASKBOARD_CODEX_PROJECT_SNAPSHOT_FILE = join(
-      config.LARK_TASKBOARD_DATA_DIR,
+  if (!config.LARK_CODEX_CODEX_PROJECT_SNAPSHOT_FILE) {
+    config.LARK_CODEX_CODEX_PROJECT_SNAPSHOT_FILE = join(
+      config.LARK_CODEX_DATA_DIR,
       "run",
       "codex-projects.json",
     );
   }
-  if (!config.LARK_TASKBOARD_TEMPORARY_PROJECT_ROOT && process.platform === "darwin") {
-    config.LARK_TASKBOARD_TEMPORARY_PROJECT_ROOT = join(homedir(), "Documents", "Codex");
+  if (!config.LARK_CODEX_TEMPORARY_PROJECT_ROOT && process.platform === "darwin") {
+    config.LARK_CODEX_TEMPORARY_PROJECT_ROOT = join(homedir(), "Documents", "Codex");
   }
-  if (config.LARK_TASKBOARD_FEISHU_APP_SECRET && config.LARK_TASKBOARD_FEISHU_APP_SECRET_FILE) {
+  if (config.LARK_CODEX_FEISHU_APP_SECRET && config.LARK_CODEX_FEISHU_APP_SECRET_FILE) {
     throw new ConfigError([
-      "LARK_TASKBOARD_FEISHU_APP_SECRET_FILE: 不能同时配置明文 Secret 与 Secret 文件",
+      "LARK_CODEX_FEISHU_APP_SECRET_FILE: 不能同时配置明文 Secret 与 Secret 文件",
     ]);
   }
-  if (config.LARK_TASKBOARD_FEISHU_CREDENTIALS_FILE) {
-    const path = config.LARK_TASKBOARD_FEISHU_CREDENTIALS_FILE;
+  if (config.LARK_CODEX_FEISHU_CREDENTIALS_FILE) {
+    const path = config.LARK_CODEX_FEISHU_CREDENTIALS_FILE;
     try {
       const stat = lstatSync(path);
       if (!stat.isFile() || stat.isSymbolicLink() || (stat.mode & 0o077) !== 0) {
@@ -390,17 +376,17 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
             .regex(/^[^\r\n\0]+$/),
         })
         .parse(JSON.parse(readFileSync(path, "utf8")));
-      config.LARK_TASKBOARD_FEISHU_APP_ID = credentials.appId;
-      config.LARK_TASKBOARD_FEISHU_APP_SECRET = credentials.appSecret;
+      config.LARK_CODEX_FEISHU_APP_ID = credentials.appId;
+      config.LARK_CODEX_FEISHU_APP_SECRET = credentials.appSecret;
     } catch {
       // JSON 解析异常可能包含凭据片段，只报告固定错误。
       throw new ConfigError([
-        "LARK_TASKBOARD_FEISHU_CREDENTIALS_FILE: 无法读取有效凭据，请检查文件为权限不宽于 0600 的普通文件，且 JSON 包含有效的 appId、appSecret",
+        "LARK_CODEX_FEISHU_CREDENTIALS_FILE: 无法读取有效凭据，请检查文件为权限不宽于 0600 的普通文件，且 JSON 包含有效的 appId、appSecret",
       ]);
     }
   }
-  if (config.LARK_TASKBOARD_FEISHU_APP_SECRET_FILE) {
-    const path = config.LARK_TASKBOARD_FEISHU_APP_SECRET_FILE;
+  if (config.LARK_CODEX_FEISHU_APP_SECRET_FILE) {
+    const path = config.LARK_CODEX_FEISHU_APP_SECRET_FILE;
     try {
       const stat = lstatSync(path);
       if (!stat.isFile() || stat.isSymbolicLink() || (stat.mode & 0o077) !== 0) {
@@ -408,15 +394,15 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
       }
       const secret = readFileSync(path, "utf8").trim();
       if (!secret) throw new Error("文件内容为空");
-      config.LARK_TASKBOARD_FEISHU_APP_SECRET = secret;
+      config.LARK_CODEX_FEISHU_APP_SECRET = secret;
     } catch (error: unknown) {
       throw new ConfigError([
-        `LARK_TASKBOARD_FEISHU_APP_SECRET_FILE: ${error instanceof Error ? error.message : "无法读取"}`,
+        `LARK_CODEX_FEISHU_APP_SECRET_FILE: ${error instanceof Error ? error.message : "无法读取"}`,
       ]);
     }
   }
-  if (config.LARK_TASKBOARD_CODEX_TOKEN_FILE) {
-    const path = config.LARK_TASKBOARD_CODEX_TOKEN_FILE;
+  if (config.LARK_CODEX_CODEX_TOKEN_FILE) {
+    const path = config.LARK_CODEX_CODEX_TOKEN_FILE;
     try {
       const stat = lstatSync(path);
       if (!stat.isFile() || stat.isSymbolicLink() || (stat.mode & 0o077) !== 0) {
@@ -425,14 +411,14 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
       if (!readFileSync(path, "utf8").trim()) throw new Error("文件内容为空");
     } catch (error: unknown) {
       throw new ConfigError([
-        `LARK_TASKBOARD_CODEX_TOKEN_FILE: ${error instanceof Error ? error.message : "无法读取"}`,
+        `LARK_CODEX_CODEX_TOKEN_FILE: ${error instanceof Error ? error.message : "无法读取"}`,
       ]);
     }
   }
-  if (config.LARK_TASKBOARD_ENV === "production") {
-    const indexPath = join(config.LARK_TASKBOARD_WEB_ROOT, "index.html");
+  if (config.LARK_CODEX_ENV === "production") {
+    const indexPath = join(config.LARK_CODEX_WEB_ROOT, "index.html");
     if (!existsSync(indexPath) || !lstatSync(indexPath).isFile()) {
-      throw new ConfigError(["LARK_TASKBOARD_WEB_ROOT: Web 构建目录缺少 index.html"]);
+      throw new ConfigError(["LARK_CODEX_WEB_ROOT: Web 构建目录缺少 index.html"]);
     }
   }
   return config;

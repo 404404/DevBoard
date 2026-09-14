@@ -8,6 +8,7 @@ test-results/
 .env
 .env.*
 !.env.example
+.lark-codex/
 .lark-taskboard/
 .firecrawl/
 .superpowers/

@@ -1,11 +1,11 @@
 import { seedProjectMember } from "./helpers/project-member-fixture.js";
-import { identityKey } from "@lark-taskboard/contracts";
+import { identityKey } from "@lark-codex/contracts";
 import { seedFeishuTestActor, TEST_FEISHU_ACTOR } from "./helpers/identity.js";
 import {
   CreateTaskCommandSchema,
   type PrincipalView,
   type CreateTaskCommand,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { AppError } from "../src/app-error.js";

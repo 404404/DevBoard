@@ -1,5 +1,5 @@
 import { CliAuthService, cliAuthOperation } from "../modules/identity/cli-auth-service.js";
-import { identityKey, sameIdentity } from "@lark-taskboard/contracts";
+import { identityKey, sameIdentity } from "@lark-codex/contracts";
 import { randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { basename, join, relative, resolve, sep } from "node:path";
@@ -32,7 +32,7 @@ import {
   UpdateTaskCommandSchema,
   TaskLifecycleCommandSchema,
   type PrincipalView,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
 
@@ -144,7 +144,7 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
     options.services?.backups ??
     new BackupService({
       database: options.database,
-      dataDirectory: options.config.LARK_TASKBOARD_DATA_DIR,
+      dataDirectory: options.config.LARK_CODEX_DATA_DIR,
     });
   const backupRunner =
     options.backupRunner ??
@@ -172,13 +172,13 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
   const registry =
     options.services?.projectRegistry ??
     options.projectRegistry ??
-    new ProjectRegistry(options.database, options.config.LARK_TASKBOARD_WORKSPACE_ROOTS);
+    new ProjectRegistry(options.database, options.config.LARK_CODEX_WORKSPACE_ROOTS);
   const identityService =
     options.services?.identityService ??
     new IdentityService({
       database: options.database,
       provider: new DevelopmentIdentityAdapter(),
-      sessionTtlSeconds: options.config.LARK_TASKBOARD_SESSION_TTL_SECONDS,
+      sessionTtlSeconds: options.config.LARK_CODEX_SESSION_TTL_SECONDS,
     });
   identityService.ensureDevelopmentActor(DEVELOPMENT_IDENTITY);
   const localActor: PrincipalView = {
@@ -208,7 +208,7 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
     new Taskboard({
       database: options.database,
       identityService,
-      temporaryProjectRoot: options.config.LARK_TASKBOARD_TEMPORARY_PROJECT_ROOT || undefined,
+      temporaryProjectRoot: options.config.LARK_CODEX_TEMPORARY_PROJECT_ROOT || undefined,
       ...revisionOption,
     });
   const workspace =
@@ -227,8 +227,8 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
       identityService,
       taskboard,
       vault: new AttachmentVault({
-        rootDirectory: join(options.config.LARK_TASKBOARD_DATA_DIR, "attachments"),
-        maxBytes: options.config.LARK_TASKBOARD_ATTACHMENT_MAX_BYTES,
+        rootDirectory: join(options.config.LARK_CODEX_DATA_DIR, "attachments"),
+        maxBytes: options.config.LARK_CODEX_ATTACHMENT_MAX_BYTES,
       }),
       attachmentUrlPrefix: "/api/v1/local/attachments",
       ...revisionOption,
@@ -237,10 +237,10 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
     options.services?.queue ??
     new ExecutionQueue({
       database: options.database,
-      dataDirectory: options.config.LARK_TASKBOARD_DATA_DIR,
-      executorNodePath: options.config.LARK_TASKBOARD_EXECUTOR_NODE_PATH,
-      executorTaskctlPath: options.config.LARK_TASKBOARD_EXECUTOR_TASKCTL_PATH,
-      executorDataDirectory: options.config.LARK_TASKBOARD_EXECUTOR_DATA_DIR,
+      dataDirectory: options.config.LARK_CODEX_DATA_DIR,
+      executorNodePath: options.config.LARK_CODEX_EXECUTOR_NODE_PATH,
+      executorTaskctlPath: options.config.LARK_CODEX_EXECUTOR_TASKCTL_PATH,
+      executorDataDirectory: options.config.LARK_CODEX_EXECUTOR_DATA_DIR,
       ...revisionOption,
     });
   const taskCreation =
@@ -259,8 +259,8 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
       database: options.database,
       taskboard,
       vault: new AttachmentVault({
-        rootDirectory: join(options.config.LARK_TASKBOARD_DATA_DIR, "attachments"),
-        maxBytes: options.config.LARK_TASKBOARD_ATTACHMENT_MAX_BYTES,
+        rootDirectory: join(options.config.LARK_CODEX_DATA_DIR, "attachments"),
+        maxBytes: options.config.LARK_CODEX_ATTACHMENT_MAX_BYTES,
       }),
       provisioner: options.codexThreadProvisioner ?? null,
       ...revisionOption,
@@ -271,7 +271,7 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
       database: options.database,
       taskboard,
       queue,
-      gitFinalizer: new TaskGitFinalizer(options.config.LARK_TASKBOARD_WORKSPACE_ROOTS),
+      gitFinalizer: new TaskGitFinalizer(options.config.LARK_CODEX_WORKSPACE_ROOTS),
       scheduleExecution: options.scheduleExecution ?? (() => {}),
       ...revisionOption,
     });
@@ -296,15 +296,15 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
   const eventFeed = new EventFeed({ database: options.database });
   const gitManagement =
     options.services?.gitManagement ??
-    new GitManagement(options.database, registry, options.config.LARK_TASKBOARD_WORKSPACE_ROOTS);
-  const expectedHost = `${options.config.LARK_TASKBOARD_ADMIN_HOST}:${options.config.LARK_TASKBOARD_ADMIN_PORT}`;
+    new GitManagement(options.database, registry, options.config.LARK_CODEX_WORKSPACE_ROOTS);
+  const expectedHost = `${options.config.LARK_CODEX_ADMIN_HOST}:${options.config.LARK_CODEX_ADMIN_PORT}`;
 
   app.addHook("onRequest", async (request) => {
     const host = request.headers.host?.trim().toLowerCase();
     const matchesHost =
       host === expectedHost ||
-      (options.config.LARK_TASKBOARD_ADMIN_PORT === 80 &&
-        host === options.config.LARK_TASKBOARD_ADMIN_HOST);
+      (options.config.LARK_CODEX_ADMIN_PORT === 80 &&
+        host === options.config.LARK_CODEX_ADMIN_HOST);
     if (!matchesHost || !isLoopback(request.ip)) {
       throw new AppError("FORBIDDEN", 403, "本机管理接口只接受 loopback 请求");
     }
@@ -347,7 +347,7 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
       .strict()
       .parse(request.body);
     const created = cliAuthOperation(() => cliAuth.create(label));
-    const verificationUrl = new URL(options.config.LARK_TASKBOARD_ORIGIN);
+    const verificationUrl = new URL(options.config.LARK_CODEX_ORIGIN);
     verificationUrl.search = "";
     verificationUrl.hash = "";
     verificationUrl.searchParams.set("taskctlLogin", created.requestId);
@@ -491,7 +491,7 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
   app.get("/api/v1/local/projects/:projectId/task-creation-options", async (request) => {
     const { projectId } = ProjectParamsSchema.parse(request.params);
     const view = taskboard.readTaskCreationOptions(projectId, requestActor(request), () => [], {
-      attachmentMaxBytes: options.config.LARK_TASKBOARD_ATTACHMENT_MAX_BYTES,
+      attachmentMaxBytes: options.config.LARK_CODEX_ATTACHMENT_MAX_BYTES,
     });
     if (projectId === TEMPORARY_PROJECT_ID) return { data: view };
     const executionContext = await registry.resolveExecutionContext(projectId);
@@ -735,7 +735,7 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
 
   app.post(
     "/api/v1/local/tasks/:taskId/attachments",
-    { bodyLimit: options.config.LARK_TASKBOARD_ATTACHMENT_MAX_BYTES },
+    { bodyLimit: options.config.LARK_CODEX_ATTACHMENT_MAX_BYTES },
     async (request, reply) => {
       const { taskId } = TaskParamsSchema.parse(request.params);
       const filename = decodeFilenameHeader(request.headers["x-filename"]);

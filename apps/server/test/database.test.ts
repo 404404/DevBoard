@@ -91,7 +91,7 @@ describe("SQLite foundation", () => {
   });
 
   it("refuses to open a database path whose final node is a symbolic link", () => {
-    const directory = mkdtempSync(join(tmpdir(), "lark-taskboard-db-symlink-"));
+    const directory = mkdtempSync(join(tmpdir(), "lark-codex-db-symlink-"));
     temporaryDirectories.push(directory);
     const outside = join(directory, "outside.sqlite");
     writeFileSync(outside, "do not open");
@@ -295,7 +295,7 @@ describe("SQLite foundation", () => {
   });
 
   it("uses WAL and private permissions for a file database", () => {
-    const directory = mkdtempSync(join(tmpdir(), "lark-taskboard-db-"));
+    const directory = mkdtempSync(join(tmpdir(), "lark-codex-db-"));
     temporaryDirectories.push(directory);
     const filename = join(directory, "taskboard.sqlite");
     const database = track(initializeDatabase(filename));
@@ -509,10 +509,10 @@ describe("SQLite foundation", () => {
       .run(
         larkProjectId,
         "LCTB",
-        "lark-taskboard",
-        "/Users/test/Projects/lark-taskboard",
+        "lark-codex",
+        "/Users/test/Projects/lark-codex",
         "47c1610d-f646-47f6-8fe3-28824096c2fe",
-        '["/Users/test/Projects/lark-taskboard"]',
+        '["/Users/test/Projects/lark-codex"]',
         0,
         "2026-09-01T00:00:00.000Z",
       );
@@ -564,13 +564,13 @@ describe("SQLite foundation", () => {
     ).toEqual([
       { id: allProjectId, projectKey: null },
       { id: temporaryProjectId, projectKey: "TEMP" },
-      { id: larkProjectId, projectKey: "LAPG" },
+      { id: larkProjectId, projectKey: "LACV" },
       { id: dockerProjectId, projectKey: "DOVO" },
     ]);
     expect(database.prepare("SELECT id, identifier FROM tasks ORDER BY id").all()).toEqual([
       { id: "task-docker-1000", identifier: "DOVO-1000" },
-      { id: "task-lark-1", identifier: "LAPG-001" },
-      { id: "task-lark-12", identifier: "LAPG-012" },
+      { id: "task-lark-1", identifier: "LACV-001" },
+      { id: "task-lark-12", identifier: "LACV-012" },
       { id: "task-temp-1", identifier: "TEMP-001" },
     ]);
     expect(
@@ -730,7 +730,7 @@ describe("SQLite foundation", () => {
   });
 
   it("creates a consistent pre-migration backup before upgrading an existing database", async () => {
-    const directory = mkdtempSync(join("/private/tmp", "lark-taskboard-migration-backup-"));
+    const directory = mkdtempSync(join("/private/tmp", "lark-codex-migration-backup-"));
     temporaryDirectories.push(directory);
     const database = track(openDatabase(join(directory, "taskboard.sqlite")));
     runMigrations(database, CORE_MIGRATIONS.slice(0, 4));
@@ -897,7 +897,7 @@ describe("SQLite foundation", () => {
   });
 
   it("does not start a migration until its pre-migration backup is durably published", async () => {
-    const directory = mkdtempSync(join("/private/tmp", "lark-taskboard-migration-order-"));
+    const directory = mkdtempSync(join("/private/tmp", "lark-codex-migration-order-"));
     temporaryDirectories.push(directory);
     const events: string[] = [];
     const database = track(

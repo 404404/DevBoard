@@ -1,4 +1,4 @@
-import { remoteTurnItems } from "@lark-taskboard/contracts";
+import { remoteTurnItems } from "@lark-codex/contracts";
 import { constants } from "node:fs";
 import { open } from "node:fs/promises";
 import { isAbsolute } from "node:path";

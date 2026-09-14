@@ -21,6 +21,7 @@ import {
 import { copyThirdPartyLicenses } from "./third-party-licenses.mjs";
 import { copyCargoLicenses } from "./cargo-licenses.mjs";
 import { copyBundledSkill } from "./package-skills.mjs";
+import { writeLegacyUpdateLauncher } from "./legacy-update-launcher.mjs";
 
 const project = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const desktop = join(project, "apps/desktop");
@@ -99,12 +100,12 @@ copyRuntimeScripts(project, runtime);
 copyBundledSkill(project, runtime, version);
 writeFileSync(
   join(runtime, "package.json"),
-  JSON.stringify({ name: "taskboard-desktop-runtime", version, type: "module" }),
+  JSON.stringify({ name: "lark-codex-desktop-runtime", version, type: "module" }),
 );
 copyRuntimeDependencies(project, runtime);
-mkdirSync(join(runtime, "node_modules/@lark-taskboard"), { recursive: true });
+mkdirSync(join(runtime, "node_modules/@lark-codex"), { recursive: true });
 for (const name of ["contracts", "taskctl"])
-  symlinkSync(`../../packages/${name}`, join(runtime, "node_modules/@lark-taskboard", name));
+  symlinkSync(`../../packages/${name}`, join(runtime, "node_modules/@lark-codex", name));
 const licenses = join(runtime, "licenses");
 mkdirSync(licenses);
 for (const [name, path] of [
@@ -120,12 +121,13 @@ console.log(`第三方许可：${thirdPartyLicenses.packageCount} 个 npm 包`);
 const cargoLicenses = copyCargoLicenses(project, runtime);
 console.log(`第三方许可：${cargoLicenses.packageCount} 个 Rust crate`);
 cpSync(
-  join(desktop, "src-tauri/target/release/taskboard-desktop"),
-  join(contents, "MacOS/taskboard-desktop"),
+  join(desktop, "src-tauri/target/release/lark-codex-desktop"),
+  join(contents, "MacOS/lark-codex-desktop"),
 );
+const legacyUpdateLauncher = writeLegacyUpdateLauncher(contents);
 writeFileSync(
   join(contents, "Info.plist"),
-  `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>taskboard-desktop</string><key>CFBundleIdentifier</key><string>cn.rocyan.taskboard.desktop</string><key>CFBundleName</key><string>Lark-Codex</string><key>CFBundleDisplayName</key><string>Lark-Codex</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>${version}</string><key>CFBundleVersion</key><string>${version.split("-")[0]}</string><key>LSMinimumSystemVersion</key><string>13.0</string><key>NSHighResolutionCapable</key><true/></dict></plist>`,
+  `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>lark-codex-desktop</string><key>CFBundleIdentifier</key><string>cn.rocyan.larkcodex.desktop</string><key>CFBundleName</key><string>Lark-Codex</string><key>CFBundleDisplayName</key><string>Lark-Codex</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>${version}</string><key>CFBundleVersion</key><string>${version.split("-")[0]}</string><key>LSMinimumSystemVersion</key><string>13.0</string><key>NSHighResolutionCapable</key><true/></dict></plist>`,
 );
 const iconset = join(cache, "Lark-Codex.iconset");
 mkdirSync(iconset, { recursive: true });
@@ -167,6 +169,7 @@ function signModules(dir) {
 signModules(join(runtime, "node_modules"));
 for (const [name] of assets)
   run("codesign", ["--force", "--sign", "-", join(runtime, "bin", name)]);
+run("codesign", ["--force", "--sign", "-", legacyUpdateLauncher]);
 run("codesign", ["--force", "--sign", "-", app]);
 run("codesign", ["--verify", "--deep", "--strict", app]);
 run(

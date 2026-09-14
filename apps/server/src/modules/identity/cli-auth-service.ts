@@ -1,6 +1,6 @@
 import { AppError } from "../../app-error.js";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { FeishuIdentityRefSchema, type FeishuIdentityRef } from "@lark-taskboard/contracts";
+import { FeishuIdentityRefSchema, type FeishuIdentityRef } from "@lark-codex/contracts";
 
 export class CliAuthError extends Error {
   constructor(

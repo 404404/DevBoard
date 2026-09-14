@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CreateTaskCommandSchema, type PrincipalView } from "@lark-taskboard/contracts";
+import { CreateTaskCommandSchema, type PrincipalView } from "@lark-codex/contracts";
 import { afterEach, describe, expect, it } from "vitest";
 import { AttachmentService, AttachmentVault } from "../src/modules/attachments/index.js";
 import { initializeDatabase } from "../src/modules/database/index.js";

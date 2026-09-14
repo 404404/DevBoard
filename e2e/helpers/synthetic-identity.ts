@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 
 import type { APIRequestContext } from "@playwright/test";
-import { identityKey, type FeishuIdentityRef } from "@lark-taskboard/contracts";
+import { identityKey, type FeishuIdentityRef } from "@lark-codex/contracts";
 import Database from "better-sqlite3";
 
 export const SYNTHETIC_FEISHU_IDENTITY: FeishuIdentityRef = {
@@ -15,13 +15,13 @@ export const SYNTHETIC_FEISHU_IDENTITY: FeishuIdentityRef = {
 export const SYNTHETIC_FEISHU_NAME = "E2E 飞书测试用户";
 
 function isolatedDataDirectory(): string {
-  const configured = process.env.LARK_TASKBOARD_DATA_DIR;
+  const configured = process.env.LARK_CODEX_DATA_DIR;
   if (!configured)
     throw new Error("Run E2E through scripts/run-e2e.mjs with an isolated data directory");
   const directory = realpathSync(configured);
   if (
     dirname(directory) !== realpathSync(tmpdir()) ||
-    !basename(directory).startsWith("lark-taskboard-e2e-")
+    !basename(directory).startsWith("lark-codex-e2e-")
   ) {
     throw new Error(
       "Synthetic identity fixtures may only access the E2E runner's temporary directory",
@@ -35,7 +35,7 @@ export function syntheticAuthFile(): string {
 }
 
 export function e2eOrigin(): string {
-  const origin = process.env.LARK_TASKBOARD_ORIGIN;
+  const origin = process.env.LARK_CODEX_ORIGIN;
   if (!origin || new URL(origin).hostname !== "127.0.0.1")
     throw new Error("E2E requires its isolated loopback origin");
   return origin;
@@ -57,7 +57,7 @@ export async function establishSyntheticFeishuSession(request: APIRequestContext
     throw new Error(`Synthetic fixture development session failed: HTTP ${login.status()}`);
   const { data } = (await login.json()) as { data: { csrfToken: string } };
   const state = await request.storageState();
-  const session = state.cookies.find((cookie) => cookie.name === "lark_taskboard_session");
+  const session = state.cookies.find((cookie) => cookie.name === "lark_codex_session");
   if (!session) throw new Error("The E2E development endpoint did not issue a session cookie");
 
   const databasePath = join(directory, "taskboard.sqlite");

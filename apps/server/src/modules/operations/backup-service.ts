@@ -19,7 +19,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
-import { BackupManifestSchema, type BackupManifest } from "@lark-taskboard/contracts";
+import { BackupManifestSchema, type BackupManifest } from "@lark-codex/contracts";
 import Database from "better-sqlite3";
 
 import {
@@ -272,7 +272,7 @@ function verifyPayload(directory: string, manifest: BackupManifest): void {
   ) {
     throw new Error("数据库备份校验失败");
   }
-  const inspectionDirectory = mkdtempSync(join(tmpdir(), "lark-taskboard-verify-"));
+  const inspectionDirectory = mkdtempSync(join(tmpdir(), "lark-codex-verify-"));
   const inspectionPath = join(inspectionDirectory, "taskboard.sqlite");
   let database: Database.Database | undefined;
   try {

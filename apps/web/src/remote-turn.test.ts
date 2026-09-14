@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import type { RemoteThread } from "@lark-taskboard/contracts";
+import type { RemoteThread } from "@lark-codex/contracts";
 import {
   remoteDuration,
   splitRemoteTurn,

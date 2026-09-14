@@ -1,4 +1,4 @@
-import type { FeishuJsapiConfig } from "@lark-taskboard/contracts";
+import type { FeishuJsapiConfig } from "@lark-codex/contracts";
 interface FeishuAuthCodeResult {
   readonly code?: string;
 }

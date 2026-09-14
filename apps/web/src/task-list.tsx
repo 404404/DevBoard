@@ -1,5 +1,5 @@
 import { userErrorMessage } from "./user-error";
-import { sameIdentity } from "@lark-taskboard/contracts";
+import { sameIdentity } from "@lark-codex/contracts";
 import { Notice } from "./notification-center";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -10,7 +10,7 @@ import type {
   TaskPriority,
   TaskStatus,
   TaskView,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 
 import { updateTask } from "./api";
 import { priorityLabel } from "./locale";

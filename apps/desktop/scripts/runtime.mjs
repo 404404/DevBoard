@@ -54,38 +54,36 @@ export function parseEnv(text) {
 }
 export function nativeEnvironment(prod, desktop, root, ports = DEFAULT_PORTS) {
   const env = Object.fromEntries(
-    Object.entries(prod).filter(([key]) => key.startsWith("LARK_TASKBOARD_")),
+    Object.entries(prod).filter(([key]) => key.startsWith("LARK_CODEX_")),
   );
-  const data = desktop.LARK_TASKBOARD_DATA_DIR;
+  const data = desktop.LARK_CODEX_DATA_DIR;
   if (!data || !isAbsolute(data)) throw new Error("请配置有效的数据目录");
-  delete env.LARK_TASKBOARD_TEMPORARY_PROJECT_ROOT;
-  delete env.LARK_TASKBOARD_FEISHU_APP_ID;
-  delete env.LARK_TASKBOARD_FEISHU_APP_SECRET;
-  delete env.LARK_TASKBOARD_FEISHU_APP_SECRET_FILE;
+  delete env.LARK_CODEX_TEMPORARY_PROJECT_ROOT;
+  delete env.LARK_CODEX_FEISHU_APP_ID;
+  delete env.LARK_CODEX_FEISHU_APP_SECRET;
+  delete env.LARK_CODEX_FEISHU_APP_SECRET_FILE;
   return {
     ...env,
-    LARK_TASKBOARD_ENV: "production",
-    LARK_TASKBOARD_AUTH_MODE: "feishu",
-    LARK_TASKBOARD_HOST: "127.0.0.1",
-    LARK_TASKBOARD_PORT: String(ports.api),
-    LARK_TASKBOARD_ADMIN_HOST: "127.0.0.1",
-    LARK_TASKBOARD_ADMIN_PORT: String(ports.admin),
-    LARK_TASKBOARD_ALLOWED_HOSTS: env.LARK_TASKBOARD_ORIGIN
-      ? new URL(env.LARK_TASKBOARD_ORIGIN).host
-      : "",
-    LARK_TASKBOARD_CODEX_PROJECT_SNAPSHOT_FILE: join(data, "run/codex-projects.json"),
-    LARK_TASKBOARD_DATA_DIR: data,
-    LARK_TASKBOARD_WEB_ROOT: join(root, "apps/web/dist"),
-    LARK_TASKBOARD_FEISHU_CREDENTIALS_FILE: desktop.LARK_TASKBOARD_FEISHU_CREDENTIALS_FILE,
-    LARK_TASKBOARD_CODEX_TOKEN_FILE: desktop.LARK_TASKBOARD_CODEX_TOKEN_FILE,
-    LARK_TASKBOARD_CODEX_TRANSPORT: "embedded",
-    LARK_TASKBOARD_CODEX_ENDPOINT: `ws://127.0.0.1:${ports.bridge}`,
-    LARK_TASKBOARD_CODEX_PROJECT_STATE_FILE: join(homedir(), ".codex/.codex-global-state.json"),
-    LARK_TASKBOARD_WORKSPACE_ROOTS:
-      desktop.LARK_TASKBOARD_WORKSPACE_ROOTS || desktop.LARK_TASKBOARD_WORKSPACE_ROOT,
-    LARK_TASKBOARD_EXECUTOR_NODE_PATH: join(root, "bin/node"),
-    LARK_TASKBOARD_EXECUTOR_TASKCTL_PATH: join(root, "packages/taskctl/dist/cli.js"),
-    LARK_TASKBOARD_EXECUTOR_DATA_DIR: data,
+    LARK_CODEX_ENV: "production",
+    LARK_CODEX_AUTH_MODE: "feishu",
+    LARK_CODEX_HOST: "127.0.0.1",
+    LARK_CODEX_PORT: String(ports.api),
+    LARK_CODEX_ADMIN_HOST: "127.0.0.1",
+    LARK_CODEX_ADMIN_PORT: String(ports.admin),
+    LARK_CODEX_ALLOWED_HOSTS: env.LARK_CODEX_ORIGIN ? new URL(env.LARK_CODEX_ORIGIN).host : "",
+    LARK_CODEX_CODEX_PROJECT_SNAPSHOT_FILE: join(data, "run/codex-projects.json"),
+    LARK_CODEX_DATA_DIR: data,
+    LARK_CODEX_WEB_ROOT: join(root, "apps/web/dist"),
+    LARK_CODEX_FEISHU_CREDENTIALS_FILE: desktop.LARK_CODEX_FEISHU_CREDENTIALS_FILE,
+    LARK_CODEX_CODEX_TOKEN_FILE: desktop.LARK_CODEX_CODEX_TOKEN_FILE,
+    LARK_CODEX_CODEX_TRANSPORT: "embedded",
+    LARK_CODEX_CODEX_ENDPOINT: `ws://127.0.0.1:${ports.bridge}`,
+    LARK_CODEX_CODEX_PROJECT_STATE_FILE: join(homedir(), ".codex/.codex-global-state.json"),
+    LARK_CODEX_WORKSPACE_ROOTS:
+      desktop.LARK_CODEX_WORKSPACE_ROOTS || desktop.LARK_CODEX_WORKSPACE_ROOT,
+    LARK_CODEX_EXECUTOR_NODE_PATH: join(root, "bin/node"),
+    LARK_CODEX_EXECUTOR_TASKCTL_PATH: join(root, "packages/taskctl/dist/cli.js"),
+    LARK_CODEX_EXECUTOR_DATA_DIR: data,
   };
 }
 export async function assertPortsFree(ports) {
@@ -185,37 +183,37 @@ export async function openFeishuBoard(input, dependencies = {}) {
 }
 
 export function desktopPaths(
-  directory = join(homedir(), "Library/Application Support/Lark Codex Taskboard/deploy"),
+  directory = join(homedir(), "Library/Application Support/Lark-Codex/deploy"),
 ) {
   const base = dirname(directory);
   return {
-    LARK_TASKBOARD_DATA_DIR: join(base, "data"),
-    LARK_TASKBOARD_FEISHU_CREDENTIALS_FILE: join(base, "secrets/feishu-credentials.json"),
-    LARK_TASKBOARD_CODEX_TOKEN_FILE: join(base, "secrets/codex-app-server-token"),
-    LARK_TASKBOARD_FRPC_CONFIG_FILE: join(base, "secrets/frpc.toml"),
-    LARK_TASKBOARD_PORTS_FILE: join(directory, "ports.json"),
-    LARK_TASKBOARD_CADDY_DATA_DIR: join(base, "caddy/data"),
-    LARK_TASKBOARD_CADDY_CONFIG_DIR: join(base, "caddy/config"),
+    LARK_CODEX_DATA_DIR: join(base, "data"),
+    LARK_CODEX_FEISHU_CREDENTIALS_FILE: join(base, "secrets/feishu-credentials.json"),
+    LARK_CODEX_CODEX_TOKEN_FILE: join(base, "secrets/codex-app-server-token"),
+    LARK_CODEX_FRPC_CONFIG_FILE: join(base, "secrets/frpc.toml"),
+    LARK_CODEX_PORTS_FILE: join(directory, "ports.json"),
+    LARK_CODEX_CADDY_DATA_DIR: join(base, "caddy/data"),
+    LARK_CODEX_CADDY_CONFIG_DIR: join(base, "caddy/config"),
   };
 }
 export function initializeDeployment(directory, defaults = DEFAULT_PORTS) {
   const paths = desktopPaths(directory);
   for (const dir of [
     directory,
-    paths.LARK_TASKBOARD_DATA_DIR,
-    dirname(paths.LARK_TASKBOARD_FEISHU_CREDENTIALS_FILE),
-    paths.LARK_TASKBOARD_CADDY_DATA_DIR,
-    paths.LARK_TASKBOARD_CADDY_CONFIG_DIR,
+    paths.LARK_CODEX_DATA_DIR,
+    dirname(paths.LARK_CODEX_FEISHU_CREDENTIALS_FILE),
+    paths.LARK_CODEX_CADDY_DATA_DIR,
+    paths.LARK_CODEX_CADDY_CONFIG_DIR,
   ])
     mkdirSync(dir, { recursive: true, mode: 0o700 });
   for (const [file, content] of [
-    [paths.LARK_TASKBOARD_FRPC_CONFIG_FILE, ""],
-    [paths.LARK_TASKBOARD_CODEX_TOKEN_FILE, randomUUID() + randomUUID() + "\n"],
+    [paths.LARK_CODEX_FRPC_CONFIG_FILE, ""],
+    [paths.LARK_CODEX_CODEX_TOKEN_FILE, randomUUID() + randomUUID() + "\n"],
     [
-      paths.LARK_TASKBOARD_PORTS_FILE,
+      paths.LARK_CODEX_PORTS_FILE,
       JSON.stringify(
-        existsSync(paths.LARK_TASKBOARD_PORTS_FILE)
-          ? readLocalPorts(paths.LARK_TASKBOARD_PORTS_FILE)
+        existsSync(paths.LARK_CODEX_PORTS_FILE)
+          ? readLocalPorts(paths.LARK_CODEX_PORTS_FILE)
           : defaults,
         null,
         2,
@@ -230,20 +228,26 @@ export function initializeDeployment(directory, defaults = DEFAULT_PORTS) {
   }
   // Import the old two-file layout once; never replace existing credentials.
   const legacyEnv = join(directory, "production.env");
-  const legacySecret = join(
-    dirname(paths.LARK_TASKBOARD_FEISHU_CREDENTIALS_FILE),
-    "feishu-app-secret",
-  );
+  const legacySecret = join(dirname(paths.LARK_CODEX_FEISHU_CREDENTIALS_FILE), "feishu-app-secret");
   const legacy = { appId: "", appSecret: "" };
   if (existsSync(legacyEnv)) {
     assertRegularFile(legacyEnv);
-    legacy.appId = parseEnv(readFileSync(legacyEnv, "utf8")).LARK_TASKBOARD_FEISHU_APP_ID || "";
+    const values = parseEnv(readFileSync(legacyEnv, "utf8"));
+    // Preserve pre-rename production.env imports without silently choosing
+    // between conflicting old/new credential keys.
+    if (
+      values.LARK_CODEX_FEISHU_APP_ID !== undefined &&
+      values.LARK_TASKBOARD_FEISHU_APP_ID !== undefined &&
+      values.LARK_CODEX_FEISHU_APP_ID !== values.LARK_TASKBOARD_FEISHU_APP_ID
+    )
+      throw new Error("新旧飞书 App ID 配置不一致，旧文件已保留，请核对迁移内容");
+    legacy.appId = values.LARK_CODEX_FEISHU_APP_ID ?? values.LARK_TASKBOARD_FEISHU_APP_ID ?? "";
   }
   if (existsSync(legacySecret)) {
     assertRegularFile(legacySecret);
     legacy.appSecret = readFileSync(legacySecret, "utf8").trim();
   }
-  const credentialsFile = paths.LARK_TASKBOARD_FEISHU_CREDENTIALS_FILE;
+  const credentialsFile = paths.LARK_CODEX_FEISHU_CREDENTIALS_FILE;
   if (!existsSync(credentialsFile)) {
     validateCredentials(legacy);
     const temp = join(dirname(credentialsFile), `.lark-config-${randomUUID()}.json`);
@@ -292,8 +296,8 @@ function readCredentials(path) {
 function deploymentPaths(directory) {
   const desktop = desktopPaths(directory);
   const paths = {
-    credentials: desktop.LARK_TASKBOARD_FEISHU_CREDENTIALS_FILE,
-    frpc: desktop.LARK_TASKBOARD_FRPC_CONFIG_FILE,
+    credentials: desktop.LARK_CODEX_FEISHU_CREDENTIALS_FILE,
+    frpc: desktop.LARK_CODEX_FRPC_CONFIG_FILE,
   };
   for (const path of Object.values(paths)) assertRegularFile(path);
   return paths;
@@ -314,7 +318,7 @@ export function readDeploymentConfiguration(directory) {
     try {
       origin = readFrpcOrigin(
         frpc,
-        readLocalPorts(desktopPaths(directory).LARK_TASKBOARD_PORTS_FILE).caddy,
+        readLocalPorts(desktopPaths(directory).LARK_CODEX_PORTS_FILE).caddy,
       );
     } catch (error) {
       originError = error.message;
@@ -333,7 +337,7 @@ export async function saveDeploymentConfiguration(directory, values, verifyFrpc)
   const paths = deploymentPaths(directory);
   if (!secret) throw new Error("请填写 App Secret");
   if (!frpc) throw new Error("请填写 frpc.toml 配置");
-  readFrpcOrigin(frpc, readLocalPorts(desktopPaths(directory).LARK_TASKBOARD_PORTS_FILE).caddy);
+  readFrpcOrigin(frpc, readLocalPorts(desktopPaths(directory).LARK_CODEX_PORTS_FILE).caddy);
   function clearLegacyCredentials() {
     // An explicit save confirms these credentials over legacy copies.
     for (const file of [
@@ -476,7 +480,7 @@ async function main() {
     }
     try {
       const paths = desktopPaths(settings.configDirectory);
-      state.ports = readLocalPorts(paths.LARK_TASKBOARD_PORTS_FILE);
+      state.ports = readLocalPorts(paths.LARK_CODEX_PORTS_FILE);
     } catch (error) {
       state.portsMessage = error.message;
     }
@@ -532,7 +536,7 @@ async function main() {
       const desktopState = JSON.parse(
         readFileSync(join(homedir(), ".codex/.codex-global-state.json"), "utf8"),
       );
-      c.LARK_TASKBOARD_WORKSPACE_ROOTS = [
+      c.LARK_CODEX_WORKSPACE_ROOTS = [
         ...new Set(
           Object.values(desktopState["local-projects"] || {}).flatMap(
             (project) => project.rootPaths || [],
@@ -545,15 +549,15 @@ async function main() {
       /* Codex may not have been configured yet. */
     }
     const deployment = readDeploymentConfiguration(settings.configDirectory);
-    const ports = readLocalPorts(c.LARK_TASKBOARD_PORTS_FILE);
-    const env = nativeEnvironment({ LARK_TASKBOARD_ORIGIN: deployment.origin }, c, root, ports);
+    const ports = readLocalPorts(c.LARK_CODEX_PORTS_FILE);
+    const env = nativeEnvironment({ LARK_CODEX_ORIGIN: deployment.origin }, c, root, ports);
     if (!existsSync(settings.codexPath))
       throw new Error("未找到 Codex 程序，请先安装并登录 Codex Desktop");
     if (deployment.credentialsError) throw new Error(deployment.credentialsError);
     if (!deployment.appId || !deployment.appSecret || !deployment.frpc.trim())
       throw new Error("请在连接配置中填写 App ID、App Secret 和 frpc 信息");
     if (deployment.originError) throw new Error(deployment.originError);
-    const url = new URL(env.LARK_TASKBOARD_ORIGIN);
+    const url = new URL(env.LARK_CODEX_ORIGIN);
     if (!isSupportedOrigin(url)) throw new Error("公网地址必须是 HTTP/HTTPS 域名或 HTTP 公网 IPv4");
     return {
       c,
@@ -628,9 +632,9 @@ async function main() {
     try {
       config = configuration();
       const { c, env, url, ports, codex } = config;
-      env.LARK_TASKBOARD_CODEX_COMMAND = codex;
+      env.LARK_CODEX_CODEX_COMMAND = codex;
       await assertPortsFree([ports.api, ports.admin, ports.bridge, ports.caddy]);
-      mkdirSync(join(c.LARK_TASKBOARD_DATA_DIR, "run"), { recursive: true, mode: 0o700 });
+      mkdirSync(join(c.LARK_CODEX_DATA_DIR, "run"), { recursive: true, mode: 0o700 });
       const caddyPath = join(stateDir, "Caddyfile");
       writeFileSync(caddyPath, renderCaddyfile(url, ports), { mode: 0o600 });
       const common = {
@@ -639,8 +643,8 @@ async function main() {
         PATH: `${join(root, "bin")}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin`,
         LANG: "zh_CN.UTF-8",
         ...env,
-        XDG_DATA_HOME: c.LARK_TASKBOARD_CADDY_DATA_DIR,
-        XDG_CONFIG_HOME: c.LARK_TASKBOARD_CADDY_CONFIG_DIR,
+        XDG_DATA_HOME: c.LARK_CODEX_CADDY_DATA_DIR,
+        XDG_CONFIG_HOME: c.LARK_CODEX_CADDY_CONFIG_DIR,
       };
       const node = join(root, "bin/node");
       launch("Lark-Codex 后端", node, ["apps/server/dist/main.js"], common);
@@ -658,7 +662,7 @@ async function main() {
         ["run", "--config", caddyPath, "--adapter", "caddyfile"],
         common,
       );
-      launch("公网隧道", join(root, "bin/frpc"), ["-c", c.LARK_TASKBOARD_FRPC_CONFIG_FILE], common);
+      launch("公网隧道", join(root, "bin/frpc"), ["-c", c.LARK_CODEX_FRPC_CONFIG_FILE], common);
       state.url = url.origin;
       state.message = "服务启动中，等待健康检查…";
       publish();
@@ -787,8 +791,8 @@ async function main() {
           try {
             const paths = desktopPaths(settings.configDirectory);
             const savedPorts = await savePorts(
-              paths.LARK_TASKBOARD_PORTS_FILE,
-              paths.LARK_TASKBOARD_FRPC_CONFIG_FILE,
+              paths.LARK_CODEX_PORTS_FILE,
+              paths.LARK_CODEX_FRPC_CONFIG_FILE,
               request.settings || {},
               (file) => verifyFrpcFile(join(root, "bin/frpc"), file),
             );

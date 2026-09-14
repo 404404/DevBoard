@@ -1,4 +1,4 @@
-import type { ActivityView } from "@lark-taskboard/contracts";
+import type { ActivityView } from "@lark-codex/contracts";
 import { TASK_STATUS_META } from "./task-status";
 
 const fields: Record<string, string> = {

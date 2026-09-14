@@ -1,5 +1,5 @@
 {
-  "name": "@lark-taskboard/taskctl",
+  "name": "@lark-codex/taskctl",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -21,7 +21,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@lark-taskboard/contracts": "0.1.0",
+    "@lark-codex/contracts": "0.1.0",
     "zod": "^4.3.6"
   }
 }

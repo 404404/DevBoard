@@ -8,7 +8,7 @@ import type {
   GitEntry,
   GitCreationOrigin,
   ProjectView,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import { createGitResource, deleteGitResource, readGitManagement } from "./api";
 import { GitBranch } from "./git-branch-icon";
 import { Plus, X } from "./icons";

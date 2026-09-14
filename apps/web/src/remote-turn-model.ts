@@ -1,4 +1,4 @@
-import type { RemoteThread } from "@lark-taskboard/contracts";
+import type { RemoteThread } from "@lark-codex/contracts";
 export type RemoteTurn = RemoteThread["turns"][number];
 type Turn = RemoteTurn;
 export type RemoteItem = Turn["items"][number];

@@ -1,5 +1,5 @@
 import { seedProjectMember } from "./helpers/project-member-fixture.js";
-import { identityKey, type IdentityRef } from "@lark-taskboard/contracts";
+import { identityKey, type IdentityRef } from "@lark-codex/contracts";
 import { seedFeishuTestActor, TEST_FEISHU_ACTOR } from "./helpers/identity.js";
 import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -8,11 +8,7 @@ import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
 
-import {
-  ALL_PROJECT_ID,
-  CreateTaskCommandSchema,
-  type PrincipalView,
-} from "@lark-taskboard/contracts";
+import { ALL_PROJECT_ID, CreateTaskCommandSchema, type PrincipalView } from "@lark-codex/contracts";
 
 import { appControl, createApp } from "../src/app.js";
 import { loadConfig } from "../src/config.js";
@@ -77,19 +73,19 @@ function isolatedTestEnvironment(prefix: string) {
   const dataDirectory = mkdtempSync(join(tmpdir(), prefix));
   temporaryDirectories.push(dataDirectory);
   return {
-    LARK_TASKBOARD_ENV: "test",
-    LARK_TASKBOARD_AUTH_MODE: "feishu",
-    LARK_TASKBOARD_ORIGIN: "https://tasks.example.com",
-    LARK_TASKBOARD_ALLOWED_HOSTS: "tasks.example.com",
-    LARK_TASKBOARD_FEISHU_APP_ID: "cli_test",
-    LARK_TASKBOARD_FEISHU_APP_SECRET: "secret-for-test",
-    LARK_TASKBOARD_DATA_DIR: dataDirectory,
-    LARK_TASKBOARD_WORKSPACE_ROOTS: `${process.cwd()},${dataDirectory}`,
+    LARK_CODEX_ENV: "test",
+    LARK_CODEX_AUTH_MODE: "feishu",
+    LARK_CODEX_ORIGIN: "https://tasks.example.com",
+    LARK_CODEX_ALLOWED_HOSTS: "tasks.example.com",
+    LARK_CODEX_FEISHU_APP_ID: "cli_test",
+    LARK_CODEX_FEISHU_APP_SECRET: "secret-for-test",
+    LARK_CODEX_DATA_DIR: dataDirectory,
+    LARK_CODEX_WORKSPACE_ROOTS: `${process.cwd()},${dataDirectory}`,
   } as const;
 }
 
 async function feishuSetup() {
-  const config = loadConfig(isolatedTestEnvironment("lark-taskboard-http-development-"));
+  const config = loadConfig(isolatedTestEnvironment("lark-codex-http-development-"));
   const database = initializeDatabase(":memory:");
   seedFeishuTestActor(database);
   const provisioner = new FakeThreadProvisioner();
@@ -282,16 +278,16 @@ describe("taskboard HTTP routes", () => {
     );
 
     const config = loadConfig({
-      ...isolatedTestEnvironment("lark-taskboard-http-options-"),
-      LARK_TASKBOARD_AUTH_MODE: "feishu",
-      LARK_TASKBOARD_ORIGIN: "https://tasks.example.com",
-      LARK_TASKBOARD_ALLOWED_HOSTS: "tasks.example.com",
-      LARK_TASKBOARD_FEISHU_APP_ID: "cli_test",
-      LARK_TASKBOARD_FEISHU_APP_SECRET: "secret-for-test",
+      ...isolatedTestEnvironment("lark-codex-http-options-"),
+      LARK_CODEX_AUTH_MODE: "feishu",
+      LARK_CODEX_ORIGIN: "https://tasks.example.com",
+      LARK_CODEX_ALLOWED_HOSTS: "tasks.example.com",
+      LARK_CODEX_FEISHU_APP_ID: "cli_test",
+      LARK_CODEX_FEISHU_APP_SECRET: "secret-for-test",
     });
     const projectRegistry = new CountingProjectRegistry(
       database,
-      config.LARK_TASKBOARD_WORKSPACE_ROOTS,
+      config.LARK_CODEX_WORKSPACE_ROOTS,
     );
     const app = createApp({
       config,
@@ -357,7 +353,7 @@ describe("taskboard HTTP routes", () => {
         },
       ],
       defaultDevelopmentContext: { id: null, label: "main", branch: "main" },
-      attachmentMaxBytes: config.LARK_TASKBOARD_ATTACHMENT_MAX_BYTES,
+      attachmentMaxBytes: config.LARK_CODEX_ATTACHMENT_MAX_BYTES,
       relationCandidates: [
         { id: first.id, identifier: "PICK-001", title: "候选任务一" },
         { id: second.id, identifier: "PICK-002", title: "候选任务二" },
@@ -487,7 +483,7 @@ describe("taskboard HTTP routes", () => {
   });
 
   it("exposes read-only system/Codex boards and reassigns temporary history", async () => {
-    const environment = isolatedTestEnvironment("lark-taskboard-http-project-sync-");
+    const environment = isolatedTestEnvironment("lark-codex-http-project-sync-");
     const config = loadConfig(environment);
     const database = initializeDatabase(":memory:");
     seedFeishuTestActor(database);
@@ -513,10 +509,10 @@ describe("taskboard HTTP routes", () => {
     const cookies = cookieHeader(login);
     const csrfToken = login.json().data.csrfToken as string;
     const projectSync = appControl(app).services.projectSync;
-    const paperDirectory = join(environment.LARK_TASKBOARD_DATA_DIR, "paper");
+    const paperDirectory = join(environment.LARK_CODEX_DATA_DIR, "paper");
     mkdirSync(paperDirectory);
     const paperRoot = realpathSync(paperDirectory);
-    const dockerRoot = realpathSync(environment.LARK_TASKBOARD_DATA_DIR);
+    const dockerRoot = realpathSync(environment.LARK_CODEX_DATA_DIR);
     projectSync.reconcile({
       schemaVersion: 1,
       generatedAt: "2026-09-01T12:00:00.000Z",
@@ -790,13 +786,13 @@ describe("taskboard HTTP routes", () => {
       },
     ).task;
     const config = loadConfig({
-      ...isolatedTestEnvironment("lark-taskboard-http-feishu-"),
-      LARK_TASKBOARD_AUTH_MODE: "feishu",
-      LARK_TASKBOARD_ORIGIN: "https://tasks.example.com",
-      LARK_TASKBOARD_ALLOWED_HOSTS: "tasks.example.com",
-      LARK_TASKBOARD_FEISHU_APP_ID: "cli_test",
-      LARK_TASKBOARD_FEISHU_APP_SECRET: "secret-for-test",
-      LARK_TASKBOARD_ATTACHMENT_MAX_BYTES: "1024",
+      ...isolatedTestEnvironment("lark-codex-http-feishu-"),
+      LARK_CODEX_AUTH_MODE: "feishu",
+      LARK_CODEX_ORIGIN: "https://tasks.example.com",
+      LARK_CODEX_ALLOWED_HOSTS: "tasks.example.com",
+      LARK_CODEX_FEISHU_APP_ID: "cli_test",
+      LARK_CODEX_FEISHU_APP_SECRET: "secret-for-test",
+      LARK_CODEX_ATTACHMENT_MAX_BYTES: "1024",
     });
     const app = createApp({
       config,
@@ -999,18 +995,18 @@ describe("taskboard HTTP routes", () => {
   });
 
   it("uploads and downloads attachments without exposing storage paths", async () => {
-    const dataDirectory = mkdtempSync(join(tmpdir(), "lark-taskboard-http-attachment-"));
+    const dataDirectory = mkdtempSync(join(tmpdir(), "lark-codex-http-attachment-"));
     temporaryDirectories.push(dataDirectory);
     const config = loadConfig({
-      LARK_TASKBOARD_ENV: "test",
-      LARK_TASKBOARD_AUTH_MODE: "feishu",
-      LARK_TASKBOARD_ORIGIN: "https://tasks.example.com",
-      LARK_TASKBOARD_ALLOWED_HOSTS: "tasks.example.com",
-      LARK_TASKBOARD_FEISHU_APP_ID: "cli_test",
-      LARK_TASKBOARD_FEISHU_APP_SECRET: "secret-for-test",
-      LARK_TASKBOARD_DATA_DIR: dataDirectory,
-      LARK_TASKBOARD_WORKSPACE_ROOTS: process.cwd(),
-      LARK_TASKBOARD_ATTACHMENT_MAX_BYTES: "1024",
+      LARK_CODEX_ENV: "test",
+      LARK_CODEX_AUTH_MODE: "feishu",
+      LARK_CODEX_ORIGIN: "https://tasks.example.com",
+      LARK_CODEX_ALLOWED_HOSTS: "tasks.example.com",
+      LARK_CODEX_FEISHU_APP_ID: "cli_test",
+      LARK_CODEX_FEISHU_APP_SECRET: "secret-for-test",
+      LARK_CODEX_DATA_DIR: dataDirectory,
+      LARK_CODEX_WORKSPACE_ROOTS: process.cwd(),
+      LARK_CODEX_ATTACHMENT_MAX_BYTES: "1024",
     });
     const database = initializeDatabase(":memory:");
     seedFeishuTestActor(database);

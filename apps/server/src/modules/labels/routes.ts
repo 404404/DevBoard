@@ -5,7 +5,7 @@ import {
   IdempotencyKeySchema,
   ReorderGlobalLabelsCommandSchema,
   UpdateGlobalLabelCommandSchema,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 
@@ -23,12 +23,12 @@ interface LabelRoutesOptions {
 }
 
 function authenticate(request: FastifyRequest, options: LabelRoutesOptions) {
-  const names = sessionCookieNames(options.config);
+  const names = sessionCookieNames(options.config, request.cookies);
   return options.identityService.authenticate(request.cookies[names.session]);
 }
 
 function mutationContext(request: FastifyRequest, options: LabelRoutesOptions): MutationContext {
-  const names = sessionCookieNames(options.config);
+  const names = sessionCookieNames(options.config, request.cookies);
   const session = options.identityService.authenticate(request.cookies[names.session]);
   const csrfHeader = request.headers["x-csrf-token"];
   options.identityService.assertCsrf(

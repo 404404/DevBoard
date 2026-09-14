@@ -16,7 +16,7 @@ import {
   UpdateCommentCommandSchema,
   TEMPORARY_PROJECT_ID,
   TaskLifecycleCommandSchema,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 
@@ -68,7 +68,7 @@ function authenticate(
   config: AppConfig,
   identityService: IdentityService,
 ): SessionContext {
-  const names = sessionCookieNames(config);
+  const names = sessionCookieNames(config, request.cookies);
   return identityService.authenticate(request.cookies[names.session]);
 }
 
@@ -77,7 +77,7 @@ function mutationContext(
   config: AppConfig,
   identityService: IdentityService,
 ): MutationContext {
-  const names = sessionCookieNames(config);
+  const names = sessionCookieNames(config, request.cookies);
   const session = identityService.authenticate(request.cookies[names.session]);
   const csrfHeader = request.headers["x-csrf-token"];
   identityService.assertCsrf(
@@ -123,7 +123,7 @@ export function registerTaskboardRoutes(
     const session = authenticate(request, config, identityService);
     const { projectId } = ProjectParamsSchema.parse(request.params);
     const optionsView = taskboard.readTaskCreationOptions(projectId, session.actor, () => [], {
-      attachmentMaxBytes: config.LARK_TASKBOARD_ATTACHMENT_MAX_BYTES,
+      attachmentMaxBytes: config.LARK_CODEX_ATTACHMENT_MAX_BYTES,
     });
     if (projectId === TEMPORARY_PROJECT_ID) {
       return { data: optionsView };
@@ -317,7 +317,7 @@ export function registerTaskboardRoutes(
   app.post(
     "/api/v1/tasks/:taskId/attachments",
     {
-      bodyLimit: config.LARK_TASKBOARD_ATTACHMENT_MAX_BYTES,
+      bodyLimit: config.LARK_CODEX_ATTACHMENT_MAX_BYTES,
       onRequest: (request, _reply, done) => {
         try {
           const context = mutationContext(request, config, identityService);

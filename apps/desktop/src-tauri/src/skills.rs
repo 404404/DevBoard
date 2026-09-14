@@ -40,7 +40,7 @@ fn run(app: &tauri::AppHandle, action: &str, options: Value) -> Result<Value, St
     }
     let _lease = MaintenanceLease(&controller);
     let home = PathBuf::from(std::env::var_os("HOME").ok_or("无法定位当前用户目录")?);
-    let app_data = home.join("Library/Application Support/Lark Codex Taskboard");
+    let app_data = crate::app_data::path(&home);
     let runtime = app
         .path()
         .resource_dir()

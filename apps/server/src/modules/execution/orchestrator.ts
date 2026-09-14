@@ -1,4 +1,4 @@
-import type { JobView } from "@lark-taskboard/contracts";
+import type { JobView } from "@lark-codex/contracts";
 
 import { CodexProtocolError, CodexRequestError, type CodexServerRequest } from "../codex/index.js";
 import {

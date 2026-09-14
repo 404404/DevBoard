@@ -1,17 +1,18 @@
-import { identityKey, identityFromKey, IdentityKeySchema } from "@lark-taskboard/contracts";
+import { identityKey, identityFromKey, IdentityKeySchema } from "@lark-codex/contracts";
 import { createHash, randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
   JobViewSchema,
+  normalizeLarkCodexEnvironment,
   JobWorkContextSchema,
   type PrincipalView,
   type JobKind,
   type JobStatus,
   type JobView,
   type JobWorkContext,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import { z } from "zod";
 
 import { AppError } from "../../app-error.js";
@@ -176,7 +177,7 @@ export class ExecutionQueue {
     const cli = fileURLToPath(
       new URL("../../../../../packages/taskctl/dist/cli.js", import.meta.url),
     );
-    this.#taskctlCommand = `LARK_TASKBOARD_DATA_DIR=${quote(resolve(options.executorDataDirectory ?? options.dataDirectory ?? process.env.LARK_TASKBOARD_DATA_DIR ?? ".data"))} ${quote(options.executorNodePath ?? process.execPath)} ${quote(options.executorTaskctlPath ?? cli)}`;
+    this.#taskctlCommand = `LARK_CODEX_DATA_DIR=${quote(resolve(options.executorDataDirectory ?? options.dataDirectory ?? normalizeLarkCodexEnvironment(process.env).LARK_CODEX_DATA_DIR ?? ".data"))} ${quote(options.executorNodePath ?? process.execPath)} ${quote(options.executorTaskctlPath ?? cli)}`;
     this.#now = options.now ?? (() => new Date());
     this.#leaseDurationMs = options.leaseDurationMs ?? 30_000;
     this.#onRevisionCommitted = options.onRevisionCommitted;
@@ -909,7 +910,7 @@ export class ExecutionQueue {
         attachmentSnapshot,
         ...(superseded ? { supersedesJobId: superseded.id } : {}),
         prompt: [
-          "按 $manage-lark-taskboard 执行。",
+          "按 $manage-lark-codex 执行。",
           String(baseContext.prompt ?? ""),
           ...(superseded
             ? [

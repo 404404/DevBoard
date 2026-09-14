@@ -29,7 +29,7 @@ describe("Codex App Server supervisor", () => {
     const child = new FakeProcess();
     const spawnProcess = vi.fn(() => child);
     const supervisor = new CodexAppServerSupervisor({
-      socketPath: "/private/tmp/lark-taskboard-test.sock",
+      socketPath: "/private/tmp/lark-codex-test.sock",
       spawnProcess,
       readinessProbe: async () => true,
       startupTimeoutMs: 200,
@@ -46,7 +46,7 @@ describe("Codex App Server supervisor", () => {
         "--codex",
         "codex",
         "--listen",
-        "unix:///private/tmp/lark-taskboard-test.sock",
+        "unix:///private/tmp/lark-codex-test.sock",
       ],
       expect.objectContaining({ stdio: ["ignore", "ignore", "pipe"] }),
     );
@@ -60,7 +60,7 @@ describe("Codex App Server supervisor", () => {
   it("fails startup without leaking stderr secrets", async () => {
     const child = new FakeProcess();
     const supervisor = new CodexAppServerSupervisor({
-      socketPath: "/private/tmp/lark-taskboard-test.sock",
+      socketPath: "/private/tmp/lark-codex-test.sock",
       spawnProcess: () => {
         queueMicrotask(() => {
           child.stderr.write("Authorization: Bearer very-secret-token\n");
@@ -83,7 +83,7 @@ describe("Codex App Server supervisor", () => {
     const child = new FakeProcess();
     const onUnexpectedExit = vi.fn();
     const supervisor = new CodexAppServerSupervisor({
-      socketPath: "/private/tmp/lark-taskboard-test.sock",
+      socketPath: "/private/tmp/lark-codex-test.sock",
       spawnProcess: () => child,
       readinessProbe: async () => true,
     });
@@ -100,7 +100,7 @@ describe("Codex App Server supervisor", () => {
   it("replays a clean unexpected exit that occurs before the restart handler is registered", async () => {
     const child = new FakeProcess();
     const supervisor = new CodexAppServerSupervisor({
-      socketPath: "/private/tmp/lark-taskboard-late-handler.sock",
+      socketPath: "/private/tmp/lark-codex-late-handler.sock",
       spawnProcess: () => child,
       readinessProbe: async () => true,
     });
@@ -137,18 +137,28 @@ describe("Codex App Server supervisor", () => {
   it("turns an asynchronous spawn error into a stable startup failure", async () => {
     const directory = mkdtempSync(join(tmpdir(), "lark-codex-spawn-error-"));
     const missingCommand = join(directory, "missing-codex");
+    const child = new FakeProcess();
     const supervisor = new CodexAppServerSupervisor({
       socketPath: join(directory, "codex.sock"),
       codexCommand: missingCommand,
+      spawnProcess: () => {
+        queueMicrotask(() => child.emit("error", new Error(`spawn ${missingCommand} ENOENT`)));
+        return child;
+      },
+      readinessProbe: async () => false,
       startupTimeoutMs: 200,
       startupPollMs: 5,
     });
+    vi.useFakeTimers();
     try {
-      await expect(supervisor.start()).rejects.toThrow("Codex App Server 启动失败");
+      const failed = expect(supervisor.start()).rejects.toThrow("Codex App Server 启动失败");
+      await vi.runAllTimersAsync();
+      await failed;
       expect(supervisor.health().error).toBe("Codex App Server 进程启动失败");
       expect(supervisor.health().error).not.toContain(missingCommand);
       await expect(supervisor.stop()).resolves.toBeUndefined();
     } finally {
+      vi.useRealTimers();
       rmSync(directory, { recursive: true, force: true });
     }
   });

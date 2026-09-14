@@ -39,7 +39,7 @@ const input = {
 };
 const health = {
   status: "ok",
-  service: "lark-taskboard-server",
+  service: "lark-codex-server",
   version: "0.1.0",
   timestamp: "2026-09-12T12:00:00.000Z",
   checks: { http: "ok", sqlite: "ok" },

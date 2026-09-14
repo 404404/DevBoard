@@ -3,12 +3,8 @@ import {
   UpdateTaskCommandSchema,
   ALL_PROJECT_ID,
   TEMPORARY_PROJECT_ID,
-} from "@lark-taskboard/contracts";
-import {
-  identityKey,
-  CreateTaskCommandSchema,
-  type PrincipalView,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
+import { identityKey, CreateTaskCommandSchema, type PrincipalView } from "@lark-codex/contracts";
 import { afterEach, expect, it } from "vitest";
 import { initializeDatabase, type SqliteDatabase } from "../src/modules/database/index.js";
 import { DevelopmentIdentityAdapter, IdentityService } from "../src/modules/identity/index.js";

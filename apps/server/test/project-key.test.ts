@@ -7,7 +7,7 @@ import {
 
 describe("projectKey", () => {
   it("combines the root basename prefix with a deterministic path checksum", () => {
-    expect(allocateProjectKey("/Users/test/Projects/lark-taskboard", new Set())).toBe("LAPG");
+    expect(allocateProjectKey("/Users/test/Projects/lark-codex", new Set())).toBe("LACV");
     expect(allocateProjectKey("/Users/test/Docker", new Set())).toBe("DOVO");
     expect(allocateProjectKey("/Users/test/Projects/codex-example", new Set())).toBe("COXL");
     expect(allocateProjectKey("/Users/test/Projects/sample-app", new Set())).toBe("SAGA");
@@ -21,16 +21,16 @@ describe("projectKey", () => {
   });
 
   it("extends collisions and the reserved TEMP key to a stable five-letter key", () => {
-    const root = "/Users/test/Projects/lark-taskboard";
+    const root = "/Users/test/Projects/lark-codex";
 
-    expect(allocateProjectKey(root, new Set(["LAPG"]))).toBe("LAPPG");
-    expect(allocateProjectKey(root, new Set(["LAPG", "LAPPG"]))).toBe("LAPPH");
-    expect(allocateProjectKey(root, new Set(["LAPG", "LAPPG"]))).toBe("LAPPH");
+    expect(allocateProjectKey(root, new Set(["LACV"]))).toBe("LALCV");
+    expect(allocateProjectKey(root, new Set(["LACV", "LALCV"]))).toBe("LALCW");
+    expect(allocateProjectKey(root, new Set(["LACV", "LALCV"]))).toBe("LALCW");
     expect(allocateProjectKey("/Users/test/test-1495", new Set())).toBe("TETMP");
   });
 
   it("checks every five-letter suffix before reporting exhaustion", () => {
-    const occupied = new Set<string>(["LAPG"]);
+    const occupied = new Set<string>(["LACV"]);
     for (let first = 0; first < 26; first += 1) {
       for (let second = 0; second < 26; second += 1) {
         for (let third = 0; third < 26; third += 1) {
@@ -40,7 +40,7 @@ describe("projectKey", () => {
       }
     }
 
-    expect(allocateProjectKey("/Users/test/Projects/lark-taskboard", occupied)).toBe("LAAAA");
+    expect(allocateProjectKey("/Users/test/Projects/lark-codex", occupied)).toBe("LAAAA");
   });
 
   it("rejects a relative or empty root", () => {
@@ -53,10 +53,10 @@ describe("projectKey", () => {
 
 describe("task identifier", () => {
   it("pads task numbers to at least three digits", () => {
-    expect(formatTaskIdentifier("LAPG", 1)).toBe("LAPG-001");
-    expect(formatTaskIdentifier("LAPG", 12)).toBe("LAPG-012");
-    expect(formatTaskIdentifier("LAPG", 999)).toBe("LAPG-999");
-    expect(formatTaskIdentifier("LAPG", 1000)).toBe("LAPG-1000");
+    expect(formatTaskIdentifier("LACV", 1)).toBe("LACV-001");
+    expect(formatTaskIdentifier("LACV", 12)).toBe("LACV-012");
+    expect(formatTaskIdentifier("LACV", 999)).toBe("LACV-999");
+    expect(formatTaskIdentifier("LACV", 1000)).toBe("LACV-1000");
     expect(formatTaskIdentifier("TEMP", 1)).toBe("TEMP-001");
   });
 

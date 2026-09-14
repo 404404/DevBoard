@@ -18,14 +18,17 @@ import {
 import { dirname, isAbsolute, join, parse, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const NAME = "manage-lark-taskboard";
+const NAME = "manage-lark-codex";
+// Recognize installed pre-rename Skills without moving or replacing user files.
+const LEGACY_NAME = "manage-lark-taskboard";
 const RECEIPT = ".lark-codex-skill.json";
-const OWNER = "cn.rocyan.taskboard.desktop";
+const OWNER = "cn.rocyan.larkcodex.desktop";
 const STAGE_PREFIX = `.${NAME}.install-`;
 const MAX_TREE_BYTES = 32 * 1024 * 1024;
 const messages = {
   managed: "此 Skill 路径含链接、受管标记或特殊文件。请在原管理工具中处理，应用不会覆盖。",
-  legacy: "Codex 旧技能目录已有同名 Skill。请先在原管理工具中处理，避免出现重复技能。",
+  legacy:
+    "Codex 旧技能目录或旧名称位置已有 Lark-Codex Skill。请先在原管理工具中处理，避免出现重复技能。",
   bundle: "随包 Skill 缺失或校验失败，请重新安装 Lark-Codex 后重试。",
   changed: "Skill 内容已发生变化，请刷新状态并重新确认。未覆盖现有文件。",
   permission: "无法读写 Skill 或安装记录，请检查目录权限后重试。",
@@ -268,7 +271,12 @@ export function createSkillManager({
   function legacyConflict() {
     const roots = new Set([join(home, ".codex")]);
     if (typeof codexHome === "string" && isAbsolute(codexHome)) roots.add(resolve(codexHome));
-    return [...roots].some((root) => statOrNull(join(root, "skills", NAME)) !== null);
+    return (
+      statOrNull(join(home, ".agents/skills", LEGACY_NAME)) !== null ||
+      [...roots].some((root) =>
+        [NAME, LEGACY_NAME].some((name) => statOrNull(join(root, "skills", name)) !== null),
+      )
+    );
   }
 
   function inspect() {

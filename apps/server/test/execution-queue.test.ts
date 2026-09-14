@@ -1,6 +1,6 @@
-import { identityKey } from "@lark-taskboard/contracts";
+import { identityKey } from "@lark-codex/contracts";
 import { TEST_FEISHU_ACTOR, seedFeishuTestActor } from "./helpers/identity.js";
-import type { PrincipalView } from "@lark-taskboard/contracts";
+import type { PrincipalView } from "@lark-codex/contracts";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { AppError } from "../src/app-error.js";

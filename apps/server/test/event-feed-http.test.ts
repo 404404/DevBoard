@@ -1,7 +1,7 @@
 import { seedProjectMember } from "./helpers/project-member-fixture.js";
-import { identityKey } from "@lark-taskboard/contracts";
+import { identityKey } from "@lark-codex/contracts";
 import { seedFeishuTestActor, TEST_FEISHU_IDENTITY } from "./helpers/identity.js";
-import { EventPageSchema } from "@lark-taskboard/contracts";
+import { EventPageSchema } from "@lark-codex/contracts";
 import type { FastifyInstance } from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -29,8 +29,8 @@ function cookieHeader(response: Awaited<ReturnType<FastifyInstance["inject"]>>):
 
 async function developmentSetup(environment: Record<string, string> = {}) {
   const config = loadConfig({
-    LARK_TASKBOARD_ENV: "test",
-    LARK_TASKBOARD_WORKSPACE_ROOTS: process.cwd(),
+    LARK_CODEX_ENV: "test",
+    LARK_CODEX_WORKSPACE_ROOTS: process.cwd(),
     ...environment,
   });
   const database = initializeDatabase(":memory:");
@@ -207,7 +207,7 @@ describe("event feed HTTP and SSE routes", () => {
 
   it("keeps an idle authenticated SSE connection alive with heartbeat comments", async () => {
     const { app, project, trusted, cookies } = await developmentSetup({
-      LARK_TASKBOARD_SSE_HEARTBEAT_MS: "1000",
+      LARK_CODEX_SSE_HEARTBEAT_MS: "1000",
     });
     const controller = new AbortController();
     const response = await app.inject({
@@ -251,12 +251,12 @@ describe("event feed HTTP and SSE routes", () => {
       projectRole: "viewer",
     });
     const config = loadConfig({
-      LARK_TASKBOARD_ENV: "test",
-      LARK_TASKBOARD_AUTH_MODE: "feishu",
-      LARK_TASKBOARD_ORIGIN: "https://tasks.example.com",
-      LARK_TASKBOARD_ALLOWED_HOSTS: "tasks.example.com",
-      LARK_TASKBOARD_FEISHU_APP_ID: "cli_test",
-      LARK_TASKBOARD_FEISHU_APP_SECRET: "secret-for-test",
+      LARK_CODEX_ENV: "test",
+      LARK_CODEX_AUTH_MODE: "feishu",
+      LARK_CODEX_ORIGIN: "https://tasks.example.com",
+      LARK_CODEX_ALLOWED_HOSTS: "tasks.example.com",
+      LARK_CODEX_FEISHU_APP_ID: "cli_test",
+      LARK_CODEX_FEISHU_APP_SECRET: "secret-for-test",
     });
     const app = createApp({
       config,

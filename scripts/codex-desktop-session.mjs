@@ -15,7 +15,7 @@ import {
   remoteEditableTurn,
   remoteTurnItems,
   buildRemoteApprovalResponse,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import { createConnection } from "node:net";
 import { join } from "node:path";
 import { resolveRemoteUploads } from "./codex-remote-upload.mjs";

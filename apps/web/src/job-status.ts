@@ -1,4 +1,4 @@
-import type { JobStatus } from "@lark-taskboard/contracts";
+import type { JobStatus } from "@lark-codex/contracts";
 
 const ACTIVE_JOB_STATUSES: readonly JobStatus[] = [
   "queued",

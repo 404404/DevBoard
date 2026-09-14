@@ -1,8 +1,8 @@
-import { CreateTaskCommandSchema } from "@lark-taskboard/contracts";
+import { CreateTaskCommandSchema } from "@lark-codex/contracts";
 import { TEST_FEISHU_ACTOR } from "./helpers/identity.js";
 import { ProjectAdministration } from "../src/modules/project-registry/index.js";
 import { randomUUID } from "node:crypto";
-import { identityKey } from "@lark-taskboard/contracts";
+import { identityKey } from "@lark-codex/contracts";
 import { afterEach, expect, it, vi } from "vitest";
 import { appControl, createApp } from "../src/app.js";
 import { loadConfig } from "../src/config.js";
@@ -132,8 +132,8 @@ async function setup() {
   const app = createApp({
     database,
     config: loadConfig({
-      LARK_TASKBOARD_ENV: "test",
-      LARK_TASKBOARD_TEMPORARY_PROJECT_ROOT: "/tmp/remote-tests",
+      LARK_CODEX_ENV: "test",
+      LARK_CODEX_TEMPORARY_PROJECT_ROOT: "/tmp/remote-tests",
     }),
     remoteClient: { connect: async () => {}, request },
     closeDatabaseOnClose: false,

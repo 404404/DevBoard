@@ -6,7 +6,7 @@ import type { AppConfig } from "../../config.js";
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 export function registerRequestBoundary(app: FastifyInstance, config: AppConfig): void {
-  const allowedHosts = new Set(config.LARK_TASKBOARD_ALLOWED_HOSTS);
+  const allowedHosts = new Set(config.LARK_CODEX_ALLOWED_HOSTS);
 
   app.addHook("onRequest", async (request) => {
     const host = request.headers.host?.trim().toLowerCase();
@@ -15,11 +15,11 @@ export function registerRequestBoundary(app: FastifyInstance, config: AppConfig)
     }
 
     const origin = request.headers.origin;
-    if (origin && origin !== config.LARK_TASKBOARD_ORIGIN) {
+    if (origin && origin !== config.LARK_CODEX_ORIGIN) {
       throw new AppError("FORBIDDEN", 403, "请求 Origin 不受信任");
     }
 
-    if (!SAFE_METHODS.has(request.method) && origin !== config.LARK_TASKBOARD_ORIGIN) {
+    if (!SAFE_METHODS.has(request.method) && origin !== config.LARK_CODEX_ORIGIN) {
       throw new AppError("FORBIDDEN", 403, "写请求必须来自受信任 Origin");
     }
   });

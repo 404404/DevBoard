@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { RemoteThread } from "@lark-taskboard/contracts";
+import type { RemoteThread } from "@lark-codex/contracts";
 
 test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 

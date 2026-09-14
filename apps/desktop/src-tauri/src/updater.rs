@@ -380,7 +380,7 @@ fn validate_archive(bytes: &[u8]) -> Result<(), ()> {
             }
         } else if kind.is_file() {
             files.insert(relative.clone());
-            if relative == Path::new("Contents/MacOS/taskboard-desktop")
+            if relative == Path::new("Contents/MacOS/lark-codex-desktop")
                 && entry.header().mode().map_err(|_| ())? & 0o111 == 0
             {
                 return Err(());
@@ -391,7 +391,7 @@ fn validate_archive(bytes: &[u8]) -> Result<(), ()> {
     }
     for required in [
         "Contents/Info.plist",
-        "Contents/MacOS/taskboard-desktop",
+        "Contents/MacOS/lark-codex-desktop",
         "Contents/Resources/runtime/bin/node",
         "Contents/Resources/runtime/desktop/runtime.mjs",
     ] {
@@ -433,11 +433,16 @@ mod tests {
     fn requires_one_complete_application_archive() {
         let required = [
             "Lark-Codex.app/Contents/Info.plist",
-            "Lark-Codex.app/Contents/MacOS/taskboard-desktop",
+            "Lark-Codex.app/Contents/MacOS/lark-codex-desktop",
             "Lark-Codex.app/Contents/Resources/runtime/bin/node",
             "Lark-Codex.app/Contents/Resources/runtime/desktop/runtime.mjs",
         ];
         assert!(validate_archive(&archive(&required)).is_ok());
+        // The regular forwarding executable keeps already-published updaters
+        // compatible while this version requires the renamed main executable.
+        let mut compatible = required.to_vec();
+        compatible.push("Lark-Codex.app/Contents/MacOS/taskboard-desktop");
+        assert!(validate_archive(&archive(&compatible)).is_ok());
         assert!(validate_archive(&archive(&required[..3])).is_err());
         let mut mixed = required.to_vec();
         mixed.push("Another.app/Contents/unexpected");
@@ -453,7 +458,7 @@ mod tests {
         fn linked_archive(target: &str) -> Vec<u8> {
             let complete = archive(&[
                 "Lark-Codex.app/Contents/Info.plist",
-                "Lark-Codex.app/Contents/MacOS/taskboard-desktop",
+                "Lark-Codex.app/Contents/MacOS/lark-codex-desktop",
                 "Lark-Codex.app/Contents/Resources/runtime/bin/node",
                 "Lark-Codex.app/Contents/Resources/runtime/desktop/runtime.mjs",
             ]);

@@ -1,4 +1,4 @@
-import type { ErrorCode } from "@lark-taskboard/contracts";
+import type { ErrorCode } from "@lark-codex/contracts";
 
 export class AppError extends Error {
   readonly code: ErrorCode;

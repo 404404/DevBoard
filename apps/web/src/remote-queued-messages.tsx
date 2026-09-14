@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import type { RemoteThread } from "@lark-taskboard/contracts";
+import type { RemoteThread } from "@lark-codex/contracts";
 import { SfSymbol } from "./sf-symbol";
 
 type Queue = NonNullable<RemoteThread["queue"]>;

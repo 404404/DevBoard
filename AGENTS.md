@@ -28,14 +28,14 @@ sw_vers -productVersion
 检查 `/Applications/Lark-Codex.app` 和以下目录是否存在，只读取必要元信息，不展示私密文件内容：
 
 ```text
-~/Library/Application Support/Lark Codex Taskboard/
+~/Library/Application Support/Lark-Codex/
 ├── data/       数据库、附件、运行时信息
 ├── secrets/    飞书凭据、frpc 配置、内部令牌
 ├── deploy/     本机端口配置
 └── caddy/      证书与 Caddy 状态
 ```
 
-存在数据目录就按升级处理；不要清空目录或覆盖成发布者的配置。正常替换 `.app` 保留这些数据。需要备份时先确认备份位置及访问权限；复制整个数据目录应先正常退出 Lark-Codex，避免只复制正在写入的 SQLite 主文件。
+存在数据目录就按升级处理；不要清空目录或覆盖成发布者的配置。首次升级启动时，若新目录不存在且旧版已退出，应用会自动迁移旧版数据目录；新旧目录同时存在或目录受其他进程占用时按提示处理，不手工合并或覆盖。正常替换 `.app` 保留这些数据。需要备份时先确认备份位置及访问权限；复制整个数据目录应先正常退出 Lark-Codex，避免只复制正在写入的 SQLite 主文件。
 
 应用内置 Node、后端、网页前端、Codex 桥接、SQLite 组件、Caddy 和 frpc 客户端。用户仍需安装并登录 Codex 和飞书客户端，并准备自己的飞书应用和公网 frp 服务。**不需要另外安装 Node、Docker、Rust 或 Homebrew。**
 
@@ -106,23 +106,23 @@ App ID/App Secret 检查仅验证凭据；不能据此判断应用已发布、�
 
 ## 5. 安装 Skill 并调用内置 taskctl
 
-首次启动且尚未安装配套技能时，「让 Codex 使用 Lark-Codex」提示提供「安装到 Codex」和稍后选项；之后可通过「应用设置 → Agent Skill」安装、更新或重新检查。首版仅支持 Codex，默认将 `manage-lark-taskboard` 安装到 `~/.agents/skills/`。
+首次启动且尚未安装配套技能时，「让 Codex 使用 Lark-Codex」提示提供「安装到 Codex」和稍后选项；之后可通过「应用设置 → Agent Skill」安装、更新或重新检查。首版仅支持 Codex，默认将 `manage-lark-codex` 安装到 `~/.agents/skills/`。
 
-安装只写入技能文件，不包含 CLI 身份授权。已有用户修改时，只有用户明确选择「使用随包版本」才替换；符号链接或受其他工具管理的目录不直接覆盖。若旧 `~/.codex/skills` 或 `$CODEX_HOME/skills` 中已有同名技能，按提示在原位置或管理器更新，不再复制第二份。应用升级仅提示技能可更新，不静默覆盖。
+安装只写入技能文件，不包含 CLI 身份授权。已有用户修改时，只有用户明确选择「使用随包版本」才替换；符号链接或受其他工具管理的目录不直接覆盖。若已有旧版名称 `manage-lark-taskboard` 的技能，或旧 `~/.codex/skills`、`$CODEX_HOME/skills` 中已有同名技能，按提示在原位置或管理器处理，不再复制第二份，也不自动改名。应用升级仅提示技能可更新，不静默覆盖。
 
 成功状态只证明文件已安装。先在 Codex 技能列表确认，未识别时由用户按需强制重新加载技能或重新打开 Codex，再在新任务核验；不要为验证而退出 Codex Desktop、接管已有会话或启动真实业务任务。
 
 CLI 示例使用该技能中的包装器，直接调用完整 `.app` 内的 Node 和 taskctl，不依赖源码目录或全局 Node。默认安装时：
 
 ```sh
-TASKCTL="$HOME/.agents/skills/manage-lark-taskboard/scripts/taskctl.sh"
+TASKCTL="$HOME/.agents/skills/manage-lark-codex/scripts/taskctl.sh"
 "$TASKCTL" --help
 "$TASKCTL" health
 "$TASKCTL" auth status
 "$TASKCTL" project list
 ```
 
-若技能已由其他目录管理，从实际加载的 `SKILL.md` 所在目录定位 `scripts/taskctl.sh` 并调整 `TASKCTL`；缺少包装器时先更新原管理器中的技能。包装器优先探测 `/Applications/Lark-Codex.app`，其次是 `~/Applications/Lark-Codex.app`。`LARK_CODEX_APP_PATH` 可覆盖应用位置，`LARK_TASKBOARD_DATA_DIR` 可显式覆盖数据目录；默认仍为应用的 AppSupport `data` 目录。包装器保持调用工作目录，便于 `context` 定位项目，不自动启动服务。
+若技能已由其他目录管理，从实际加载的 `SKILL.md` 所在目录定位 `scripts/taskctl.sh` 并调整 `TASKCTL`；缺少包装器时先更新原管理器中的技能。包装器优先探测 `/Applications/Lark-Codex.app`，其次是 `~/Applications/Lark-Codex.app`。`LARK_CODEX_APP_PATH` 可覆盖应用位置，`LARK_CODEX_DATA_DIR` 可显式覆盖数据目录；默认仍为应用的 AppSupport `data` 目录。包装器保持调用工作目录，便于 `context` 定位项目，不自动启动服务。
 
 CLI 自动从 `data/run/runtime.json` 读取本机管理地址和能力令牌；不要 `cat` 此文件，也不要在命令行拼接令牌。`--help` 不需要后台运行；其他命令依赖当前服务。找不到运行信息时先检查应用状态与数据路径，不启动第二套后端或创建伪造的 runtime 文件。
 

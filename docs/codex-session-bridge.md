@@ -34,6 +34,6 @@
 
 旧版在 `$CODEX_HOME/taskboard/recent/<uuid>` 创建目录，但桌面不会仅凭名称 `recent` 判断无项目任务。0.153.4 根据持久化归属或 `Documents/Codex/YYYY-MM-DD/<name>` 目录布局识别 projectless；缺失标识的外部会话可能按项目上下文恢复。
 
-新临时任务在 `LARK_TASKBOARD_TEMPORARY_PROJECT_ROOT/YYYY-MM-DD/task-<uuid>` 中创建，页面顶部也使用同一根目录。桌面应用从当前用户主目录推导 `~/Documents/Codex`，创建任务时自动创建所需目录，不读取 `production.env` 中的路径配置，不再从 `CODEX_HOME` 推导。源码开发可使用 `LARK_TASKBOARD_TEMPORARY_PROJECT_ROOT` 覆盖默认根目录；项目任务仍使用项目的执行目录。
+新临时任务在 `LARK_CODEX_TEMPORARY_PROJECT_ROOT/YYYY-MM-DD/task-<uuid>` 中创建，页面顶部也使用同一根目录。桌面应用从当前用户主目录推导 `~/Documents/Codex`，创建任务时自动创建所需目录，不读取 `production.env` 中的路径配置，不再从 `CODEX_HOME` 推导。源码开发可使用 `LARK_CODEX_TEMPORARY_PROJECT_ROOT` 覆盖默认根目录；项目任务仍使用项目的执行目录。
 
 既有任务继续使用已绑定的工作目录，不强制搬移用户文件。

@@ -5,7 +5,7 @@ import {
   type FeishuIdentityRef,
   type IdentityRef,
   type TaskAssigneeCandidate,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 
 export function currentAssignee(
   candidates: readonly TaskAssigneeCandidate[],

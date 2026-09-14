@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
 import { appControl, createApp } from "../src/app.js";
 import { loadConfig } from "../src/config.js";
-import { identityKey } from "@lark-taskboard/contracts";
+import { identityKey } from "@lark-codex/contracts";
 import { seedFeishuTestActor, TEST_FEISHU_ACTOR } from "./helpers/identity.js";
 import { initializeDatabase } from "../src/modules/database/index.js";
 
@@ -29,9 +29,9 @@ it("allows verified Feishu members to manage Git while requiring authentication 
   const app = createApp({
     database: db,
     config: loadConfig({
-      LARK_TASKBOARD_ENV: "test",
-      LARK_TASKBOARD_DATA_DIR: root,
-      LARK_TASKBOARD_WORKSPACE_ROOTS: root,
+      LARK_CODEX_ENV: "test",
+      LARK_CODEX_DATA_DIR: root,
+      LARK_CODEX_WORKSPACE_ROOTS: root,
     }),
   });
   cleanup.push(() => app.close());

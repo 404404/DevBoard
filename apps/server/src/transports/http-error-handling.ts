@@ -1,4 +1,4 @@
-import { ErrorEnvelopeSchema, type ErrorCode } from "@lark-taskboard/contracts";
+import { ErrorEnvelopeSchema, type ErrorCode } from "@lark-codex/contracts";
 import type { FastifyInstance } from "fastify";
 import { ZodError } from "zod";
 

@@ -20,7 +20,7 @@ import {
   RemoteReviewSchema,
   RemoteReviewContentSchema,
   RemoteReviewScopeSchema,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { AppError } from "../../app-error.js";
@@ -94,7 +94,7 @@ export function registerRemoteRoutes(
   const { config, identityService, client } = options;
   const commands = new RemoteCommands(options.database);
   function authenticate(request: FastifyRequest, write = false) {
-    const names = sessionCookieNames(config);
+    const names = sessionCookieNames(config, request.cookies);
     const session = identityService.authenticate(request.cookies[names.session]);
     identityService.assertBoardAccess(session.actor);
     if (write)
@@ -147,7 +147,7 @@ export function registerRemoteRoutes(
   }
   app.get("/api/v1/tasks/:taskId/progress", async (request, reply) => {
     const session = identityService.authenticate(
-      request.cookies[sessionCookieNames(config).session],
+      request.cookies[sessionCookieNames(config, request.cookies).session],
     );
     const { taskId } = z.object({ taskId: z.uuid() }).parse(request.params);
     const task = options.taskboard.readTask(taskId, session.actor);
@@ -343,7 +343,7 @@ export function registerRemoteRoutes(
             throw new AppError("NOT_FOUND", 404, "项目不可用");
           cwd = (await options.projectRegistry.resolveExecutionContext(command.projectId)).cwd;
         } else {
-          const root = config.LARK_TASKBOARD_TEMPORARY_PROJECT_ROOT;
+          const root = config.LARK_CODEX_TEMPORARY_PROJECT_ROOT;
           if (!root || !isAbsolute(root))
             throw new AppError("INVALID_REQUEST", 409, "临时工作目录尚未配置");
           cwd = join(root, new Date().toISOString().slice(0, 10), `task-${randomUUID()}`);

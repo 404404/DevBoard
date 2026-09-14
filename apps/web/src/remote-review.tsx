@@ -2,7 +2,7 @@ import { remoteReviewMessage } from "./remote-api";
 import { RemoteNotice } from "./remote-notice";
 import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { RemoteReviewFile, RemoteReviewScope } from "@lark-taskboard/contracts";
+import type { RemoteReviewFile, RemoteReviewScope } from "@lark-codex/contracts";
 import { readRemoteReview, readRemoteReviewFile, remoteErrorMessage } from "./remote-api";
 import type { RemoteDiffLine } from "./remote-diff";
 import { reviewHunks, reviewTree, type ReviewTree } from "./remote-review-model";

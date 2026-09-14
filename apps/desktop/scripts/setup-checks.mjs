@@ -1,4 +1,4 @@
-import { HealthResponseSchema } from "@lark-taskboard/contracts";
+import { HealthResponseSchema } from "@lark-codex/contracts";
 import { execFile as execFileCallback } from "node:child_process";
 import { lookup, resolve4, resolve6, resolveCname } from "node:dns/promises";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";

@@ -6,13 +6,14 @@ import {
   FeishuIdentityRefSchema,
   RuntimeDescriptorSchema,
   type RuntimeDescriptor,
-} from "@lark-taskboard/contracts";
+} from "@lark-codex/contracts";
 
 import { z } from "zod";
 import {
   credentialPaths,
+  authFileLocations,
+  compatibleCredentialStore,
   defaultAuthFile,
-  defaultCredentialStore,
   PendingCredentialSchema,
   readCredential,
   SessionCredentialSchema,
@@ -20,8 +21,9 @@ import {
   validateRuntimeTarget,
   type CredentialStore,
 } from "./auth.js";
+import { runtimeDataDirectory } from "./runtime-path.js";
 
-export const TASKCTL_PACKAGE_NAME = "@lark-taskboard/taskctl";
+export const TASKCTL_PACKAGE_NAME = "@lark-codex/taskctl";
 
 export interface TaskctlDependencies {
   readonly readRuntimeDescriptor: () => Promise<RuntimeDescriptor>;
@@ -463,7 +465,7 @@ function output(writer: (value: string) => void, value: unknown): void {
 }
 
 export async function readDefaultRuntimeDescriptor(): Promise<RuntimeDescriptor> {
-  const dataDirectory = process.env.LARK_TASKBOARD_DATA_DIR ?? join(process.cwd(), ".data");
+  const dataDirectory = runtimeDataDirectory();
   const raw = await readFileFs(join(dataDirectory, "run", "runtime.json"), "utf8");
   return RuntimeDescriptorSchema.parse(JSON.parse(raw) as unknown);
 }
@@ -472,7 +474,11 @@ export function defaultTaskctlDependencies(): TaskctlDependencies {
   return {
     readRuntimeDescriptor: readDefaultRuntimeDescriptor,
     fetch,
-    credentials: defaultCredentialStore,
+    credentials: {
+      read: (path) => compatibleCredentialStore(authFileLocations()).read(path),
+      write: (path, value) => compatibleCredentialStore(authFileLocations()).write(path, value),
+      remove: (path) => compatibleCredentialStore(authFileLocations()).remove(path),
+    },
     authFile: defaultAuthFile,
     now: Date.now,
     readFile: async (path) => readFileFs(path),

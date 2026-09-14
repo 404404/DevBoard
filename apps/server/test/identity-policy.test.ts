@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { identityKey, type IdentityRef, TEMPORARY_PROJECT_ID } from "@lark-taskboard/contracts";
+import { identityKey, type IdentityRef, TEMPORARY_PROJECT_ID } from "@lark-codex/contracts";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { appControl, createApp } from "../src/app.js";
@@ -22,14 +22,14 @@ function setup() {
   const directory = mkdtempSync(join(tmpdir(), "taskboard-identity-policy-"));
   const database = initializeDatabase(":memory:");
   const config = loadConfig({
-    LARK_TASKBOARD_ENV: "test",
-    LARK_TASKBOARD_AUTH_MODE: "feishu",
-    LARK_TASKBOARD_ORIGIN: "https://tasks.example.com",
-    LARK_TASKBOARD_ALLOWED_HOSTS: "tasks.example.com",
-    LARK_TASKBOARD_FEISHU_APP_ID: "cli_test",
-    LARK_TASKBOARD_FEISHU_APP_SECRET: "test-secret",
-    LARK_TASKBOARD_DATA_DIR: directory,
-    LARK_TASKBOARD_WORKSPACE_ROOTS: directory,
+    LARK_CODEX_ENV: "test",
+    LARK_CODEX_AUTH_MODE: "feishu",
+    LARK_CODEX_ORIGIN: "https://tasks.example.com",
+    LARK_CODEX_ALLOWED_HOSTS: "tasks.example.com",
+    LARK_CODEX_FEISHU_APP_ID: "cli_test",
+    LARK_CODEX_FEISHU_APP_SECRET: "test-secret",
+    LARK_CODEX_DATA_DIR: directory,
+    LARK_CODEX_WORKSPACE_ROOTS: directory,
   });
   const member = (userId: string, name: string) =>
     seedProjectMember(database, TEMPORARY_PROJECT_ID, {
@@ -217,7 +217,7 @@ describe("Feishu owner and comment identity policy", () => {
           url: "/api/v1/session",
           headers: {
             host: "tasks.example.com",
-            cookie: `__Host-lark_taskboard_session=${historicalToken}`,
+            cookie: `__Host-lark_codex_session=${historicalToken}`,
           },
         })
       ).statusCode,

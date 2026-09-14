@@ -8,7 +8,7 @@
 
 ## 本机配置
 
-首次启动自动创建 `~/Library/Application Support/Lark Codex Taskboard/` 下的数据、证书与配置目录。路径由当前用户目录推导，不读取 desktop.env 或 production.env，不保存自定义目录或 Codex 路径。正式部署沿用现有配置目录及看板数据。
+首次启动自动创建 `~/Library/Application Support/Lark-Codex/` 下的数据、证书与配置目录。路径由当前用户目录推导，不读取 desktop.env 或 production.env，不保存自定义目录或 Codex 路径。正式部署沿用现有配置目录及看板数据。
 
 应用自动查找 Codex Desktop / ChatGPT 内置程序及常见 CLI 路径，使用本机登录状态；新安装 Codex 后无需重启管理应用即可重新检测。工作区允许目录在服务启动时读取 Codex Desktop 项目列表。macOS 临时任务根目录由当前用户主目录动态推导为 `~/Documents/Codex`，创建临时任务时自动递归创建目录，不提供路径编辑入口。
 
@@ -82,7 +82,13 @@ CARGO_ENCODED_RUSTFLAGS="--remap-path-prefix=$HOME=/build" npm run build:desktop
 2. 打开应用，按照「使用引导」配置自己的飞书应用与完整 frpc.toml；使用域名时完成对应 DNS 配置。
 3. 检查连接和服务状态，在飞书中打开看板并验证登录。
 
-应用更新通过替换整个 `.app` 完成。用户数据和配置位于 `~/Library/Application Support/Lark Codex Taskboard/`，不会因正常替换应用而被覆盖。分发时只发送应用产物，保留自己电脑上的该目录；不要把其中的 `secrets/`、数据库、附件、日志或运行时描述复制给接收方。
+应用更新通过替换整个 `.app` 完成。用户数据和配置位于 `~/Library/Application Support/Lark-Codex/`，不会因正常替换应用而被覆盖。分发时只发送应用产物，保留自己电脑上的该目录；不要把其中的 `secrets/`、数据库、附件、日志或运行时描述复制给接收方。
+
+旧版使用 `~/Library/Application Support/Lark Codex Taskboard/`。升级首次启动会等待旧应用释放实例锁，并在新目录不存在时原子移动完整旧目录，保留数据库、附件、配置及权限。两个目录同时存在、路径含链接或旧实例仍占用时会显示错误并保留内容，不合并、不覆盖、不自动备份。
+
+主程序和 bundle identifier 已统一为 `lark-codex-desktop`、`cn.rocyan.larkcodex.desktop`。更新包保留旧名 `Contents/MacOS/taskboard-desktop` 的小型转发启动器，仅用于兼容 v0.1.0 的结构校验与更新后重启；更新公钥保持不变。
+
+随包 Skill 使用 `manage-lark-codex`。检测到旧 `manage-lark-taskboard` 目录时会提示交由原管理工具处理，不自动改名或覆盖；新目录内的旧安装凭据也需要按已修改内容重新确认。
 
 桌面 `.cache/`、`staging/`、`src-tauri/target/` 和过时的 `dist/` 是可重建产物，不属于运行数据。删除这些目录会使下次构建重新下载或编译；应先保留计划分发的已验证应用。
 
@@ -98,7 +104,7 @@ codesign --verify --deep --strict "apps/desktop/dist/Lark-Codex.app"
 
 ## 内嵌 Codex 桥接
 
-桌面版使用 `LARK_TASKBOARD_CODEX_TRANSPORT=embedded`，直接在后端进程中加载桥接模块与项目快照监听。业务 API、本机管理 API 和受 token 保护的桥接接口由同一进程按已配置端口提供；保留本机 WebSocket 接口兼容现有调用，不再运行独立的桥接 Node 服务。退出或启动失败时，后端统一释放监听器。
+桌面版使用 `LARK_CODEX_CODEX_TRANSPORT=embedded`，直接在后端进程中加载桥接模块与项目快照监听。业务 API、本机管理 API 和受 token 保护的桥接接口由同一进程按已配置端口提供；保留本机 WebSocket 接口兼容现有调用，不再运行独立的桥接 Node 服务。退出或启动失败时，后端统一释放监听器。
 
 ## 连接配置页面
 
