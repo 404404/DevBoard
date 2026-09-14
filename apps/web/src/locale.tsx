@@ -1,0 +1,150 @@
+import type { JobStatus, TaskPriority, TaskStatus } from "@lark-taskboard/contracts";
+
+const STATUS_LABELS: Readonly<Record<TaskStatus, string>> = {
+  backlog: "待立项",
+  todo: "待处理",
+  in_progress: "处理中",
+  in_review: "待验收",
+  blocked: "已阻塞",
+  done: "已完成",
+  canceled: "已取消",
+};
+
+const PRIORITY_LABELS: Readonly<Record<TaskPriority, string>> = {
+  none: "无优先级",
+  urgent: "紧急",
+  high: "高",
+  medium: "中",
+  low: "低",
+};
+
+const JOB_STATUS_LABELS: Readonly<Record<JobStatus, string>> = {
+  queued: "排队中",
+  running: "执行中",
+  waiting_approval: "等待审批",
+  waiting_input: "等待输入",
+  canceling: "取消中",
+  succeeded: "已完成",
+  failed: "失败",
+  failed_recoverable: "可重试失败",
+  canceled: "已取消",
+};
+
+export const UI_COPY = {
+  projects: "项目",
+  selectProject: "切换项目",
+  boardFallback: "任务看板",
+  live: "实时同步",
+  offline: "已断开",
+  reconnecting: "正在重连",
+  offlineBanner: "连接已断开，恢复网络后将自动补齐变更",
+  reconnectingBanner: "实时通道正在重连",
+  closeNotice: "关闭提示",
+  boardCommands: "看板命令",
+  tasks: "任务",
+  taskCount: (count: number) => `${count} 项`,
+  readOnly: "只读",
+  editable: "可编辑",
+  taskTitle: "任务标题",
+  taskDescription: "任务描述",
+  initialStatus: "初始状态",
+  newTask: "新增任务",
+  createTask: "创建任务",
+  created: (identifier: string) => `${identifier} 已创建`,
+  updated: (identifier: string) => `${identifier} 已更新`,
+  moveConflict: "移动失败：任务版本已变化，已加载最新看板",
+  kanban: "任务状态看板",
+  noTasks: "暂无任务",
+  normal: "普通",
+  version: (version: number) => `版本 ${version}`,
+  drag: (identifier: string) => `拖动 ${identifier}`,
+  advance: (identifier: string) => `将 ${identifier} 移至下一状态`,
+  taskDetails: "任务详情",
+  close: "关闭",
+  conflict: "任务已被其他客户端更新，请加载最新版本后重试。",
+  loadLatest: "加载最新版本",
+  title: "标题",
+  description: "描述",
+  previewDescription: "预览描述",
+  status: "状态",
+  priority: "优先级",
+  labels: "标签（逗号分隔）",
+  links: "链接（每行一个）",
+  taskLinks: "任务链接",
+  noTaskLinks: "暂无链接",
+  saveChanges: "保存修改",
+  codexExecution: "Codex 执行",
+  codexDescription: "执行过程保存在任务中，完成后进入待验收。",
+  startCodex: "启动 Codex",
+  continueCodex: "继续 Codex",
+  cancelExecution: "取消执行",
+  refresh: "刷新",
+  executionEvents: "执行事件",
+  noExecutions: "尚无执行记录。启动后会创建持久化作业。",
+  commandApproval: "命令执行审批",
+  fileApproval: "文件写入审批",
+  codexInput: "Codex 需要输入",
+  permissionRequest: "Codex 权限请求",
+  question: "问题",
+  userInput: "Codex 用户输入",
+  submitInput: "提交输入",
+  allowOnce: "允许一次",
+  decline: "拒绝",
+  cancel: "取消",
+  noProjects: "尚未登记项目",
+  noProjectsHint: "请先通过本机管理接口登记 Git 项目，再返回此处刷新。",
+  refreshProjects: "刷新项目",
+  syncing: "正在同步本地数据",
+  readFailed: "数据读取失败",
+  retry: "重试",
+  workspaceLoading: "正在加载任务上下文",
+  comments: "评论",
+  noComments: "暂无评论",
+  newComment: "新评论",
+  commentPlaceholder: "支持 Markdown 和 Mermaid 代码块",
+  postComment: "发表评论",
+  deletedUser: "已删除用户",
+  editComment: "编辑评论",
+  commentDeleted: "评论已删除",
+  save: "保存",
+  edit: "编辑",
+  deleteComment: "删除评论",
+  attachments: "附件",
+  noAttachments: "暂无附件",
+  unknown: "未知",
+  uploading: "正在上传…",
+  uploadAttachment: "上传附件",
+  relations: "关系",
+  noRelations: "暂无关系",
+  relationType: "关系类型",
+  relatedTask: "关联任务",
+  selectTask: "选择任务",
+  add: "添加",
+  deleteRelation: (identifier: string) => `删除与 ${identifier} 的关系`,
+  activity: "活动",
+  noActivity: "暂无活动",
+  system: "系统",
+  executionSummary: "执行摘要",
+  activeJobs: (count: number) => `活动作业 ${count} 个`,
+  latestStatus: (status: string) => `最近状态：${status}`,
+  noExecutionSummary: "暂无执行记录",
+  operationFailed: "操作失败，请重试",
+  mermaidRendering: "正在渲染图表…",
+  mermaidRenderFailed: "图表渲染失败",
+} as const;
+
+export function useUiCopy() {
+  return UI_COPY;
+}
+
+export function statusLabel(status: TaskStatus): string {
+  return STATUS_LABELS[status];
+}
+
+export function priorityLabel(priority: TaskPriority): string {
+  return PRIORITY_LABELS[priority];
+}
+
+export function jobStatusLabel(status: JobStatus): string {
+  return JOB_STATUS_LABELS[status];
+}

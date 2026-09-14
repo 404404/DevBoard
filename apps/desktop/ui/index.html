@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Lark-Codex</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <aside>
+      <div class="brand"><img class="logo" src="icon.png" alt="" />Lark-Codex</div>
+      <div class="edition">本机工作空间</div>
+      <nav>
+        <button data-tab="overview" class="selected">
+          <span class="nav-icon" aria-hidden="true"></span><span>服务概览</span>
+        </button>
+        <button data-tab="guide">
+          <span class="nav-icon" aria-hidden="true"></span><span>使用引导</span>
+        </button>
+        <button data-tab="connections">
+          <span class="nav-icon" aria-hidden="true"></span><span>连接配置</span>
+        </button>
+        <button data-tab="ports">
+          <span class="nav-icon" aria-hidden="true"></span><span>端口设置</span>
+        </button>
+        <button data-tab="settings">
+          <span class="nav-icon" aria-hidden="true"></span><span>应用设置</span>
+        </button>
+        <button data-tab="logs">
+          <span class="nav-icon" aria-hidden="true"></span><span>运行日志</span>
+        </button>
+      </nav>
+    </aside>
+    <main>
+      <header>
+        <span id="breadcrumb">服务概览</span>
+      </header>
+      <div id="restart-notice" class="restart-notice" hidden>
+        <span role="status">配置待重启生效</span>
+        <button id="restart-service" type="button">重启服务</button>
+      </div>
+      <div id="update-notice" class="update-notice" hidden>
+        <span id="update-notice-text" role="status" aria-live="polite"></span>
+        <button id="update-notice-open" type="button">查看更新</button>
+        <button id="update-notice-dismiss" type="button" aria-label="暂时关闭更新提示">稍后</button>
+      </div>
+      <section id="overview" class="page">
+        <div class="eyebrow">本机工作空间</div>
+        <h1>工作从这里开始</h1>
+        <p class="intro">连接飞书与 Codex，让你的项目保持同步。</p>
+        <button id="overview-guide" class="guide-entry" type="button">
+          <span
+            ><strong>第一次使用？</strong
+            ><small>配置飞书、隧道和域名，检查连接是否就绪。</small></span
+          >
+          <span aria-hidden="true">使用引导 →</span>
+        </button>
+        <div class="hero">
+          <div class="hero-top">
+            <span id="status" class="badge">正在启动</span><span class="host">本机服务</span>
+          </div>
+          <h2 id="message">正在启动服务管理器…</h2>
+          <p>关闭窗口后服务继续运行；退出应用时停止服务。数据保存在你的 Mac 上。</p>
+          <div class="actions">
+            <button id="start" class="primary">启动服务</button><button id="stop">停止服务</button>
+          </div>
+        </div>
+        <p id="open-error" role="alert"></p>
+        <div class="section-title">
+          <h3>连接状态</h3>
+          <span>自动刷新</span>
+        </div>
+        <div id="services" class="services"></div>
+        <div class="note">
+          <strong>你的 Codex，仍在你的电脑上。</strong>
+          <p>应用负责连接与同步，不会在退出时关闭 Codex Desktop。</p>
+        </div>
+      </section>
+      <section id="guide" class="page" hidden>
+        <div class="eyebrow">连接你的工作空间</div>
+        <h1>使用引导</h1>
+        <p id="setup-intro" class="intro">按三步完成连接。</p>
+        <aside class="setup-contact">
+          如果没有 frp 服务器（步骤 1），联系作者购买，微信号：rocyan921。
+        </aside>
+        <div class="setup-toolbar">
+          <p>检查不会保存配置或重启服务。</p>
+          <button id="setup-check-all" type="button" class="primary">检查全部</button>
+        </div>
+        <p id="setup-stale" class="setup-stale" role="status" hidden>配置已修改，请重新检查。</p>
+        <p id="setup-notice" class="setup-notice" role="status" aria-live="polite"></p>
+        <p id="setup-error" class="setup-error" role="alert" hidden></p>
+        <div class="setup-steps">
+          <details class="setup-step" id="setup-step-tunnel" open>
+            <summary>
+              <span class="setup-number">1</span
+              ><span class="setup-step-title"
+                >配置 frp 客户端<small>让外网能够访问这台 Mac 的本地服务</small></span
+              ><span id="setup-status-tunnel" class="setup-status">未检查</span>
+            </summary>
+            <div class="setup-body">
+              <ol>
+                <li>
+                  隧道转发到 <code>127.0.0.1:<span id="setup-caddy-port">58981</span></code
+                  >。
+                </li>
+                <li>将完整 <code>frpc.toml</code> 粘贴到「连接配置」，应用会自动识别。</li>
+              </ol>
+              <p id="setup-dns-description">
+                填写并检查 frpc.toml 后，将按隧道类型显示是否需要 DNS 解析。
+              </p>
+              <div id="setup-dns-domain-row" class="setup-value" hidden>
+                <span>域名</span><code id="setup-dns-domain">请先填写 frpc.toml</code>
+                <button id="setup-copy-dns" type="button">复制</button>
+              </div>
+              <div id="setup-dns-target-row" class="setup-value" hidden>
+                <span id="setup-dns-target-label">解析目标</span
+                ><code id="setup-dns-target">请先填写 frpc.toml</code>
+                <button id="setup-copy-dns-target" type="button">复制</button>
+              </div>
+              <p id="setup-domain-instructions" class="setup-help" hidden>
+                请先填写 frpc.toml 以获取解析目标。
+              </p>
+              <div class="setup-value">
+                <span>公网地址</span><code id="setup-public-origin">请先填写 frpc.toml</code>
+                <button id="setup-copy-public-origin" type="button">复制</button>
+              </div>
+              <p id="setup-http-warning" class="setup-protocol-warning" role="note" hidden>
+                HTTP 为明文传输，登录会话和业务数据存在被窃取或篡改的风险。
+              </p>
+              <div class="setup-actions">
+                <button id="setup-configure-tunnel" type="button">填写配置</button>
+                <button id="setup-check-tunnel" type="button">检查隧道</button>
+                <button id="setup-check-dns" type="button">检查访问</button>
+              </div>
+              <div id="setup-results-tunnel" class="setup-results" aria-live="polite"></div>
+              <div id="setup-results-dns" class="setup-results" aria-live="polite"></div>
+            </div>
+          </details>
+          <details class="setup-step" id="setup-step-feishu">
+            <summary>
+              <span id="setup-number-feishu" class="setup-number">2</span
+              ><span class="setup-step-title"
+                >创建飞书应用<small>让看板出现在你的飞书里</small></span
+              ><span id="setup-status-feishu" class="setup-status">未检查</span>
+            </summary>
+            <div class="setup-body">
+              <ol>
+                <li>在飞书开放平台创建企业自建应用，在「添加应用能力」中添加「网页应用」。</li>
+                <li>
+                  从飞书后台「凭证与基础信息 → 应用凭证」复制 App ID 和 App
+                  Secret，分别粘贴到本应用「<a id="setup-link-feishu" href="#connections"
+                    >连接配置</a
+                  >」的同名输入框。
+                </li>
+                <li>复制下方地址，按标注的位置粘贴到飞书后台并保存。</li>
+              </ol>
+              <div class="setup-value">
+                <span>主页地址</span><code id="setup-trusted-origin">请先填写 frpc.toml</code>
+                <button id="setup-copy-trusted-origin" type="button">复制</button>
+              </div>
+              <p class="setup-help">
+                粘贴到飞书后台「网页应用」的桌面端主页和移动端主页（两项均填写），以及「安全设置 →
+                H5 可信域名」。
+              </p>
+              <div class="setup-value">
+                <span>重定向 URL</span><code id="setup-origin">请先填写 frpc.toml</code>
+                <button id="setup-copy-origin" type="button">复制</button>
+              </div>
+              <p class="setup-help">粘贴到飞书后台「安全设置 → 重定向 URL」，保留末尾的 /。</p>
+              <ol start="4">
+                <li>
+                  在「权限管理」搜索并开通
+                  <code>contact:user.employee_id:readonly</code
+                  >；在「版本管理与发布」创建版本、设置可用范围并发布。
+                </li>
+              </ol>
+              <div class="setup-actions">
+                <button id="setup-open-feishu" type="button">飞书开放平台 ↗</button>
+                <button id="setup-configure-feishu" type="button">填写凭据</button>
+                <button id="setup-check-feishu" type="button">检查凭据</button>
+              </div>
+              <div id="setup-results-feishu" class="setup-results" aria-live="polite"></div>
+            </div>
+          </details>
+          <details class="setup-step" id="setup-step-codex">
+            <summary>
+              <span id="setup-number-codex" class="setup-number">3</span
+              ><span class="setup-step-title"
+                >确认 Codex 登录<small>复用这台 Mac 上的 Codex</small></span
+              ><span id="setup-status-codex" class="setup-status">未检查</span>
+            </summary>
+            <div class="setup-body">
+              <p>安装并打开 Codex，完成登录后，回到这里检查。</p>
+              <div class="setup-actions">
+                <button id="setup-open-codex" type="button">打开 Codex</button>
+                <button id="setup-download-codex" type="button">下载 Codex ↗</button>
+                <button id="setup-check-codex" type="button">检查登录</button>
+              </div>
+              <div id="setup-results-codex" class="setup-results" aria-live="polite"></div>
+            </div>
+          </details>
+        </div>
+        <div class="setup-finish">
+          <h2>保存配置，再到飞书验证</h2>
+          <p>保存配置并重启服务后，从飞书打开应用验证。</p>
+          <div class="setup-actions">
+            <button id="setup-save" type="button" class="primary">前往连接配置</button
+            ><button id="setup-open-board" type="button">打开飞书验证 ↗</button>
+          </div>
+          <p id="setup-checked-at" class="setup-help"></p>
+        </div>
+      </section>
+      <section id="connections" class="page" hidden>
+        <div class="eyebrow">飞书与公网连接</div>
+        <h1>连接配置</h1>
+        <p class="intro">保存到本机后，选择立即重启服务或稍后手动重启。</p>
+        <form id="connections-form" autocomplete="off">
+          <label for="app-id">App ID</label>
+          <input id="app-id" required spellcheck="false" placeholder="cli_…" />
+          <p id="app-id-path" class="hint"></p>
+          <label for="app-secret">App Secret</label>
+          <div class="secret-input">
+            <input
+              required
+              id="app-secret"
+              type="password"
+              autocomplete="new-password"
+              spellcheck="false"
+              placeholder="填写飞书应用密钥"
+            />
+            <button id="show-secret" type="button">显示密钥</button>
+          </div>
+          <p id="secret-hint" class="hint"></p>
+          <label for="frpc-content">frpc.toml</label>
+          <textarea
+            required
+            id="frpc-content"
+            rows="9"
+            spellcheck="false"
+            placeholder="粘贴完整的 frpc.toml 内容"
+          ></textarea>
+          <p id="frpc-hint" class="hint"></p>
+          <button id="save-connections" class="primary" type="submit">保存配置</button>
+          <p id="connections-result" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+      <section id="ports" class="page" hidden>
+        <div class="eyebrow">服务连接</div>
+        <h1>端口设置</h1>
+        <p class="intro">修改后保存，重启服务后生效。</p>
+        <form id="ports-form">
+          <div class="port-fields">
+            <div>
+              <label for="port-api">后端服务</label>
+              <input
+                id="port-api"
+                type="number"
+                required
+                min="1"
+                max="65535"
+                step="1"
+                inputmode="numeric"
+              />
+              <p class="hint">看板与远程连接使用的本机端口。</p>
+            </div>
+            <div>
+              <label for="port-admin">本机管理</label>
+              <input
+                id="port-admin"
+                type="number"
+                required
+                min="1"
+                max="65535"
+                step="1"
+                inputmode="numeric"
+              />
+              <p class="hint">本机任务管理使用的端口。</p>
+            </div>
+            <div>
+              <label for="port-bridge">Codex 桥接</label>
+              <input
+                id="port-bridge"
+                type="number"
+                required
+                min="1"
+                max="65535"
+                step="1"
+                inputmode="numeric"
+              />
+              <p class="hint">应用与 Codex 通信使用的本机端口。</p>
+            </div>
+            <div>
+              <label for="port-caddy">Caddy</label>
+              <input
+                id="port-caddy"
+                type="number"
+                required
+                min="1"
+                max="65535"
+                step="1"
+                inputmode="numeric"
+              />
+              <p class="hint">本机 Caddy 监听端口，保存时同步更新 frpc 的 localPort。</p>
+            </div>
+          </div>
+          <button id="save-ports" class="primary" type="submit">保存端口</button>
+          <p id="ports-result" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+      <section id="settings" class="page" hidden>
+        <div class="eyebrow">偏好设置</div>
+        <h1>应用设置</h1>
+        <div id="update-card" class="update-card" aria-labelledby="update-title">
+          <div class="update-heading">
+            <h2 id="update-title">应用更新</h2>
+            <span id="update-current-version">正在读取版本…</span>
+          </div>
+          <p id="update-status" role="status" aria-live="polite">正在读取更新状态…</p>
+          <p id="update-last-checked" class="update-help">每天在后台检查一次，也可以手动检查。</p>
+          <div id="update-download-progress" hidden>
+            <progress id="update-progress" max="100" aria-label="更新下载进度"></progress>
+            <span id="update-progress-text"></span>
+          </div>
+          <details id="update-release-notes" hidden>
+            <summary>版本说明</summary>
+            <p id="update-notes"></p>
+          </details>
+          <p id="update-error" class="update-error" role="alert" hidden></p>
+          <div class="update-actions">
+            <button id="update-check" type="button">检查更新</button>
+            <button id="update-download" class="primary" type="button" hidden>下载更新</button>
+            <button id="update-install" class="primary" type="button" hidden>安装并重启</button>
+          </div>
+          <p id="update-install-hint" class="update-help" hidden>
+            安装时将停止本机服务，重启后恢复。请先结束正在执行的任务并保存配置。
+          </p>
+        </div>
+        <p class="intro">目录由应用自动管理，Codex 程序自动识别。</p>
+        <label for="directory">部署配置目录</label>
+        <input id="directory" readonly />
+        <label for="codex">Codex 可执行文件</label>
+        <input id="codex" readonly />
+      </section>
+      <section id="logs" class="page" hidden>
+        <div class="eyebrow">服务动态</div>
+        <h1>运行日志</h1>
+        <p class="intro">最近的服务消息。密钥和请求内容不会在此显示。</p>
+        <div id="log-list" class="log-list"></div>
+      </section>
+      <div id="error" role="alert"></div>
+    </main>
+    <dialog
+      id="restart-dialog"
+      aria-labelledby="restart-title"
+      aria-describedby="restart-description"
+    >
+      <h2 id="restart-title">重启服务</h2>
+      <p id="restart-description">配置已保存，重启服务后生效。</p>
+      <p id="restart-error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button id="restart-later" type="button" autofocus>稍后手动重启</button>
+        <button id="restart-now" class="primary" type="button">立即重启</button>
+      </div>
+    </dialog>
+    <dialog
+      id="update-dialog"
+      aria-labelledby="update-dialog-title"
+      aria-describedby="update-dialog-description"
+    >
+      <h2 id="update-dialog-title">安装更新并重启</h2>
+      <p id="update-dialog-description">
+        安装会停止 Lark-Codex 的本机服务，飞书看板将暂时不可用，并中断尚未完成的执行。
+        请先结束正在执行的任务并保存配置。安装完成后应用会重新启动，原有配置与任务数据会保留。
+      </p>
+      <p id="update-dialog-error" class="update-error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button id="update-cancel" type="button" autofocus>稍后安装</button>
+        <button id="update-confirm" class="primary" type="button">安装并重启</button>
+      </div>
+    </dialog>
+    <script src="app.js"></script>
+    <script src="updater.js"></script>
+  </body>
+</html>

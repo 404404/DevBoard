@@ -1,0 +1,741 @@
+.remote-composer-wrap {
+  position: relative;
+  min-width: 0;
+  margin-inline: 6px;
+}
+.remote-page .remote-rich-composer {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  grid-template-areas: "add text controls";
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 0;
+  background: var(--remote-surface);
+  border-radius: 30px;
+  box-shadow: 0 4px 30px #00000009;
+  min-height: 44px;
+  margin-inline: 22px;
+  transition:
+    min-height 280ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-radius 280ms ease,
+    padding 280ms ease,
+    margin 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.remote-page .remote-rich-composer.is-expanded {
+  grid-template-columns: 34px 34px minmax(0, 1fr);
+  grid-template-areas: "text text text" "add gear controls";
+  align-items: end;
+  padding: 8px 10px;
+  min-height: 80px;
+  margin-inline: 0;
+  gap: 0 6px;
+  border-radius: 28px;
+}
+.remote-page .remote-rich-composer textarea {
+  grid-area: text;
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 0;
+  flex-basis: auto;
+}
+.remote-page .remote-rich-composer.is-expanded textarea {
+  min-height: 32px;
+  padding: 2px 4px 6px;
+}
+.remote-rich-composer .remote-composer-add {
+  grid-area: add;
+}
+.remote-rich-composer .remote-composer-gear {
+  grid-area: gear;
+}
+.remote-rich-composer .remote-composer-controls {
+  grid-area: controls;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-left: 0;
+}
+.remote-rich-composer .remote-composer-add,
+.remote-rich-composer .remote-composer-gear,
+.remote-rich-composer .remote-model-control {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 5px;
+}
+.remote-rich-composer .sf-symbol {
+  width: 20px;
+  height: 20px;
+}
+.remote-rich-composer .remote-model-control {
+  color: #008cff;
+}
+.remote-page .remote-composer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  cursor: default;
+}
+.remote-composer-popover {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  z-index: 21;
+  width: min(360px, 100%);
+  max-height: calc(var(--remote-height, 100dvh) - 150px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px;
+  border: 1px solid var(--remote-border);
+  border-radius: 28px;
+  background: color-mix(in srgb, var(--remote-surface) 82%, transparent);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 12px 36px #0002;
+  transform-origin: 32px bottom;
+  animation: remote-menu-enter 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.remote-composer-popover > p {
+  color: var(--remote-muted);
+  margin: 0 6px 10px;
+  font-size: 14px;
+}
+.remote-composer-popover button {
+  text-align: left;
+}
+.remote-add-menu button {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  min-height: 58px;
+  padding: 6px 12px;
+  font-size: 17px;
+}
+.remote-add-menu button > span {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--remote-subtle);
+}
+.remote-add-menu .sf-symbol {
+  width: 22px;
+  height: 22px;
+}
+.remote-permission-menu button {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 45px;
+  padding: 5px 2px;
+}
+.remote-permission-menu button > .sf-symbol {
+  flex-shrink: 0;
+  width: 17px;
+  height: 17px;
+}
+.remote-permission-menu button > span:not(.sf-symbol) {
+  flex: 1;
+  font-size: 13px;
+}
+.remote-permission-menu small {
+  display: block;
+  color: var(--remote-muted);
+  font-size: 11px;
+  line-height: 1.35;
+  margin-top: 2px;
+}
+.remote-model-picker-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.remote-model-picker-heading > .sf-symbol {
+  color: var(--remote-muted);
+  margin-top: 8px;
+}
+.remote-model-picker-heading > button {
+  padding: 4px;
+}
+.remote-model-picker-heading > button:nth-child(2) {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  gap: 2px;
+}
+.remote-model-picker-heading strong {
+  color: #3384ff;
+  font-weight: 500;
+}
+.remote-model-picker-heading strong .sf-symbol {
+  width: 12px;
+  height: 12px;
+  margin-left: 7px;
+  color: var(--remote-muted);
+}
+.remote-model-picker-heading button > span:not(.sf-symbol) {
+  color: var(--remote-muted);
+  overflow-wrap: anywhere;
+  font-size: 15px;
+}
+.remote-model-picker-heading > button:last-child {
+  color: var(--remote-muted);
+}
+.remote-effort-slider {
+  position: relative;
+  margin: 18px 0 4px;
+  height: 34px;
+}
+.remote-effort-slider input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 34px;
+  margin: 0;
+  opacity: 0;
+  touch-action: none;
+  z-index: 4;
+  cursor: pointer;
+}
+.remote-effort-slider > div {
+  pointer-events: none;
+  position: absolute;
+  inset: 0 16px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.remote-effort-slider > div span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #9997;
+}
+.remote-model-list button {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 6px;
+  font-size: 17px;
+}
+.remote-model-list .sf-symbol {
+  flex-shrink: 0;
+}
+.remote-attachment-list {
+  grid-area: attachments;
+  display: flex;
+  overflow-x: auto;
+  gap: 8px;
+  max-width: 100%;
+}
+.remote-attachment-list > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  max-width: 230px;
+  padding: 8px;
+  border-radius: 16px;
+  background: var(--remote-subtle);
+}
+.remote-attachment-list > div > span:not(.sf-symbol) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.remote-attachment-list small {
+  display: block;
+  color: var(--remote-muted);
+  font-size: 11px;
+}
+.remote-attachment-list button {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  flex-shrink: 0;
+}
+.remote-attachment-list button .sf-symbol {
+  width: 18px;
+  height: 18px;
+  color: var(--remote-muted);
+}
+
+.remote-page .remote-rich-composer.has-attachments {
+  grid-template-areas: "attachments attachments attachments" "text text text" "add gear controls";
+  row-gap: 6px;
+}
+.remote-composer-popover-add {
+  bottom: 0;
+  width: min(288px, 100%);
+  padding: 12px;
+  transform-origin: 24px calc(100% - 20px);
+  border-radius: 32px;
+}
+.remote-composer-popover-permissions {
+  bottom: 52px;
+  width: min(292px, 100%);
+  padding: 12px;
+  border-radius: 28px;
+  transform-origin: 52px bottom;
+  overflow: visible;
+}
+.remote-composer-popover-permissions > p {
+  margin: 0 2px 8px;
+  font-size: 11px;
+}
+.remote-composer-popover-permissions::after {
+  content: "";
+  position: absolute;
+  bottom: -7px;
+  left: 44px;
+  width: 14px;
+  height: 14px;
+  border-right: 1px solid var(--remote-border);
+  border-bottom: 1px solid var(--remote-border);
+  border-bottom-right-radius: 3px;
+  background: var(--remote-surface);
+  transform: rotate(45deg);
+}
+.remote-composer-popover.is-closing {
+  animation: remote-menu-exit 160ms ease-in both;
+  pointer-events: none;
+}
+.remote-page .remote-composer-backdrop.is-closing {
+  pointer-events: none;
+}
+.remote-composer-popover button {
+  transition:
+    background-color 120ms ease,
+    transform 150ms ease;
+  border-radius: 14px;
+}
+.remote-composer-popover button:active {
+  background-color: var(--remote-subtle);
+  transform: scale(0.98);
+}
+.remote-model-control,
+.remote-composer-gear {
+  animation: remote-toolbar-enter 240ms ease both;
+}
+.remote-model-list {
+  animation: remote-toolbar-enter 220ms ease both;
+}
+.remote-effort-gauge {
+  display: block;
+  width: 24px;
+  height: 24px;
+  overflow: visible;
+  fill: none;
+  stroke-width: 2.5px;
+  stroke-linecap: round;
+}
+.remote-gauge-track {
+  stroke: #c5c5c7;
+}
+.remote-gauge-fill {
+  stroke: #008cff;
+  transition: stroke-dashoffset 340ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.remote-gauge-needle {
+  transform-origin: 16px 18px;
+  transform: rotate(var(--gauge-angle));
+  transition: transform 340ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.remote-gauge-needle,
+.remote-effort-gauge circle {
+  stroke: var(--remote-text);
+}
+.remote-slider-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  background: var(--remote-subtle);
+  overflow: hidden;
+  pointer-events: none;
+}
+.remote-slider-track > span {
+  display: block;
+  height: 100%;
+  width: calc(16px + (100% - 32px) * var(--effort-ratio));
+  background: #3384ff;
+  transition: width 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.remote-slider-thumb {
+  position: absolute;
+  top: 1px;
+  left: calc((100% - 32px) * var(--effort-ratio));
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 5px #0003;
+  z-index: 3;
+  pointer-events: none;
+  transition: left 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.remote-effort-slider:has(input:focus-visible) {
+  outline: 2px solid #3384ff;
+  outline-offset: 4px;
+  border-radius: 20px;
+}
+@keyframes remote-menu-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes remote-menu-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.9);
+  }
+}
+@keyframes remote-toolbar-enter {
+  from {
+    opacity: 0;
+    transform: translateY(5px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .remote-page .remote-rich-composer,
+  .remote-composer-popover,
+  .remote-composer-popover.is-closing,
+  .remote-composer-popover button,
+  .remote-model-list,
+  .remote-model-control,
+  .remote-composer-gear,
+  .remote-gauge-fill,
+  .remote-gauge-needle,
+  .remote-slider-track > span,
+  .remote-slider-thumb {
+    animation-duration: 1ms;
+    transition-duration: 1ms;
+  }
+}
+
+/* The transparent native range retains touch/keyboard behavior. Its thumb
+   geometry matches the animated visual thumb, including the endpoints. */
+.remote-effort-slider input {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+}
+.remote-effort-slider input::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 32px;
+  height: 32px;
+}
+.remote-effort-slider input::-moz-range-thumb {
+  width: 32px;
+  height: 32px;
+  border: 0;
+}
+
+/* Match the desktop picker: both views stay mounted while the measured
+   container height and staggered opacity/translation transition. */
+.remote-picker-views {
+  position: relative;
+  overflow: clip;
+  max-height: calc(var(--remote-height, 100dvh) - 184px);
+  transition: height 320ms cubic-bezier(0.19, 1, 0.22, 1);
+}
+.remote-picker-simple-panel,
+.remote-picker-list-panel {
+  width: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.remote-picker-simple-panel {
+  position: relative;
+}
+.remote-picker-list-panel,
+.remote-picker-simple-panel > .remote-model-picker-heading,
+.remote-picker-simple-panel > .remote-effort-slider,
+.remote-picker-simple-panel > .remote-settings-note {
+  opacity: 1;
+  translate: 0 0;
+  transition:
+    opacity 200ms cubic-bezier(0.23, 1, 0.32, 1),
+    translate 320ms cubic-bezier(0.19, 1, 0.22, 1);
+}
+.remote-picker-views[data-view="model"] .remote-picker-list-panel {
+  opacity: 0;
+  translate: 0 10px;
+}
+.remote-picker-views[data-view="models"] .remote-picker-simple-panel > .remote-model-picker-heading,
+.remote-picker-views[data-view="models"] .remote-picker-simple-panel > .remote-effort-slider,
+.remote-picker-views[data-view="models"] .remote-picker-simple-panel > .remote-settings-note {
+  opacity: 0;
+  translate: 0 -10px;
+}
+.remote-picker-views[data-view="model"] .remote-model-picker-heading {
+  transition-delay: 56ms;
+}
+.remote-picker-views[data-view="model"] .remote-effort-slider,
+.remote-picker-views[data-view="models"] .remote-picker-list-panel {
+  transition-delay: 40ms;
+}
+.remote-picker-views[data-view="models"] .remote-effort-slider {
+  transition-delay: 16ms;
+}
+.remote-picker-list-panel > p {
+  color: var(--remote-muted);
+  font-size: 12px;
+  margin: 0 6px 4px;
+}
+.remote-picker-list-panel .remote-model-list {
+  max-height: min(360px, calc(var(--remote-height, 100dvh) - 210px));
+  overscroll-behavior: contain;
+  overflow-y: auto;
+  animation: none;
+}
+.remote-model-list small {
+  display: block;
+  font-size: 12px;
+  color: var(--remote-muted);
+  margin-top: 3px;
+}
+.remote-model-list button {
+  text-align: left;
+  align-items: center;
+}
+.remote-model-picker-heading .remote-speed-toggle {
+  color: var(--remote-muted);
+  flex: 0 0 24px;
+}
+.remote-model-picker-heading .remote-speed-toggle[aria-pressed="true"] {
+  color: #3384ff;
+}
+.remote-speed-toggle .sf-symbol {
+  transition:
+    color 200ms ease,
+    transform 320ms cubic-bezier(0.19, 1, 0.22, 1);
+}
+.remote-speed-toggle[aria-pressed="true"] .sf-symbol {
+  transform: scale(1.12);
+}
+.remote-model-picker-heading strong {
+  animation: remote-picker-label 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.remote-model-picker-heading[data-default="true"] strong {
+  color: var(--remote-text);
+}
+@keyframes remote-picker-label {
+  from {
+    opacity: 0;
+    translate: 0 3px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .remote-picker-views,
+  .remote-picker-list-panel,
+  .remote-picker-simple-panel > .remote-model-picker-heading,
+  .remote-picker-simple-panel > .remote-effort-slider,
+  .remote-picker-simple-panel > .remote-settings-note,
+  .remote-speed-toggle .sf-symbol {
+    transition: none;
+  }
+  .remote-model-picker-heading strong {
+    animation: none;
+  }
+}
+
+.remote-composer-popover-model,
+.remote-composer-popover-models {
+  transform-origin: right bottom;
+  animation: remote-model-menu-enter 320ms cubic-bezier(0.23, 1, 0.32, 1) 30ms both;
+}
+@keyframes remote-model-menu-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.remote-model-picker-heading[data-ultra="true"] strong,
+.remote-model-picker-heading[data-ultra="true"] .remote-speed-toggle[aria-pressed="true"] {
+  color: #8b5cf6;
+}
+.remote-effort-slider[data-ultra="true"] .remote-slider-track > span {
+  background: linear-gradient(100deg, #4946dc, #a36bff);
+}
+@media (prefers-reduced-motion: reduce) {
+  .remote-composer-popover-model,
+  .remote-composer-popover-models {
+    animation: none;
+  }
+}
+
+.remote-speed-control {
+  flex: 0 0 24px;
+  display: grid;
+  place-items: start center;
+}
+.remote-speed-control button {
+  padding: 4px;
+}
+.remote-speed-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+.remote-composer-popover-model,
+.remote-composer-popover-models {
+  overflow: visible;
+}
+.remote-speed-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 8px;
+  z-index: 3;
+  display: grid;
+  gap: 3px;
+  padding: 8px 12px;
+  border: 1px solid var(--remote-border);
+  border-radius: 10px;
+  background: var(--remote-surface);
+  box-shadow: 0 4px 16px #0002;
+  color: var(--remote-text);
+  font-size: 13px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+}
+.remote-speed-tooltip small {
+  color: var(--remote-muted);
+  font-size: 11px;
+}
+.remote-speed-tooltip strong {
+  font-weight: 500;
+}
+.remote-speed-tooltip.is-visible,
+.remote-composer-popover-model:has(.remote-speed-toggle:hover) .remote-speed-tooltip,
+.remote-composer-popover-model:has(.remote-speed-toggle:focus-visible) .remote-speed-tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+.remote-slider-track > span {
+  position: relative;
+  overflow: hidden;
+}
+.remote-speed-particles {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.remote-speed-particle-path {
+  position: absolute;
+  inset-inline: 0;
+  height: 0;
+  opacity: 0;
+  will-change: transform;
+  animation-name: remote-speed-particle-travel;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  transform: translateX(100%);
+}
+.remote-speed-particle-path > span {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 3px;
+  background: #ffffffb8;
+  border-radius: 999px;
+  box-shadow: 0 0 5px #ffffff57;
+}
+@keyframes remote-speed-particle-travel {
+  0% {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  8% {
+    opacity: 1;
+    transform: translateX(92%);
+  }
+  92% {
+    opacity: 1;
+    transform: translateX(8%);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(0);
+  }
+}
+.remote-picker-views[data-view="models"] .remote-speed-particle-path {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .remote-speed-particle-path {
+    animation: none;
+  }
+}
+
+.remote-attachment-list .remote-attachment-image {
+  width: 44px;
+  height: 44px;
+  overflow: hidden;
+  border-radius: 8px;
+}
+.remote-attachment-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.remote-upload-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.remote-page .remote-upload-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 1em;
+  height: 1em;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.remote-upload-cancel .sf-symbol {
+  width: 1em;
+  height: 1em;
+}

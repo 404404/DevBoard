@@ -1,0 +1,419 @@
+import { afterAll, describe, expect, it, vi } from "vitest";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { ConfigError, loadConfig } from "../src/config.js";
+
+describe("loadConfig", () => {
+  it("uses localhost-safe defaults", () => {
+    const config = loadConfig({});
+
+    expect(config).toMatchObject({
+      LARK_TASKBOARD_HOST: "127.0.0.1",
+      LARK_TASKBOARD_PORT: 47_823,
+      LARK_TASKBOARD_ADMIN_HOST: "127.0.0.1",
+      LARK_TASKBOARD_ADMIN_PORT: 47_824,
+      LARK_TASKBOARD_ORIGIN: "http://localhost:5173",
+      LARK_TASKBOARD_EVENT_HISTORY_LIMIT: 10_000,
+      LARK_TASKBOARD_SSE_HEARTBEAT_MS: 15_000,
+      LARK_TASKBOARD_SSE_RETRY_MS: 3_000,
+      LARK_TASKBOARD_SSE_WRITE_TIMEOUT_MS: 10_000,
+      LARK_TASKBOARD_PROJECT_SYNC_RECONCILE_MS: 30_000,
+    });
+    expect(config.LARK_TASKBOARD_DATA_DIR).toBe(
+      join(fileURLToPath(new URL("../../../", import.meta.url)), ".data"),
+    );
+    expect(config.LARK_TASKBOARD_CODEX_PROJECT_SNAPSHOT_FILE).toBe(
+      join(config.LARK_TASKBOARD_DATA_DIR, "run/codex-projects.json"),
+    );
+  });
+
+  it("rejects invalid ports", () => {
+    expect(() => loadConfig({ LARK_TASKBOARD_PORT: "70000" })).toThrow(ConfigError);
+    expect(() => loadConfig({ LARK_TASKBOARD_ADMIN_PORT: "47823" })).toThrow(ConfigError);
+  });
+
+  it("rejects unsafe event feed limits and timing values", () => {
+    expect(() => loadConfig({ LARK_TASKBOARD_EVENT_HISTORY_LIMIT: "9" })).toThrow(ConfigError);
+    expect(() => loadConfig({ LARK_TASKBOARD_SSE_HEARTBEAT_MS: "999" })).toThrow(ConfigError);
+    expect(() => loadConfig({ LARK_TASKBOARD_SSE_WRITE_TIMEOUT_MS: "0" })).toThrow(ConfigError);
+    expect(() => loadConfig({ LARK_TASKBOARD_PROJECT_SYNC_RECONCILE_MS: "49" })).toThrow(
+      ConfigError,
+    );
+  });
+
+  it("requires absolute workspace roots", () => {
+    expect(() => loadConfig({ LARK_TASKBOARD_WORKSPACE_ROOTS: "relative/path" })).toThrow(
+      ConfigError,
+    );
+  });
+
+  it("accepts an absolute temporary project display root without using it as a workspace root", () => {
+    const displayRoot = join(tmpdir(), "lark-taskboard-temporary-display-root");
+
+    expect(loadConfig({ LARK_TASKBOARD_TEMPORARY_PROJECT_ROOT: displayRoot })).toMatchObject({
+      LARK_TASKBOARD_TEMPORARY_PROJECT_ROOT: displayRoot,
+    });
+    expect(() =>
+      loadConfig({ LARK_TASKBOARD_TEMPORARY_PROJECT_ROOT: "relative/temporary-root" }),
+    ).toThrow(ConfigError);
+  });
+
+  it.skipIf(process.platform !== "darwin")(
+    "defaults temporary projects to the current user's Documents folder before it exists",
+    () => {
+      const directory = mkdtempSync(join(tmpdir(), "lark-new-user-home-"));
+      try {
+        vi.stubEnv("HOME", directory);
+        const expected = join(directory, "Documents", "Codex");
+        expect(existsSync(expected)).toBe(false);
+        expect(loadConfig({}).LARK_TASKBOARD_TEMPORARY_PROJECT_ROOT).toBe(expected);
+        expect(existsSync(expected)).toBe(false);
+      } finally {
+        vi.unstubAllEnvs();
+        rmSync(directory, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it("fails closed for unsafe authentication mode combinations", () => {
+    expect(() =>
+      loadConfig({
+        LARK_TASKBOARD_ENV: "production",
+        LARK_TASKBOARD_AUTH_MODE: "development",
+      }),
+    ).toThrow(ConfigError);
+    expect(() =>
+      loadConfig({
+        LARK_TASKBOARD_AUTH_MODE: "feishu",
+        LARK_TASKBOARD_ORIGIN: "http://localhost:5173",
+      }),
+    ).toThrow(ConfigError);
+    expect(() =>
+      loadConfig({
+        LARK_TASKBOARD_ENV: "production",
+        LARK_TASKBOARD_AUTH_MODE: "feishu",
+        LARK_TASKBOARD_HOST: "0.0.0.0",
+        LARK_TASKBOARD_FEISHU_APP_ID: "cli_test_app",
+        LARK_TASKBOARD_FEISHU_APP_SECRET: "secret",
+        LARK_TASKBOARD_ORIGIN: "https://tasks.example.com",
+      }),
+    ).toThrow(ConfigError);
+  });
+
+  it.each([
+    ["http://8.8.8.8:47823", "http://8.8.8.8:47823"],
+    ["http://8.8.8.8:80", "http://8.8.8.8"],
+    ["http://8.8.8.8", "http://8.8.8.8"],
+    ["http://tasks.example.com:8080", "http://tasks.example.com:8080"],
+  ])(
+    "allows Feishu authentication on a canonical public IPv4 HTTP origin: %s",
+    (origin, normalizedOrigin) => {
+      expect(
+        loadConfig({
+          LARK_TASKBOARD_ENV: "test",
+          LARK_TASKBOARD_AUTH_MODE: "feishu",
+          LARK_TASKBOARD_FEISHU_APP_ID: "cli_test_app",
+          LARK_TASKBOARD_FEISHU_APP_SECRET: "secret",
+          LARK_TASKBOARD_ORIGIN: origin,
+          LARK_TASKBOARD_ALLOWED_HOSTS: new URL(origin).host,
+        }),
+      ).toMatchObject({
+        LARK_TASKBOARD_AUTH_MODE: "feishu",
+        LARK_TASKBOARD_ORIGIN: normalizedOrigin,
+      });
+    },
+  );
+
+  it.each([
+    "http://0.1.2.3:47823",
+    "http://10.0.0.1:47823",
+    "http://100.64.0.1:47823",
+    "http://127.0.0.1:47823",
+    "http://127.0.0.0x1",
+    "http://169.254.1.1:47823",
+    "http://172.16.0.1:47823",
+    "http://192.0.0.1:47823",
+    "http://192.0.2.1:47823",
+    "http://192.168.1.1:47823",
+    "http://198.18.0.1:47823",
+    "http://198.51.100.1:47823",
+    "http://203.0.113.1:47823",
+    "http://224.0.0.1:47823",
+    "http://tasks.example.com:47823/path",
+    "http://8.8.8.8:47823/path",
+    "http://user@8.8.8.8:47823",
+  ])("rejects a non-public or non-canonical Feishu HTTP origin: %s", (origin) => {
+    expect(() =>
+      loadConfig({
+        LARK_TASKBOARD_ENV: "test",
+        LARK_TASKBOARD_AUTH_MODE: "feishu",
+        LARK_TASKBOARD_FEISHU_APP_ID: "cli_test_app",
+        LARK_TASKBOARD_FEISHU_APP_SECRET: "secret",
+        LARK_TASKBOARD_ORIGIN: origin,
+      }),
+    ).toThrow(ConfigError);
+  });
+
+  it("does not expose development authentication on a public HTTP origin", () => {
+    expect(() =>
+      loadConfig({
+        LARK_TASKBOARD_ENV: "test",
+        LARK_TASKBOARD_AUTH_MODE: "development",
+        LARK_TASKBOARD_ORIGIN: "http://8.8.8.8:47823",
+      }),
+    ).toThrow(ConfigError);
+  });
+
+  it("accepts only an authenticated local Codex WebSocket endpoint", () => {
+    const directory = mkdtempSync(join(tmpdir(), "lark-taskboard-codex-token-"));
+    const tokenFile = join(directory, "codex-token");
+    try {
+      writeFileSync(tokenFile, "capability-token\n", { mode: 0o600 });
+      expect(
+        loadConfig({
+          LARK_TASKBOARD_CODEX_TRANSPORT: "websocket",
+          LARK_TASKBOARD_CODEX_ENDPOINT: "ws://127.0.0.1:47825",
+          LARK_TASKBOARD_CODEX_TOKEN_FILE: tokenFile,
+        }),
+      ).toMatchObject({
+        LARK_TASKBOARD_CODEX_TRANSPORT: "websocket",
+        LARK_TASKBOARD_CODEX_ENDPOINT: "ws://127.0.0.1:47825/",
+        LARK_TASKBOARD_CODEX_TOKEN_FILE: tokenFile,
+      });
+
+      for (const endpoint of [
+        "ws://192.168.1.10:47825",
+        "ws://0.0.0.0:47825",
+        "wss://127.0.0.1:47825",
+        "ws://user:secret@127.0.0.1:47825",
+        "ws://127.0.0.1:0",
+        "ws://127.0.0.1:65536",
+        "ws://127.0.0.1:47826/path",
+        "ws://127.0.0.1:47826/?token=secret",
+        "ws://127.0.0.1:47826/#fragment",
+        "ws://127.0.0.1:47826/?",
+        "ws://127.0.0.1:47826/#",
+        "ws://host.docker.internal:47825",
+        "ws://docker.local:47825",
+      ]) {
+        expect(() =>
+          loadConfig({
+            LARK_TASKBOARD_CODEX_TRANSPORT: "websocket",
+            LARK_TASKBOARD_CODEX_ENDPOINT: endpoint,
+            LARK_TASKBOARD_CODEX_TOKEN_FILE: tokenFile,
+          }),
+        ).toThrow(ConfigError);
+      }
+      expect(() =>
+        loadConfig({
+          LARK_TASKBOARD_CODEX_TRANSPORT: "websocket",
+          LARK_TASKBOARD_CODEX_ENDPOINT: "ws://127.0.0.1:47825",
+        }),
+      ).toThrow(ConfigError);
+
+      const symlink = join(directory, "codex-token-link");
+      mkdirSync(join(directory, "nested"));
+      writeFileSync(join(directory, "nested", "wide-token"), "wide", { mode: 0o644 });
+      symlinkSync(tokenFile, symlink);
+      if (existsSync(symlink)) {
+        expect(() =>
+          loadConfig({
+            LARK_TASKBOARD_CODEX_TRANSPORT: "websocket",
+            LARK_TASKBOARD_CODEX_TOKEN_FILE: symlink,
+          }),
+        ).toThrow(ConfigError);
+      }
+      expect(() =>
+        loadConfig({
+          LARK_TASKBOARD_CODEX_TRANSPORT: "websocket",
+          LARK_TASKBOARD_CODEX_TOKEN_FILE: join(directory, "nested", "wide-token"),
+        }),
+      ).toThrow(ConfigError);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("requires a built web root and a private Feishu secret file in production", () => {
+    const directory = mkdtempSync(join(tmpdir(), "lark-taskboard-production-config-"));
+    const webRoot = join(directory, "web");
+    const secretFile = join(directory, "feishu-secret");
+    const codexTokenFile = join(directory, "codex-token");
+    try {
+      writeFileSync(secretFile, "secret-from-file\n", { mode: 0o600 });
+      writeFileSync(codexTokenFile, "codex-token-from-file\n", { mode: 0o600 });
+      let error: unknown;
+      try {
+        loadConfig({
+          LARK_TASKBOARD_ENV: "production",
+          LARK_TASKBOARD_AUTH_MODE: "feishu",
+          LARK_TASKBOARD_FEISHU_APP_ID: "cli_test_app",
+          LARK_TASKBOARD_FEISHU_APP_SECRET_FILE: secretFile,
+          LARK_TASKBOARD_CODEX_TRANSPORT: "websocket",
+          LARK_TASKBOARD_CODEX_ENDPOINT: "ws://127.0.0.1:47825",
+          LARK_TASKBOARD_CODEX_TOKEN_FILE: codexTokenFile,
+          LARK_TASKBOARD_ORIGIN: "https://tasks.example.com",
+          LARK_TASKBOARD_ALLOWED_HOSTS: "tasks.example.com",
+          LARK_TASKBOARD_WEB_ROOT: webRoot,
+        });
+      } catch (caught: unknown) {
+        error = caught;
+      }
+      expect(error).toBeInstanceOf(ConfigError);
+      expect((error as ConfigError).issues).toContain(
+        "LARK_TASKBOARD_WEB_ROOT: Web 构建目录缺少 index.html",
+      );
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("embedded desktop bridge configuration", () => {
+  const directory = mkdtempSync(join(tmpdir(), "embedded-config-"));
+  const tokenFile = join(directory, "token");
+  writeFileSync(tokenFile, "test-token", { mode: 0o600 });
+  afterAll(() => rmSync(directory, { recursive: true, force: true }));
+  const embedded = {
+    LARK_TASKBOARD_CODEX_TRANSPORT: "embedded",
+    LARK_TASKBOARD_CODEX_COMMAND: "/Applications/Codex.app/Contents/Resources/codex",
+    LARK_TASKBOARD_CODEX_TOKEN_FILE: tokenFile,
+    LARK_TASKBOARD_CODEX_PROJECT_STATE_FILE: "/tmp/codex-projects.json",
+  };
+  it("accepts embedded mode with production Feishu security settings", () => {
+    const webRoot = join(directory, "production-web");
+    mkdirSync(webRoot);
+    writeFileSync(join(webRoot, "index.html"), "<html></html>");
+    const secretFile = join(directory, "feishu-secret");
+    writeFileSync(secretFile, "test-secret", { mode: 0o600 });
+    const config = loadConfig({
+      ...embedded,
+      LARK_TASKBOARD_ENV: "production",
+      LARK_TASKBOARD_AUTH_MODE: "feishu",
+      LARK_TASKBOARD_FEISHU_APP_ID: "cli_test",
+      LARK_TASKBOARD_FEISHU_APP_SECRET_FILE: secretFile,
+      LARK_TASKBOARD_ORIGIN: "https://tasks.example.com",
+      LARK_TASKBOARD_ALLOWED_HOSTS: "tasks.example.com",
+      LARK_TASKBOARD_WEB_ROOT: webRoot,
+    });
+    expect(config.LARK_TASKBOARD_CODEX_TRANSPORT).toBe("embedded");
+  });
+  it("accepts a local embedded bridge with explicit native paths", () => {
+    expect(loadConfig(embedded).LARK_TASKBOARD_CODEX_TRANSPORT).toBe("embedded");
+  });
+  it.each(["embedded", "websocket"])(
+    "accepts allocated loopback ports for %s bridges",
+    (transport) => {
+      for (const port of [1, 80, 47826, 65535]) {
+        const endpoint = `ws://127.0.0.1:${port}`;
+        expect(
+          loadConfig({
+            ...embedded,
+            LARK_TASKBOARD_CODEX_TRANSPORT: transport,
+            LARK_TASKBOARD_CODEX_ENDPOINT: endpoint,
+          }).LARK_TASKBOARD_CODEX_ENDPOINT,
+        ).toBe(new URL(endpoint).toString());
+      }
+    },
+  );
+  it("rejects a remote endpoint and missing native paths for embedded mode", () => {
+    expect(() =>
+      loadConfig({ ...embedded, LARK_TASKBOARD_CODEX_ENDPOINT: "ws://host.docker.internal:47825" }),
+    ).toThrow();
+    expect(() => loadConfig({ ...embedded, LARK_TASKBOARD_CODEX_COMMAND: "codex" })).toThrow();
+    expect(() =>
+      loadConfig({ ...embedded, LARK_TASKBOARD_CODEX_PROJECT_STATE_FILE: undefined }),
+    ).toThrow();
+  });
+});
+
+describe("unified Feishu credentials configuration", () => {
+  const directory = mkdtempSync(join(tmpdir(), "feishu-credentials-config-"));
+  afterAll(() => rmSync(directory, { recursive: true, force: true }));
+  const credentialsFile = join(directory, "feishu.json");
+  writeFileSync(
+    credentialsFile,
+    JSON.stringify({ appId: "cli_credentials123", appSecret: "private-test-secret" }),
+    { mode: 0o600 },
+  );
+  const legacySecretFile = join(directory, "legacy-secret");
+  writeFileSync(legacySecretFile, "other-secret", { mode: 0o600 });
+
+  it("loads both credentials from one private file in production Feishu mode", () => {
+    const webRoot = join(directory, "web");
+    mkdirSync(webRoot);
+    writeFileSync(join(webRoot, "index.html"), "<html></html>");
+    const tokenFile = join(directory, "token");
+    writeFileSync(tokenFile, "test-token", { mode: 0o600 });
+
+    const config = loadConfig({
+      LARK_TASKBOARD_ENV: "production",
+      LARK_TASKBOARD_AUTH_MODE: "feishu",
+      LARK_TASKBOARD_FEISHU_CREDENTIALS_FILE: credentialsFile,
+      LARK_TASKBOARD_CODEX_TRANSPORT: "websocket",
+      LARK_TASKBOARD_CODEX_TOKEN_FILE: tokenFile,
+      LARK_TASKBOARD_ORIGIN: "https://tasks.example.com",
+      LARK_TASKBOARD_WEB_ROOT: webRoot,
+    });
+
+    expect(config.LARK_TASKBOARD_FEISHU_APP_ID).toBe("cli_credentials123");
+    expect(config.LARK_TASKBOARD_FEISHU_APP_SECRET).toBe("private-test-secret");
+    expect(config.LARK_TASKBOARD_FEISHU_APP_SECRET_FILE).toBeUndefined();
+  });
+
+  it.each([
+    ["LARK_TASKBOARD_FEISHU_APP_ID", "cli_other"],
+    ["LARK_TASKBOARD_FEISHU_APP_SECRET", "other-secret"],
+    ["LARK_TASKBOARD_FEISHU_APP_SECRET_FILE", legacySecretFile],
+  ])("rejects a credentials file mixed with %s", (key, value) => {
+    expect(() =>
+      loadConfig({
+        LARK_TASKBOARD_FEISHU_CREDENTIALS_FILE: credentialsFile,
+        [key]: value,
+      }),
+    ).toThrow(ConfigError);
+  });
+
+  it("rejects relative, missing, symlink and publicly readable credentials files", () => {
+    const symlink = join(directory, "credentials-link");
+    symlinkSync(credentialsFile, symlink);
+    const publicFile = join(directory, "public.json");
+    writeFileSync(publicFile, '{"appId":"cli_test","appSecret":"secret"}', { mode: 0o644 });
+
+    for (const path of [
+      "relative.json",
+      join(directory, "missing.json"),
+      symlink,
+      publicFile,
+      directory,
+    ]) {
+      expect(() => loadConfig({ LARK_TASKBOARD_FEISHU_CREDENTIALS_FILE: path })).toThrow(
+        ConfigError,
+      );
+    }
+  });
+
+  it.each([
+    '{"appSecret":"sensitive-parse-test",',
+    JSON.stringify({ appId: "cli_test" }),
+    JSON.stringify({ appId: "cli_test", appSecret: "" }),
+    JSON.stringify({ appId: "cli_test", appSecret: 123 }),
+    JSON.stringify({ appId: "invalid", appSecret: "sensitive-parse-test" }),
+    JSON.stringify({ appId: "cli_test", appSecret: "secret\nline" }),
+    "null",
+  ])("rejects invalid credentials without echoing their contents (%#)", (contents) => {
+    const path = join(directory, "invalid.json");
+    writeFileSync(path, contents, { mode: 0o600 });
+    let caught: unknown;
+    try {
+      loadConfig({ LARK_TASKBOARD_FEISHU_CREDENTIALS_FILE: path });
+    } catch (error: unknown) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ConfigError);
+    expect(JSON.stringify((caught as ConfigError).issues)).not.toContain("sensitive-parse-test");
+  });
+});

@@ -1,0 +1,8 @@
+# Keep local development history and deployment records out of release exports.
+/memory export-ignore
+/docs/acceptance export-ignore
+/docs/experiments export-ignore
+/docs/superpowers export-ignore
+/docs/http-deployment.md export-ignore
+/docs/mobile-codex-remote.md export-ignore
+/docs/remote-questions-edit.md export-ignore

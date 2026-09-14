@@ -1,0 +1,47 @@
+{
+  "codexVersion": "0.154.0",
+  "clientMethods": [
+    "initialize",
+    "fs/createDirectory",
+    "thread/start",
+    "thread/name/set",
+    "thread/archive",
+    "thread/resume",
+    "thread/unsubscribe",
+    "thread/read",
+    "thread/list",
+    "model/list",
+    "account/rateLimits/read",
+    "turn/start",
+    "turn/interrupt",
+    "command/exec"
+  ],
+  "clientNotifications": ["initialized"],
+  "serverRequests": [
+    "item/commandExecution/requestApproval",
+    "item/fileChange/requestApproval",
+    "item/permissions/requestApproval",
+    "item/tool/requestUserInput",
+    "mcpServer/elicitation/request",
+    "execCommandApproval",
+    "applyPatchApproval"
+  ],
+  "serverNotifications": [
+    "thread/started",
+    "thread/status/changed",
+    "turn/started",
+    "turn/completed",
+    "turn/diff/updated",
+    "turn/plan/updated",
+    "item/started",
+    "item/completed",
+    "item/agentMessage/delta",
+    "item/commandExecution/outputDelta",
+    "item/fileChange/outputDelta",
+    "item/fileChange/patchUpdated",
+    "serverRequest/resolved",
+    "error",
+    "warning"
+  ],
+  "oneShotApprovalDecisions": ["accept", "decline", "cancel"]
+}

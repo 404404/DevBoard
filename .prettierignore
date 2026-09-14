@@ -1,0 +1,15 @@
+node_modules
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+apps/desktop/.cache/
+apps/desktop/staging/
+.worktrees/
+.superpowers/
+dist
+coverage
+playwright-report
+test-results
+package-lock.json
+# Preserve upstream license bytes and their verified checksums.
+apps/desktop/licenses/**/LICENSE*
+apps/desktop/licenses/**/COPYRIGHT*

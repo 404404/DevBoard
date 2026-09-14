@@ -1,0 +1,466 @@
+{
+  "formatVersion": 1,
+  "packages": {
+    "alloc-stdlib@0.2.4": {
+      "repository": "https://github.com/dropbox/rust-alloc-no-stdlib",
+      "commit": "ae42d22078b98549e987d2f03d12df7b984fde47",
+      "license": "BSD-3-Clause",
+      "files": [
+        {
+          "path": "rust-alloc-no-stdlib/ae42d22078b98549e987d2f03d12df7b984fde47/LICENSE",
+          "destination": "LICENSE",
+          "source": "https://raw.githubusercontent.com/dropbox/rust-alloc-no-stdlib/ae42d22078b98549e987d2f03d12df7b984fde47/LICENSE",
+          "sha256": "c0c56f26d9c051cac4d200c34c84e7ae9aaa853e01a982a1df08b09931e518ae"
+        }
+      ]
+    },
+    "block2@0.6.2": {
+      "repository": "https://github.com/madsmtm/objc2",
+      "commit": "b4167b582b2f75f9a1be75495c41b765344fd03c",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "objc2/b4167b582b2f75f9a1be75495c41b765344fd03c/LICENSE.md",
+          "destination": "LICENSE.md",
+          "source": "https://raw.githubusercontent.com/madsmtm/objc2/b4167b582b2f75f9a1be75495c41b765344fd03c/LICENSE.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-MIT.txt",
+          "destination": "STANDARD-MIT.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/MIT.txt",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        }
+      ]
+    },
+    "dispatch2@0.3.1": {
+      "repository": "https://github.com/madsmtm/objc2",
+      "commit": "8852b424193ca41602281b3d7540d7c8ed51e49a",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "files": [
+        {
+          "path": "objc2/8852b424193ca41602281b3d7540d7c8ed51e49a/LICENSE.md",
+          "destination": "LICENSE.md",
+          "source": "https://raw.githubusercontent.com/madsmtm/objc2/8852b424193ca41602281b3d7540d7c8ed51e49a/LICENSE.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-MIT.txt",
+          "destination": "STANDARD-MIT.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/MIT.txt",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-Apache-2.0.txt",
+          "destination": "STANDARD-Apache-2.0.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/Apache-2.0.txt",
+          "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-Zlib.txt",
+          "destination": "STANDARD-Zlib.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/Zlib.txt",
+          "sha256": "bfb1112d49db5b1daecdfef24bd7e2f3ea0bafb33aa67aa0ab51e2bf8407c03d"
+        }
+      ]
+    },
+    "objc2-app-kit@0.3.2": {
+      "repository": "https://github.com/madsmtm/objc2",
+      "commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "files": [
+        {
+          "path": "objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "destination": "LICENSE.md",
+          "source": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-MIT.txt",
+          "destination": "STANDARD-MIT.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/MIT.txt",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-Apache-2.0.txt",
+          "destination": "STANDARD-Apache-2.0.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/Apache-2.0.txt",
+          "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-Zlib.txt",
+          "destination": "STANDARD-Zlib.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/Zlib.txt",
+          "sha256": "bfb1112d49db5b1daecdfef24bd7e2f3ea0bafb33aa67aa0ab51e2bf8407c03d"
+        }
+      ]
+    },
+    "objc2-core-foundation@0.3.2": {
+      "repository": "https://github.com/madsmtm/objc2",
+      "commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "files": [
+        {
+          "path": "objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "destination": "LICENSE.md",
+          "source": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-MIT.txt",
+          "destination": "STANDARD-MIT.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/MIT.txt",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-Apache-2.0.txt",
+          "destination": "STANDARD-Apache-2.0.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/Apache-2.0.txt",
+          "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-Zlib.txt",
+          "destination": "STANDARD-Zlib.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/Zlib.txt",
+          "sha256": "bfb1112d49db5b1daecdfef24bd7e2f3ea0bafb33aa67aa0ab51e2bf8407c03d"
+        }
+      ]
+    },
+    "objc2-core-graphics@0.3.2": {
+      "repository": "https://github.com/madsmtm/objc2",
+      "commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "files": [
+        {
+          "path": "objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "destination": "LICENSE.md",
+          "source": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-MIT.txt",
+          "destination": "STANDARD-MIT.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/MIT.txt",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-Apache-2.0.txt",
+          "destination": "STANDARD-Apache-2.0.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/Apache-2.0.txt",
+          "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-Zlib.txt",
+          "destination": "STANDARD-Zlib.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/Zlib.txt",
+          "sha256": "bfb1112d49db5b1daecdfef24bd7e2f3ea0bafb33aa67aa0ab51e2bf8407c03d"
+        }
+      ]
+    },
+    "objc2-encode@4.1.0": {
+      "repository": "https://github.com/madsmtm/objc2",
+      "commit": "8d214f5477365ffcbcbb7de058c86ed9a518efb7",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "objc2/8d214f5477365ffcbcbb7de058c86ed9a518efb7/LICENSE.md",
+          "destination": "LICENSE.md",
+          "source": "https://raw.githubusercontent.com/madsmtm/objc2/8d214f5477365ffcbcbb7de058c86ed9a518efb7/LICENSE.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-MIT.txt",
+          "destination": "STANDARD-MIT.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/MIT.txt",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        }
+      ]
+    },
+    "objc2-exception-helper@0.1.1": {
+      "repository": "https://github.com/madsmtm/objc2",
+      "commit": "8d214f5477365ffcbcbb7de058c86ed9a518efb7",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "files": [
+        {
+          "path": "objc2/8d214f5477365ffcbcbb7de058c86ed9a518efb7/LICENSE.md",
+          "destination": "LICENSE.md",
+          "source": "https://raw.githubusercontent.com/madsmtm/objc2/8d214f5477365ffcbcbb7de058c86ed9a518efb7/LICENSE.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-MIT.txt",
+          "destination": "STANDARD-MIT.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/MIT.txt",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-Apache-2.0.txt",
+          "destination": "STANDARD-Apache-2.0.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/Apache-2.0.txt",
+          "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-Zlib.txt",
+          "destination": "STANDARD-Zlib.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/Zlib.txt",
+          "sha256": "bfb1112d49db5b1daecdfef24bd7e2f3ea0bafb33aa67aa0ab51e2bf8407c03d"
+        }
+      ]
+    },
+    "objc2-foundation@0.3.2": {
+      "repository": "https://github.com/madsmtm/objc2",
+      "commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "destination": "LICENSE.md",
+          "source": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-MIT.txt",
+          "destination": "STANDARD-MIT.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/MIT.txt",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        }
+      ]
+    },
+    "objc2-osa-kit@0.3.2": {
+      "repository": "https://github.com/madsmtm/objc2",
+      "commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "files": [
+        {
+          "path": "objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "destination": "LICENSE.md",
+          "source": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-MIT.txt",
+          "destination": "STANDARD-MIT.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/MIT.txt",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-Apache-2.0.txt",
+          "destination": "STANDARD-Apache-2.0.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/Apache-2.0.txt",
+          "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-Zlib.txt",
+          "destination": "STANDARD-Zlib.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/Zlib.txt",
+          "sha256": "bfb1112d49db5b1daecdfef24bd7e2f3ea0bafb33aa67aa0ab51e2bf8407c03d"
+        }
+      ]
+    },
+    "objc2-web-kit@0.3.2": {
+      "repository": "https://github.com/madsmtm/objc2",
+      "commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "files": [
+        {
+          "path": "objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "destination": "LICENSE.md",
+          "source": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-MIT.txt",
+          "destination": "STANDARD-MIT.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/MIT.txt",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-Apache-2.0.txt",
+          "destination": "STANDARD-Apache-2.0.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/Apache-2.0.txt",
+          "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-Zlib.txt",
+          "destination": "STANDARD-Zlib.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/Zlib.txt",
+          "sha256": "bfb1112d49db5b1daecdfef24bd7e2f3ea0bafb33aa67aa0ab51e2bf8407c03d"
+        }
+      ]
+    },
+    "objc2@0.6.4": {
+      "repository": "https://github.com/madsmtm/objc2",
+      "commit": "8852b424193ca41602281b3d7540d7c8ed51e49a",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "objc2/8852b424193ca41602281b3d7540d7c8ed51e49a/LICENSE.md",
+          "destination": "LICENSE.md",
+          "source": "https://raw.githubusercontent.com/madsmtm/objc2/8852b424193ca41602281b3d7540d7c8ed51e49a/LICENSE.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        },
+        {
+          "path": "spdx/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/STANDARD-MIT.txt",
+          "destination": "STANDARD-MIT.txt",
+          "source": "https://raw.githubusercontent.com/spdx/license-list-data/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee/text/MIT.txt",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        }
+      ]
+    },
+    "unic-char-property@0.9.0": {
+      "repository": "https://github.com/open-i18n/rust-unic",
+      "commit": "5878605364af97a3358368a6eaef02104af2e016",
+      "license": "MIT/Apache-2.0",
+      "files": [
+        {
+          "path": "rust-unic/5878605364af97a3358368a6eaef02104af2e016/LICENSE-MIT",
+          "destination": "LICENSE-MIT",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        },
+        {
+          "path": "rust-unic/5878605364af97a3358368a6eaef02104af2e016/LICENSE-APACHE",
+          "destination": "LICENSE-APACHE",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "rust-unic/5878605364af97a3358368a6eaef02104af2e016/COPYRIGHT.md",
+          "destination": "COPYRIGHT.md",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/COPYRIGHT.md",
+          "sha256": "f5c342c49f3ac804f3e8e7bb62a8040a44c50d47bb36902b1abd13f66a1adf8b"
+        },
+        {
+          "path": "rust-unic/5878605364af97a3358368a6eaef02104af2e016/AUTHORS",
+          "destination": "AUTHORS",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/AUTHORS",
+          "sha256": "2748c1a1fba7616917c61d455e8d715ab952671ead63f2026ad0124410596b09"
+        }
+      ]
+    },
+    "unic-char-range@0.9.0": {
+      "repository": "https://github.com/open-i18n/rust-unic",
+      "commit": "5878605364af97a3358368a6eaef02104af2e016",
+      "license": "MIT/Apache-2.0",
+      "files": [
+        {
+          "path": "rust-unic/5878605364af97a3358368a6eaef02104af2e016/LICENSE-MIT",
+          "destination": "LICENSE-MIT",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        },
+        {
+          "path": "rust-unic/5878605364af97a3358368a6eaef02104af2e016/LICENSE-APACHE",
+          "destination": "LICENSE-APACHE",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "rust-unic/5878605364af97a3358368a6eaef02104af2e016/COPYRIGHT.md",
+          "destination": "COPYRIGHT.md",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/COPYRIGHT.md",
+          "sha256": "f5c342c49f3ac804f3e8e7bb62a8040a44c50d47bb36902b1abd13f66a1adf8b"
+        },
+        {
+          "path": "rust-unic/5878605364af97a3358368a6eaef02104af2e016/AUTHORS",
+          "destination": "AUTHORS",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/AUTHORS",
+          "sha256": "2748c1a1fba7616917c61d455e8d715ab952671ead63f2026ad0124410596b09"
+        }
+      ]
+    },
+    "unic-common@0.9.0": {
+      "repository": "https://github.com/open-i18n/rust-unic",
+      "commit": "5878605364af97a3358368a6eaef02104af2e016",
+      "license": "MIT/Apache-2.0",
+      "files": [
+        {
+          "path": "rust-unic/5878605364af97a3358368a6eaef02104af2e016/LICENSE-MIT",
+          "destination": "LICENSE-MIT",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        },
+        {
+          "path": "rust-unic/5878605364af97a3358368a6eaef02104af2e016/LICENSE-APACHE",
+          "destination": "LICENSE-APACHE",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "rust-unic/5878605364af97a3358368a6eaef02104af2e016/COPYRIGHT.md",
+          "destination": "COPYRIGHT.md",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/COPYRIGHT.md",
+          "sha256": "f5c342c49f3ac804f3e8e7bb62a8040a44c50d47bb36902b1abd13f66a1adf8b"
+        },
+        {
+          "path": "rust-unic/5878605364af97a3358368a6eaef02104af2e016/AUTHORS",
+          "destination": "AUTHORS",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/AUTHORS",
+          "sha256": "2748c1a1fba7616917c61d455e8d715ab952671ead63f2026ad0124410596b09"
+        }
+      ]
+    },
+    "unic-ucd-ident@0.9.0": {
+      "repository": "https://github.com/open-i18n/rust-unic",
+      "commit": "8a6ce83063d90b91ae2ce59eddb803edd393fca9",
+      "license": "MIT/Apache-2.0",
+      "files": [
+        {
+          "path": "rust-unic/8a6ce83063d90b91ae2ce59eddb803edd393fca9/LICENSE-MIT",
+          "destination": "LICENSE-MIT",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/8a6ce83063d90b91ae2ce59eddb803edd393fca9/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        },
+        {
+          "path": "rust-unic/8a6ce83063d90b91ae2ce59eddb803edd393fca9/LICENSE-APACHE",
+          "destination": "LICENSE-APACHE",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/8a6ce83063d90b91ae2ce59eddb803edd393fca9/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "rust-unic/8a6ce83063d90b91ae2ce59eddb803edd393fca9/COPYRIGHT.md",
+          "destination": "COPYRIGHT.md",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/8a6ce83063d90b91ae2ce59eddb803edd393fca9/COPYRIGHT.md",
+          "sha256": "f5c342c49f3ac804f3e8e7bb62a8040a44c50d47bb36902b1abd13f66a1adf8b"
+        },
+        {
+          "path": "rust-unic/8a6ce83063d90b91ae2ce59eddb803edd393fca9/AUTHORS",
+          "destination": "AUTHORS",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/8a6ce83063d90b91ae2ce59eddb803edd393fca9/AUTHORS",
+          "sha256": "2748c1a1fba7616917c61d455e8d715ab952671ead63f2026ad0124410596b09"
+        }
+      ]
+    },
+    "unic-ucd-version@0.9.0": {
+      "repository": "https://github.com/open-i18n/rust-unic",
+      "commit": "5878605364af97a3358368a6eaef02104af2e016",
+      "license": "MIT/Apache-2.0",
+      "files": [
+        {
+          "path": "rust-unic/5878605364af97a3358368a6eaef02104af2e016/LICENSE-MIT",
+          "destination": "LICENSE-MIT",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        },
+        {
+          "path": "rust-unic/5878605364af97a3358368a6eaef02104af2e016/LICENSE-APACHE",
+          "destination": "LICENSE-APACHE",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "rust-unic/5878605364af97a3358368a6eaef02104af2e016/COPYRIGHT.md",
+          "destination": "COPYRIGHT.md",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/COPYRIGHT.md",
+          "sha256": "f5c342c49f3ac804f3e8e7bb62a8040a44c50d47bb36902b1abd13f66a1adf8b"
+        },
+        {
+          "path": "rust-unic/5878605364af97a3358368a6eaef02104af2e016/AUTHORS",
+          "destination": "AUTHORS",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/AUTHORS",
+          "sha256": "2748c1a1fba7616917c61d455e8d715ab952671ead63f2026ad0124410596b09"
+        }
+      ]
+    }
+  }
+}
