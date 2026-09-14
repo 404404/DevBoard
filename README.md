@@ -27,7 +27,7 @@ Lark-Codex 将飞书任务看板与本机 Codex 连接起来。你可以整理�
 
 ![飞书桌面端的 Lark-Codex 任务看板](docs/images/desktop-taskboard.png)
 
-### 移动端 Remote
+### 移动端看板与 Remote
 
 Remote 让你在飞书移动端连接 Mac 上的 Codex，参考 Codex Desktop 的主要交互体验。手机和 Mac 都在国内时，搭配国内 frp 服务器，远程访问可走国内链路、减少跨境中转，有助于交互流畅；模型请求仍由本机 Codex 连接其服务。
 
@@ -35,7 +35,12 @@ Remote 让你在飞书移动端连接 Mac 上的 Codex，参考 Codex Desktop �
 - 实时查看流式结果，处理审批和补充输入。
 - 发送附件和图片，查看代码 diff 并审查改动。
 
-<img src="docs/images/mobile-remote.jpg" alt="飞书移动端的 Lark-Codex 远程入口" width="360" />
+左侧为手机端任务看板，右侧为 Remote 入口。
+
+<p>
+  <img src="docs/images/mobile-taskboard.png" alt="飞书移动端的 Lark-Codex 任务看板" width="48%" />
+  <img src="docs/images/mobile-remote.jpg" alt="飞书移动端的 Lark-Codex 远程入口" width="48%" />
+</p>
 
 ## 安装前准备
 
