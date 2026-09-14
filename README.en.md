@@ -2,11 +2,11 @@
 
 [简体中文](README.md) · **English**
 
-Manage tasks in Feishu and let Codex on your Mac help execute them.
+Manage tasks in Lark and let Codex on your Mac help execute them.
 
 **User guide** · [Agent operating guide (Chinese)](AGENTS.md)
 
-Lark-Codex connects a Feishu task board to Codex running on your Mac. Organize projects and tasks, submit requests, track execution, and handle approvals or requests for more information. The Mac app starts and manages local services; you access the board through Feishu.
+Lark-Codex connects a Lark task board to Codex running on your Mac. Organize projects and tasks, submit requests, track execution, and handle approvals or requests for more information. The Mac app starts and manages local services; you access the board through Lark.
 
 Current release: **0.1.1 preview**, for **Apple Silicon Macs running macOS 13 or later**.
 
@@ -14,24 +14,24 @@ Current release: **0.1.1 preview**, for **Apple Silicon Macs running macOS 13 or
 
 - Manage tasks by project using a dashboard, board, or list, with statuses, priorities, labels, comments, and attachments.
 - Start or continue Codex execution from a task, and view progress, results, and pending approvals.
-- Access the board from Feishu on desktop or mobile, connected to the workspace running on your own Mac.
+- Access the board from Lark on desktop or mobile, connected to the workspace running on your own Mac.
 - Use mobile Remote to create or continue Codex conversations on your Mac, view streaming results, and handle approvals.
 - Send attachments and images from your phone, provide additional input, and view code diffs to review changes.
 - Let authorized agents query and manage tasks through the built-in command-line tool.
 
-Local services and task data stay on your Mac. Feishu sign-in, public access, and Codex execution still require their respective network services.
+Local services and task data stay on your Mac. Lark sign-in, public access, and Codex execution still require their respective network services.
 
 ## Screenshots
 
 ### Desktop task board
 
-View and manage tasks by status in the Feishu desktop client.
+View and manage tasks by status in the Lark desktop client.
 
-![Lark-Codex task board in Feishu on desktop](docs/images/desktop-taskboard.png)
+![Lark-Codex task board in Lark on desktop](docs/images/desktop-taskboard.png)
 
 ### Mobile task board and Remote
 
-Remote connects Feishu on your phone to Codex on your Mac, drawing on the main interaction patterns of Codex Desktop. When both devices are in mainland China, using an frp server in mainland China can keep remote-access traffic on domestic routes and reduce cross-border relays, helping interactions feel responsive. Model requests still go from your local Codex to its configured service.
+Remote connects Lark on your phone to Codex on your Mac, drawing on the main interaction patterns of Codex Desktop. When both devices are in mainland China, using an frp server in mainland China can keep remote-access traffic on domestic routes and reduce cross-border relays, helping interactions feel responsive. Model requests still go from your local Codex to its configured service.
 
 - Browse conversations by project, start a new conversation, or continue an existing one.
 - View streaming results, handle approvals, and provide additional input.
@@ -40,8 +40,8 @@ Remote connects Feishu on your phone to Codex on your Mac, drawing on the main i
 The mobile task board is on the left; the Remote entry screen is on the right.
 
 <p>
-  <img src="docs/images/mobile-taskboard.png" alt="Lark-Codex task board in Feishu on mobile" width="48%" />
-  <img src="docs/images/mobile-remote.jpg" alt="Lark-Codex Remote entry screen in Feishu on mobile" width="48%" />
+  <img src="docs/images/mobile-taskboard.png" alt="Lark-Codex task board in Lark on mobile" width="48%" />
+  <img src="docs/images/mobile-remote.jpg" alt="Lark-Codex Remote entry screen in Lark on mobile" width="48%" />
 </p>
 
 ## Prerequisites
@@ -50,11 +50,11 @@ The mobile task board is on the left; the Remote entry screen is on the right.
 | --- | --- |
 | Apple Silicon Mac | macOS 13 or later. The current installer does not support Intel Macs, Windows, or Linux. |
 | Codex | Installed, signed in, and working locally. |
-| Feishu client and custom app | You need permission to create, configure, and publish an enterprise custom web app in Feishu. |
+| Lark client and custom app | You need permission to create, configure, and publish an enterprise custom web app in Lark. |
 | Public frp tunnel service | A working server or service-provider configuration to access the local services on your Mac. |
 | Domain name, depending on tunnel type | HTTP/HTTPS domain-based access requires DNS configuration. TCP access through a public IPv4 address can work without a domain. |
 
-The installer includes **Node.js, the board's frontend and backend, the Codex bridge, SQLite components, Caddy, and the frp client**. You do not need to install Node.js, Docker, Rust, or development tools separately. You must provide Codex, the Feishu client, and a public frp server.
+The installer includes **Node.js, the board's frontend and backend, the Codex bridge, SQLite components, Caddy, and the frp client**. You do not need to install Node.js, Docker, Rust, or development tools separately. You must provide Codex, the Lark client, and a public frp server.
 
 ## Download and install
 
@@ -87,13 +87,13 @@ DNS configuration is part of this step. The guide shows instructions based on th
 
 HTTPS access requires public port 443 to reach the local Caddy service. HTTP and TCP modes use plain HTTP, so sessions and application content are not encrypted with HTTPS.
 
-### 2. Create and configure the Feishu app
+### 2. Create and configure the Lark app
 
-Create an enterprise custom web app in the [Feishu developer console](https://open.feishu.cn/app). Enter its **App ID** and **App Secret** in **连接配置 (Connection Settings)**.
+Create an enterprise custom web app in the [Lark developer console](https://open.feishu.cn/app). Enter its **App ID** and **App Secret** in **连接配置 (Connection Settings)**.
 
-Use the addresses in the setup guide to configure the desktop and mobile homepages, H5 trusted domains, and redirect URL. Enable the permission to obtain a user's user ID (`contact:user.employee_id:readonly`), then publish an app version in Feishu and configure its availability scope.
+Use the addresses in the setup guide to configure the desktop and mobile homepages, H5 trusted domains, and redirect URL. Enable the permission to obtain a user's user ID (`contact:user.employee_id:readonly`), then publish an app version in Lark and configure its availability scope.
 
-A successful credentials check only confirms that the credentials work. You still need to verify the publication status, availability scope, and actual sign-in in Feishu. Any account that successfully authenticates through Feishu can operate the same board, so configure the app's availability scope for your intended users.
+A successful credentials check only confirms that the credentials work. You still need to verify the publication status, availability scope, and actual sign-in in Lark. Any account that successfully authenticates through Lark can operate the same board, so configure the app's availability scope for your intended users.
 
 ### 3. Confirm Codex sign-in, save, and verify
 
@@ -101,14 +101,14 @@ Make sure Codex is installed and signed in on this Mac, then run the checks in t
 
 **Running checks does not save your configuration automatically.** Save after filling in the settings. If settings have changed, choose to restart services immediately or restart them manually later. Unchanged settings do not trigger a new restart reminder.
 
-Once **服务概览 (Service Overview)** shows that the backend, Caddy, and public tunnel are healthy, open your configured app in Feishu, sign in, and check that the board loads. This completes the initial setup.
+Once **服务概览 (Service Overview)** shows that the backend, Caddy, and public tunnel are healthy, open your configured app in Lark, sign in, and check that the board loads. This completes the initial setup.
 
 ## Everyday use
 
 Manage projects in Codex Desktop, select a synced project on the board, and create a task describing what you need. After starting Codex execution, use the task details to view progress, results, approvals, and requests for more input. Review and accept the result when execution finishes.
 
 - **Close the Lark-Codex window:** the app remains in the menu bar and services keep running.
-- **Quit Lark-Codex or click 停止服务 (Stop Services):** local services stop, and the board becomes temporarily unavailable in Feishu.
+- **Quit Lark-Codex or click 停止服务 (Stop Services):** local services stop, and the board becomes temporarily unavailable in Lark.
 - **Shut down, put your Mac to sleep, or disconnect it from the network:** public access may be interrupted. Keep your Mac online when using remote features.
 
 Quitting Lark-Codex does not close Codex Desktop. Handle any executing board tasks before updating or stopping services.
@@ -125,13 +125,13 @@ An installed-file status does not mean the Skill is loaded in your current Codex
 
 > Please use $manage-lark-codex to first list my projects and tasks, then help me handle the task I specify.
 
-Installing the Skill does not grant permission to write to Feishu. You still need to complete pairing confirmation in Feishu before an agent first acts on your behalf.
+Installing the Skill does not grant permission to write to Lark. You still need to complete pairing confirmation in Lark before an agent first acts on your behalf.
 
 ## Let an agent help with installation and configuration
 
 To have an agent help install the app, configure it, or troubleshoot a problem, give it this repository's [AGENTS.md (Chinese)](AGENTS.md) and explain what you want to accomplish. For example:
 
-> Please read AGENTS.md, check whether my Mac meets the requirements, and help me install and configure Lark-Codex. Clearly tell me when I need to sign in or confirm something in the Feishu developer console.
+> Please read AGENTS.md, check whether my Mac meets the requirements, and help me install and configure Lark-Codex. Clearly tell me when I need to sign in or confirm something in the Lark developer console.
 
 The agent guide covers the built-in `taskctl` entry point, identity pairing, read-only checks, and common operations. It does not require cloning the source or installing development dependencies. Agents differ in how they automatically load instruction files; if yours cannot load the file automatically, provide its contents or a link directly.
 
@@ -153,8 +153,8 @@ On the first launch after upgrading, if the new directory does not exist, the ap
 | --- | --- |
 | macOS cannot verify the developer | The current release is not notarized. Verify the download source and follow the Apple instructions above. |
 | A port is in use and services cannot start | Choose available ports in 端口设置 (Port Settings), save, and restart. Do not arbitrarily terminate other programs. |
-| Local services work, but the app does not open in Feishu | Check that the Mac is online, along with the frp service, DNS, Feishu homepage settings, publication status, and availability scope. |
-| The Feishu credentials check passes, but sign-in fails | Check the user ID permission, trusted domains, and redirect URL, then try signing in through Feishu. |
+| Local services work, but the app does not open in Lark | Check that the Mac is online, along with the frp service, DNS, Lark homepage settings, publication status, and availability scope. |
+| The Lark credentials check passes, but sign-in fails | Check the user ID permission, trusted domains, and redirect URL, then try signing in through Lark. |
 | Codex checks fail or projects do not appear | Confirm sign-in and projects in Codex, then check again in the app. A basic sign-in check does not guarantee that online requests will work or that quota is available. |
 
 When reporting an issue, include the app version, macOS version, steps to reproduce it, and screenshots with sensitive details removed. Do not publish your App Secret, tunnel credentials, login tokens, or complete data directory.
