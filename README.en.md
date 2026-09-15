@@ -37,17 +37,28 @@ Local services and task data stay on your Mac. Lark sign-in, public access, and 
 
 ## Screenshots
 
-Desktop board, mobile board, and Remote. Click an image to view it at full size.
+### Lark · Desktop, mobile, and Remote
 
-<p align="center">
-  <a href="docs/images/desktop-taskboard.png"><img src="docs/images/desktop-taskboard.png" alt="Desktop board" width="900" /></a>
-</p>
+Manage tasks in the Lark custom app. Mobile Remote supports Codex conversations, streamed output, attachments, approvals, and code review.
 
 <table>
-  <tr><th>Mobile board</th><th>Remote</th></tr>
+  <tr><th>Desktop board</th><th>Mobile board</th><th>Remote</th></tr>
   <tr>
-    <td align="center"><a href="docs/images/mobile-taskboard.png"><img src="docs/images/mobile-taskboard.png" alt="Mobile board" width="280" /></a></td>
-    <td align="center"><a href="docs/images/mobile-remote.png"><img src="docs/images/mobile-remote.png" alt="Remote" width="280" /></a></td>
+    <td align="center"><a href="docs/images/desktop-taskboard.png"><img src="docs/images/desktop-taskboard.png" alt="Desktop board" width="340" /></a></td>
+    <td align="center"><a href="docs/images/mobile-taskboard.png"><img src="docs/images/mobile-taskboard.png" alt="Mobile board" height="200" /></a></td>
+    <td align="center"><a href="docs/images/mobile-remote.png"><img src="docs/images/mobile-remote.png" alt="Remote" height="200" /></a></td>
+  </tr>
+</table>
+
+### Web · Desktop and mobile browsers
+
+Sign in over HTTPS with a locally created Web account. Click a thumbnail to view the full image.
+
+<table>
+  <tr><th>Desktop browser</th><th>Mobile browser</th></tr>
+  <tr>
+    <td align="center"><a href="docs/images/web-desktop-redacted.png"><img src="docs/images/web-desktop-redacted.png" alt="Desktop browser" width="420" /></a></td>
+    <td align="center"><a href="docs/images/web-mobile-redacted.png"><img src="docs/images/web-mobile-redacted.png" alt="Mobile browser" height="220" /></a></td>
   </tr>
 </table>
 

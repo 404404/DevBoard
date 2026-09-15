@@ -38,17 +38,28 @@ CodexBoard 将项目任务看板与本机 Codex 连接起来。你可以整理�
 
 ## 界面预览
 
-桌面看板、移动看板与 Remote。点击图片可查看大图。
+### 飞书 · 桌面端、移动端与 Remote
 
-<p align="center">
-  <a href="docs/images/desktop-taskboard.png"><img src="docs/images/desktop-taskboard.png" alt="桌面看板" width="900" /></a>
-</p>
+在飞书自建应用中管理任务；移动端 Remote 支持 Codex 对话、流式结果、附件、审批与代码审查。
 
 <table>
-  <tr><th>移动看板</th><th>Remote</th></tr>
+  <tr><th>桌面看板</th><th>移动看板</th><th>Remote</th></tr>
   <tr>
-    <td align="center"><a href="docs/images/mobile-taskboard.png"><img src="docs/images/mobile-taskboard.png" alt="移动看板" width="280" /></a></td>
-    <td align="center"><a href="docs/images/mobile-remote.png"><img src="docs/images/mobile-remote.png" alt="Remote" width="280" /></a></td>
+    <td align="center"><a href="docs/images/desktop-taskboard.png"><img src="docs/images/desktop-taskboard.png" alt="桌面看板" width="340" /></a></td>
+    <td align="center"><a href="docs/images/mobile-taskboard.png"><img src="docs/images/mobile-taskboard.png" alt="移动看板" height="200" /></a></td>
+    <td align="center"><a href="docs/images/mobile-remote.png"><img src="docs/images/mobile-remote.png" alt="Remote" height="200" /></a></td>
+  </tr>
+</table>
+
+### Web · 桌面与移动浏览器
+
+通过 HTTPS 和本机创建的 Web 账号登录。点击缩略图可查看大图。
+
+<table>
+  <tr><th>桌面浏览器</th><th>移动浏览器</th></tr>
+  <tr>
+    <td align="center"><a href="docs/images/web-desktop-redacted.png"><img src="docs/images/web-desktop-redacted.png" alt="桌面浏览器" width="420" /></a></td>
+    <td align="center"><a href="docs/images/web-mobile-redacted.png"><img src="docs/images/web-mobile-redacted.png" alt="移动浏览器" height="220" /></a></td>
   </tr>
 </table>
 
