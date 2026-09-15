@@ -71,7 +71,7 @@ export function TaskCardPresentation({
               {priorityLabel(task.priority)}
             </span>
           )}
-          {task.assigneeIdentity?.kind === "feishu" && task.assignee && (
+          {task.assigneeIdentity && task.assigneeIdentity.kind !== "service" && task.assignee && (
             <span
               className="task-card-assignee"
               title={task.assignee.name}

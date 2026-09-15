@@ -7,7 +7,7 @@ export interface ExternalIdentity {
 }
 
 export interface IdentityProvider {
-  readonly kind: "feishu" | "development";
+  readonly kind: "feishu" | "development" | "web";
   exchangeCode(code: string): Promise<ExternalIdentity>;
 }
 

@@ -112,6 +112,7 @@ export const DESKTOP_RUNTIME_SCRIPT_FILES = Object.freeze([
   "frpc-config.mjs",
   "ports.mjs",
   "setup-controller.mjs",
+  "web-accounts.mjs",
   "setup-checks.mjs",
   "skill-manager.mjs",
 ]);

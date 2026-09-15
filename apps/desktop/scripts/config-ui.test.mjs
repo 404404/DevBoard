@@ -121,7 +121,11 @@ test("configuration editor synchronizes files without clobbering edits and submi
   await get("connections-form").onsubmit(event());
   assert.deepEqual(JSON.parse(JSON.stringify(sent[0])), {
     action: "deployment",
-    settings: { appId: "cli_edit", appSecret: "secret-one", frpc: "serverPort = 7000" },
+    settings: {
+      appId: "cli_edit",
+      appSecret: "secret-one",
+      frpc: "serverPort = 7000",
+    },
   });
   await snapshot({ deploymentRevision: 1, deployment: { appId: "cli_edit" } });
   await snapshot({ deployment: { appId: "cli_external2" } });
@@ -349,6 +353,7 @@ test("setup checks current connection drafts without saving or using unsaved por
   await get("setup-check-feishu").onclick();
   assert.equal(sent[0].action, "setup_check");
   assert.deepEqual(Object.keys(sent[0].settings).sort(), [
+    "accessMode",
     "appId",
     "appSecret",
     "frpc",
@@ -635,7 +640,7 @@ test("guide has three steps with DNS, public access and both checks in the frp s
   ];
   assert.deepEqual(
     steps.map((step) => step[1]),
-    ["setup-step-tunnel", "setup-step-feishu", "setup-step-codex"],
+    ["setup-step-tunnel", "setup-step-web", "setup-step-feishu", "setup-step-codex"],
   );
   for (const id of [
     "setup-dns-domain-row",
@@ -648,9 +653,9 @@ test("guide has three steps with DNS, public access and both checks in the frp s
     "setup-results-dns",
   ])
     assert.ok(steps[0][2].includes(`id="${id}"`), id);
-  assert.match(html, /id="setup-intro"[^>]*>按三步完成连接。/);
-  assert.match(steps[1][2], /id="setup-number-feishu"[^>]*>2</);
-  assert.match(steps[2][2], /id="setup-number-codex"[^>]*>3</);
+  assert.match(html, /id="setup-intro"[^>]*>选择访问方式，再按三步完成连接。/);
+  assert.match(steps[2][2], /id="setup-number-feishu"[^>]*>2</);
+  assert.match(steps[3][2], /id="setup-number-codex"[^>]*>3</);
   assert.doesNotMatch(html, /setup-step-dns|setup-status-dns/);
   assert.match(
     html,

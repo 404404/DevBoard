@@ -40,7 +40,7 @@ it("offers label and Git management to a signed-in user without project membersh
       <BoardPage session={session} />
     </QueryClientProvider>,
   );
-  expect(html).toContain("标签管理</button>");
-  expect(html).toContain("分支 / worktree 管理</button>");
+  expect(html).toContain("标签管理</span>");
+  expect(html).toContain("分支 / worktree 管理</span>");
   client.clear();
 });

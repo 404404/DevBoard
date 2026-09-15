@@ -440,7 +440,7 @@ function CommentItem({
     writable &&
     comment.source !== "codex" &&
     !comment.executedAt &&
-    actor.identity.kind === "feishu" &&
+    actor.identity.kind !== "service" &&
     sameIdentity(comment.author?.identity, actor.identity) &&
     comment.deletedAt === null;
   return (

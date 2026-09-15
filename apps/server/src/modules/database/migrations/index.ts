@@ -1,3 +1,4 @@
+import { webAccountsMigration } from "./0023-web-accounts.js";
 import { CORE_SCHEMA_SQL } from "./0001-core-schema.js";
 import { PROJECT_CONTEXTS_SQL } from "./0002-project-contexts.js";
 import { REQUEST_IDEMPOTENCY_SQL } from "./0003-request-idempotency.js";
@@ -124,6 +125,7 @@ export function identityMigrations(
     ...LEGACY_MIGRATIONS,
     feishuUserIdentitiesMigration(mappings),
     { version: 22, name: "multiple_child_tasks", sql: MULTIPLE_CHILD_TASKS_SQL },
+    webAccountsMigration,
   ];
 }
 

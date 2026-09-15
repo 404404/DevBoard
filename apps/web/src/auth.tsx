@@ -4,7 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { LoaderCircle } from "./icons";
 import type { ReactNode } from "react";
 
-import { restoreOrCreateSession } from "./auth-session";
+import { WebLoginForm } from "./web-login";
+import { WebLoginRequired, restoreOrCreateSession } from "./auth-session";
 
 const sessionQueryKey = ["session"] as const;
 
@@ -15,6 +16,7 @@ function useSession() {
     retry: false,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
+    refetchInterval: (query) => (query.state.data?.actor.identity.kind === "web" ? 30_000 : false),
   });
 }
 
@@ -30,9 +32,13 @@ export function SessionGate({
       <main className="session-state" aria-live="polite">
         <LoaderCircle className="spin" aria-hidden="true" />
         <h1>正在进入任务看板</h1>
-        <p>正在确认飞书身份并同步本地数据。</p>
+        <p>正在确认登录状态。</p>
       </main>
     );
+  }
+
+  if (session.error instanceof WebLoginRequired) {
+    return <WebLoginForm enabled={session.error.enabled} />;
   }
 
   if (session.isError && !session.data) {

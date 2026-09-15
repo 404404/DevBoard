@@ -3,8 +3,8 @@ import {
   identityFromKey,
   sameIdentity,
   IdentityKeySchema,
-  FeishuIdentityRefSchema,
-  type FeishuIdentityRef,
+  UserIdentityRefSchema,
+  type UserIdentityRef,
 } from "@lark-codex/contracts";
 import { createHash, randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
@@ -43,7 +43,7 @@ import { AppError } from "../../app-error.js";
 import {
   assertBoardAccess,
   hasBoardAccess,
-  assertFeishuAssignee,
+  assertUserAssignee,
   FEISHU_IDENTITY_SQL,
 } from "../identity/identity-policy.js";
 import { withTransaction, type SqliteDatabase } from "../database/index.js";
@@ -257,7 +257,7 @@ export class Taskboard {
           NULL AS projectRole
         FROM identities
         WHERE identities.active = 1
-          AND ${FEISHU_IDENTITY_SQL}
+          AND (${FEISHU_IDENTITY_SQL} OR (identities.kind = 'web' AND EXISTS (SELECT 1 FROM web_accounts WHERE id = identities.user_id)))
           AND identities.identity_key = ?`,
       )
       .all(identityKey(actor.identity));
@@ -308,8 +308,8 @@ export class Taskboard {
   }
 
   createTask(command: CreateTaskCommand, context: MutationContext): TaskMutationResult {
-    if (context.actor.identity.kind !== "feishu") {
-      throw new AppError("FORBIDDEN", 403, "创建任务需要已登录的飞书用户");
+    if (context.actor.identity.kind === "service") {
+      throw new AppError("FORBIDDEN", 403, "创建任务需要已登录用户");
     }
     const assigneeIdentity = context.actor.identity;
     if (command.assigneeIdentity && !sameIdentity(command.assigneeIdentity, assigneeIdentity)) {
@@ -645,10 +645,10 @@ export class Taskboard {
       this.#validateDateRange(next.startAt, next.dueAt);
       if (command.assigneeIdentity !== undefined) {
         if (
-          context.actor.identity.kind !== "feishu" ||
+          context.actor.identity.kind === "service" ||
           !sameIdentity(command.assigneeIdentity, context.actor.identity)
         ) {
-          throw new AppError("FORBIDDEN", 403, "负责人必须是当前登录的飞书用户");
+          throw new AppError("FORBIDDEN", 403, "负责人必须是当前登录用户");
         }
         this.#validateAssignee(current.projectId, command.assigneeIdentity);
       }
@@ -1269,11 +1269,11 @@ export class Taskboard {
     }
   }
 
-  #validateAssignee(_projectId: string, identity: FeishuIdentityRef | null): void {
+  #validateAssignee(_projectId: string, identity: UserIdentityRef | null): void {
     if (!identity) {
       return;
     }
-    assertFeishuAssignee(this.#database, identityKey(FeishuIdentityRefSchema.parse(identity)));
+    assertUserAssignee(this.#database, identityKey(UserIdentityRefSchema.parse(identity)));
   }
 
   #validateLabels(labels: readonly string[]): void {

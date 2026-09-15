@@ -1,3 +1,4 @@
+import { manageWebAccounts } from "./web-accounts.mjs";
 import { readFrpcOrigin, isSupportedOrigin, readFrpcDnsTarget } from "./frpc-config.mjs";
 import { DEFAULT_PORTS, readLocalPorts, savePorts } from "./ports.mjs";
 import { createSetupController, detectCodexPath } from "./setup-controller.mjs";
@@ -65,7 +66,7 @@ export function nativeEnvironment(prod, desktop, root, ports = DEFAULT_PORTS) {
   return {
     ...env,
     LARK_CODEX_ENV: "production",
-    LARK_CODEX_AUTH_MODE: "feishu",
+    LARK_CODEX_AUTH_MODE: prod.LARK_CODEX_AUTH_MODE === "web" ? "web" : "feishu",
     LARK_CODEX_HOST: "127.0.0.1",
     LARK_CODEX_PORT: String(ports.api),
     LARK_CODEX_ADMIN_HOST: "127.0.0.1",
@@ -74,7 +75,8 @@ export function nativeEnvironment(prod, desktop, root, ports = DEFAULT_PORTS) {
     LARK_CODEX_CODEX_PROJECT_SNAPSHOT_FILE: join(data, "run/codex-projects.json"),
     LARK_CODEX_DATA_DIR: data,
     LARK_CODEX_WEB_ROOT: join(root, "apps/web/dist"),
-    LARK_CODEX_FEISHU_CREDENTIALS_FILE: desktop.LARK_CODEX_FEISHU_CREDENTIALS_FILE,
+    LARK_CODEX_FEISHU_CREDENTIALS_FILE:
+      prod.LARK_CODEX_AUTH_MODE === "web" ? undefined : desktop.LARK_CODEX_FEISHU_CREDENTIALS_FILE,
     LARK_CODEX_CODEX_TOKEN_FILE: desktop.LARK_CODEX_CODEX_TOKEN_FILE,
     LARK_CODEX_CODEX_TRANSPORT: "embedded",
     LARK_CODEX_CODEX_ENDPOINT: `ws://127.0.0.1:${ports.bridge}`,
@@ -324,20 +326,31 @@ export function readDeploymentConfiguration(directory) {
       originError = error.message;
     }
   }
-  return { ...credentials, credentialsError, origin, originError, frpc, paths };
+  const accessMode =
+    credentialsError || credentials.appId || credentials.appSecret ? "feishu" : "web";
+  return { ...credentials, accessMode, credentialsError, origin, originError, frpc, paths };
 }
 export async function saveDeploymentConfiguration(directory, values, verifyFrpc) {
-  const appId = String(values.appId || "").trim();
-  const secret = String(values.appSecret || "").trim();
+  const current = readDeploymentConfiguration(directory);
+  const appId = String(values.appId ?? current.appId ?? "").trim();
+  const secret = String(values.appSecret ?? current.appSecret ?? "").trim();
   const frpc = String(values.frpc || "").trim();
-  if (!/^cli_[A-Za-z0-9]+$/.test(appId)) throw new Error("App ID 格式无效，应以 cli_ 开头");
+  if (appId && !/^cli_[A-Za-z0-9]+$/.test(appId))
+    throw new Error("App ID 格式无效，应以 cli_ 开头");
   if (secret.length > 4096 || /[\r\n\0]/.test(secret)) throw new Error("App Secret 格式无效");
   if (Buffer.byteLength(frpc) > 262144 || frpc.includes("\0"))
     throw new Error("frpc.toml 内容过大或包含无效字符");
   const paths = deploymentPaths(directory);
-  if (!secret) throw new Error("请填写 App Secret");
+  if (Boolean(appId) !== Boolean(secret))
+    throw new Error("飞书 App ID 和 App Secret 请同时填写，或同时留空以仅使用 Web 账号");
+  const accessMode = appId && secret ? "feishu" : "web";
   if (!frpc) throw new Error("请填写 frpc.toml 配置");
-  readFrpcOrigin(frpc, readLocalPorts(desktopPaths(directory).LARK_CODEX_PORTS_FILE).caddy);
+  const origin = readFrpcOrigin(
+    frpc,
+    readLocalPorts(desktopPaths(directory).LARK_CODEX_PORTS_FILE).caddy,
+  );
+  if (accessMode === "web" && !origin.startsWith("https://"))
+    throw new Error("Web 账号访问必须使用 HTTPS 隧道");
   function clearLegacyCredentials() {
     // An explicit save confirms these credentials over legacy copies.
     for (const file of [
@@ -346,8 +359,8 @@ export async function saveDeploymentConfiguration(directory, values, verifyFrpc)
     ])
       rmSync(file, { force: true });
   }
-  const current = readDeploymentConfiguration(directory);
   if (
+    current.accessMode === accessMode &&
     !current.credentialsError &&
     current.appId === appId &&
     current.appSecret === secret &&
@@ -422,7 +435,14 @@ function verifyFrpcFile(binary, file) {
 function configurationFingerprint(deployment, ports, codexPath) {
   return createHash("sha256")
     .update(
-      JSON.stringify([deployment.appId, deployment.appSecret, deployment.frpc, ports, codexPath]),
+      JSON.stringify([
+        deployment.accessMode,
+        deployment.appId,
+        deployment.appSecret,
+        deployment.frpc,
+        ports,
+        codexPath,
+      ]),
     )
     .digest("hex");
 }
@@ -450,6 +470,10 @@ async function main() {
     message: "服务尚未启动",
     settings,
     services: [],
+    webAccounts: [],
+    webAccountsBusy: false,
+    webAccountsMessage: "",
+    webAccountsRevision: 0,
     url: "",
     deployment: {},
     deploymentSaving: false,
@@ -514,7 +538,10 @@ async function main() {
   let quitting = false;
   let healthBusy = false;
   setupController = createSetupController({
+    readWebAccounts: () =>
+      manageWebAccounts(desktopPaths(settings.configDirectory).LARK_CODEX_DATA_DIR, "list"),
     getConfiguration: () => ({
+      accessMode: state.deployment.accessMode,
       appId: state.deployment.appId || "",
       appSecret: state.deployment.appSecret || "",
       frpc: state.deployment.frpc || "",
@@ -550,14 +577,25 @@ async function main() {
     }
     const deployment = readDeploymentConfiguration(settings.configDirectory);
     const ports = readLocalPorts(c.LARK_CODEX_PORTS_FILE);
-    const env = nativeEnvironment({ LARK_CODEX_ORIGIN: deployment.origin }, c, root, ports);
+    const env = nativeEnvironment(
+      { LARK_CODEX_ORIGIN: deployment.origin, LARK_CODEX_AUTH_MODE: deployment.accessMode },
+      c,
+      root,
+      ports,
+    );
     if (!existsSync(settings.codexPath))
       throw new Error("未找到 Codex 程序，请先安装并登录 Codex Desktop");
-    if (deployment.credentialsError) throw new Error(deployment.credentialsError);
-    if (!deployment.appId || !deployment.appSecret || !deployment.frpc.trim())
+    if (deployment.accessMode === "feishu" && deployment.credentialsError)
+      throw new Error(deployment.credentialsError);
+    if (
+      (deployment.accessMode === "feishu" && (!deployment.appId || !deployment.appSecret)) ||
+      !deployment.frpc.trim()
+    )
       throw new Error("请在连接配置中填写 App ID、App Secret 和 frpc 信息");
     if (deployment.originError) throw new Error(deployment.originError);
     const url = new URL(env.LARK_CODEX_ORIGIN);
+    if (deployment.accessMode === "web" && url.protocol !== "https:")
+      throw new Error("Web 账号访问必须使用 HTTPS");
     if (!isSupportedOrigin(url)) throw new Error("公网地址必须是 HTTP/HTTPS 域名或 HTTP 公网 IPv4");
     return {
       c,
@@ -749,6 +787,43 @@ async function main() {
             state.boardOpenError = error.message;
           } finally {
             state.boardOpening = false;
+            publish();
+          }
+        } else if (request.action === "open_web_board") {
+          try {
+            if (state.phase !== "ready" || config?.url.protocol !== "https:")
+              throw new Error("请先启动服务并配置 HTTPS 公网地址。");
+            await new Promise((resolve, reject) => {
+              const child = spawn("/usr/bin/open", [config.url.origin], { stdio: "ignore" });
+              child.once("error", reject);
+              child.once("exit", (code) =>
+                code === 0 ? resolve() : reject(new Error("无法打开默认浏览器。")),
+              );
+            });
+            state.webAccountsMessage = "已在默认浏览器打开登录页面。";
+          } catch {
+            state.webAccountsMessage =
+              "无法打开 Web 看板，请确认服务已启动、已配置 HTTPS 和默认浏览器。";
+          }
+          publish();
+        } else if (request.action === "web_accounts") {
+          state.webAccountsBusy = true;
+          state.webAccountsMessage = "正在处理…";
+          publish();
+          try {
+            const data = desktopPaths(settings.configDirectory).LARK_CODEX_DATA_DIR;
+            const { operation, ...input } = request.settings || {};
+            const result = await manageWebAccounts(data, operation, input);
+            state.webAccounts =
+              operation === "list" ? result : await manageWebAccounts(data, "list");
+            state.webAccountsMessage =
+              operation === "list" ? "账号列表已刷新。" : "已保存，立即生效。";
+            state.webAccountsRevision += 1;
+          } catch (error) {
+            state.webAccountsMessage = error.message;
+          } finally {
+            request.settings = null;
+            state.webAccountsBusy = false;
             publish();
           }
         } else if (request.action === "setup_check") {

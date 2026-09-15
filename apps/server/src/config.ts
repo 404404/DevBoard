@@ -64,7 +64,7 @@ function isLocalDevelopmentOrigin(origin: string): boolean {
 const AppConfigSchema = z
   .object({
     LARK_CODEX_ENV: z.enum(["development", "test", "production"]).default("development"),
-    LARK_CODEX_AUTH_MODE: z.enum(["development", "feishu"]).default("development"),
+    LARK_CODEX_AUTH_MODE: z.enum(["development", "feishu", "web"]).default("development"),
     LARK_CODEX_HOST: z.string().min(1).default("127.0.0.1"),
     LARK_CODEX_PORT: z.coerce.number().int().min(1).max(65_535).default(47_823),
     LARK_CODEX_ADMIN_HOST: z.literal("127.0.0.1").default("127.0.0.1"),
@@ -208,6 +208,16 @@ const AppConfigSchema = z
       });
     }
 
+    if (
+      config.LARK_CODEX_AUTH_MODE === "web" &&
+      new URL(config.LARK_CODEX_ORIGIN).protocol !== "https:"
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["LARK_CODEX_ORIGIN"],
+        message: "Web 账号访问必须使用 HTTPS",
+      });
+    }
     if (config.LARK_CODEX_AUTH_MODE === "feishu") {
       if (!config.LARK_CODEX_FEISHU_APP_ID && !config.LARK_CODEX_FEISHU_CREDENTIALS_FILE) {
         context.addIssue({

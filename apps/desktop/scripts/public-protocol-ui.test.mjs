@@ -55,7 +55,10 @@ for (const [name, engine] of Object.entries({ chromium, webkit }))
       await page.locator("#save-connections").click();
       const calls = await page.evaluate(() => window.calls);
       assert.deepEqual(calls, [
-        { action: "deployment", settings: { appId: "cli_test", appSecret: "test-secret", frpc } },
+        {
+          action: "deployment",
+          settings: { appId: "cli_test", appSecret: "test-secret", frpc },
+        },
       ]);
       assert.deepEqual(errors, []);
     } finally {

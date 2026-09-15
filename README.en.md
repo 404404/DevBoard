@@ -2,19 +2,20 @@
 
 [简体中文](README.md) · **English**
 
-Manage tasks in Lark and let Codex on your Mac help execute them.
+Manage tasks in a browser or Lark and let Codex on your Mac help execute them.
 
 **User guide** · [Agent operating guide (Chinese)](AGENTS.md)
 
-Lark-Codex connects a Lark task board to Codex running on your Mac. Organize projects and tasks, submit requests, track execution, and handle approvals or requests for more information. The Mac app starts and manages local services; you access the board through Lark.
+Lark-Codex connects a Lark task board to Codex running on your Mac. Organize projects and tasks, submit requests, track execution, and handle approvals or requests for more information. The Mac app starts and manages local services; you access the board through HTTPS with a locally created Web account, through Lark, or both.
 
-Current release: **0.1.1 preview**, for **Apple Silicon Macs running macOS 13 or later**.
+Current release: **0.1.2 preview**, for **Apple Silicon Macs running macOS 13 or later**.
 
 ## What you can do
 
 - Manage tasks by project using a dashboard, board, or list, with statuses, priorities, labels, comments, and attachments.
 - Start or continue Codex execution from a task, and view progress, results, and pending approvals.
-- Access the board from Lark on desktop or mobile, connected to the workspace running on your own Mac.
+- Access the board in a desktop or mobile browser with a local Web account, or use Lark.
+- Manage branches and worktrees; desktop connection and port settings adapt to the window size.
 - Use mobile Remote to create or continue Codex conversations on your Mac, view streaming results, and handle approvals.
 - Send attachments and images from your phone, provide additional input, and view code diffs to review changes.
 - Let authorized agents query and manage tasks through the built-in command-line tool.
@@ -46,15 +47,15 @@ The mobile task board is on the left; the Remote entry screen is on the right.
 
 ## Prerequisites
 
-| Requirement | Details |
-| --- | --- |
-| Apple Silicon Mac | macOS 13 or later. The current installer does not support Intel Macs, Windows, or Linux. |
-| Codex | Installed, signed in, and working locally. |
-| Lark client and custom app | You need permission to create, configure, and publish an enterprise custom web app in Lark. |
-| Public frp tunnel service | A working server or service-provider configuration to access the local services on your Mac. |
+| Requirement                           | Details                                                                                                                        |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Apple Silicon Mac                     | macOS 13 or later. The current installer does not support Intel Macs, Windows, or Linux.                                       |
+| Codex                                 | Installed, signed in, and working locally.                                                                                     |
+| Lark client and custom app (optional) | Required for Lark access or CLI pairing; not required for Web-only access.                                                     |
+| Public frp tunnel service             | A working server or service-provider configuration to access the local services on your Mac.                                   |
 | Domain name, depending on tunnel type | HTTP/HTTPS domain-based access requires DNS configuration. TCP access through a public IPv4 address can work without a domain. |
 
-The installer includes **Node.js, the board's frontend and backend, the Codex bridge, SQLite components, Caddy, and the frp client**. You do not need to install Node.js, Docker, Rust, or development tools separately. You must provide Codex, the Lark client, and a public frp server.
+The installer includes **Node.js, the board's frontend and backend, the Codex bridge, SQLite components, Caddy, and the frp client**. You do not need to install Node.js, Docker, Rust, or development tools separately. You must provide Codex and a public frp server. Lark is optional for Web-only access.
 
 ## Download and install
 
@@ -63,10 +64,10 @@ The installer includes **Node.js, the board's frontend and backend, the Codex br
 3. Open the DMG and drag `Lark-Codex.app` into **Applications**.
 4. Open Lark-Codex from Applications, then eject the installer disk.
 
-To check download integrity, also download the corresponding `.dmg.sha256` file and run the following in the directory containing both files. For version 0.1.1:
+To check download integrity, also download the corresponding `.dmg.sha256` file and run the following in the directory containing both files. For version 0.1.2:
 
 ```sh
-shasum -a 256 -c Lark-Codex-0.1.1-macos-arm64.dmg.sha256
+shasum -a 256 -c Lark-Codex-0.1.2-macos-arm64.dmg.sha256
 ```
 
 An `OK` result means the file matches the publisher's checksum.
@@ -87,7 +88,23 @@ DNS configuration is part of this step. The guide shows instructions based on th
 
 HTTPS access requires public port 443 to reach the local Caddy service. HTTP and TCP modes use plain HTTP, so sessions and application content are not encrypted with HTTPS.
 
-### 2. Create and configure the Lark app
+### 2. Configure Web accounts, Lark, or both
+
+The setup guide can show either Web or Lark instructions. This only changes the guide; Connection Settings supports both methods at once.
+
+#### Web accounts
+
+1. Configure an **HTTPS** public entry point, save it, and start or restart services. Password sign-in is not available over plain HTTP or TCP tunnel entry points.
+2. Open **应用设置 → Web 账号 (App Settings → Web Accounts)**, also accessible through **管理 Web 账号 (Manage Web Accounts)** in Connection Settings. Create a username, display name, and password of **8–256 characters**. Accounts can only be created locally; there is no public registration.
+3. Open your public URL in a browser and sign in. For Web-only access, leave both Lark App ID and App Secret empty.
+
+The guide checks the running configuration and enabled account availability automatically. It does not test the password or prove a successful browser sign-in; verify that separately.
+
+Web accounts are trusted users who can execute tasks. Accounts share the board without per-project access isolation. New tasks belong to the signed-in user, and comments use that identity. Only create accounts for people you trust. Disabling an account or resetting its password invalidates its existing browser sessions.
+
+CLI writes still require pairing with a real Lark user. Web sign-in does not authorize CLI writes or replace that pairing.
+
+#### Lark app (can remain enabled alongside Web accounts)
 
 Create an enterprise custom web app in the [Lark developer console](https://open.feishu.cn/app). Enter its **App ID** and **App Secret** in **连接配置 (Connection Settings)**.
 
@@ -101,14 +118,14 @@ Make sure Codex is installed and signed in on this Mac, then run the checks in t
 
 **Running checks does not save your configuration automatically.** Save after filling in the settings. If settings have changed, choose to restart services immediately or restart them manually later. Unchanged settings do not trigger a new restart reminder.
 
-Once **服务概览 (Service Overview)** shows that the backend, Caddy, and public tunnel are healthy, open your configured app in Lark, sign in, and check that the board loads. This completes the initial setup.
+Once **服务概览 (Service Overview)** shows that the backend, Caddy, and public tunnel are healthy, sign in through your Web account or Lark and check that the board loads. When both methods are enabled, verify each separately.
 
 ## Everyday use
 
 Manage projects in Codex Desktop, select a synced project on the board, and create a task describing what you need. After starting Codex execution, use the task details to view progress, results, approvals, and requests for more input. Review and accept the result when execution finishes.
 
 - **Close the Lark-Codex window:** the app remains in the menu bar and services keep running.
-- **Quit Lark-Codex or click 停止服务 (Stop Services):** local services stop, and the board becomes temporarily unavailable in Lark.
+- **Quit Lark-Codex or click 停止服务 (Stop Services):** local services stop, and the board becomes temporarily unavailable in both browsers and Lark.
 - **Shut down, put your Mac to sleep, or disconnect it from the network:** public access may be interrupted. Keep your Mac online when using remote features.
 
 Quitting Lark-Codex does not close Codex Desktop. Handle any executing board tasks before updating or stopping services.
@@ -149,13 +166,13 @@ On the first launch after upgrading, if the new directory does not exist, the ap
 
 ## Troubleshooting
 
-| Symptom | What to check first |
-| --- | --- |
-| macOS cannot verify the developer | The current release is not notarized. Verify the download source and follow the Apple instructions above. |
-| A port is in use and services cannot start | Choose available ports in 端口设置 (Port Settings), save, and restart. Do not arbitrarily terminate other programs. |
-| Local services work, but the app does not open in Lark | Check that the Mac is online, along with the frp service, DNS, Lark homepage settings, publication status, and availability scope. |
-| The Lark credentials check passes, but sign-in fails | Check the user ID permission, trusted domains, and redirect URL, then try signing in through Lark. |
-| Codex checks fail or projects do not appear | Confirm sign-in and projects in Codex, then check again in the app. A basic sign-in check does not guarantee that online requests will work or that quota is available. |
+| Symptom                                                | What to check first                                                                                                                                                     |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| macOS cannot verify the developer                      | The current release is not notarized. Verify the download source and follow the Apple instructions above.                                                               |
+| A port is in use and services cannot start             | Choose available ports in 端口设置 (Port Settings), save, and restart. Do not arbitrarily terminate other programs.                                                     |
+| Local services work, but the app does not open in Lark | Check that the Mac is online, along with the frp service, DNS, Lark homepage settings, publication status, and availability scope.                                      |
+| The Lark credentials check passes, but sign-in fails   | Check the user ID permission, trusted domains, and redirect URL, then try signing in through Lark.                                                                      |
+| Codex checks fail or projects do not appear            | Confirm sign-in and projects in Codex, then check again in the app. A basic sign-in check does not guarantee that online requests will work or that quota is available. |
 
 When reporting an issue, include the app version, macOS version, steps to reproduce it, and screenshots with sensitive details removed. Do not publish your App Secret, tunnel credentials, login tokens, or complete data directory.
 

@@ -90,7 +90,7 @@ test("blank values are rejected without changing saved files", async (t) => {
       { appId: "cli_new", appSecret: "", frpc: "" },
       async () => {},
     ),
-    /请填写/,
+    /同时填写/,
   );
   assert.equal(readDeploymentConfiguration(f.dir).appSecret, "old-secret");
 });
@@ -313,4 +313,38 @@ test("unchanged explicit saves still clear conflicting legacy credentials", asyn
   );
   assert.equal(result.changed, false);
   assert.equal(existsSync(legacy), false);
+});
+
+test("Web-only configuration needs no Feishu credentials and rejects plaintext access", async (t) => {
+  const f = fixture(t);
+  const values = { appId: "", appSecret: "", frpc: tunnel("web.example.com") };
+  const saved = await saveDeploymentConfiguration(f.dir, values, async () => {});
+  assert.equal(saved.accessMode, "web");
+  assert.equal(readDeploymentConfiguration(f.dir).accessMode, "web");
+  await assert.rejects(
+    saveDeploymentConfiguration(
+      f.dir,
+      { ...values, frpc: values.frpc.replace('type = "https"', 'type = "http"') },
+      async () => {},
+    ),
+    /HTTPS/,
+  );
+  assert.equal(readDeploymentConfiguration(f.dir).accessMode, "web");
+  await assert.rejects(
+    saveDeploymentConfiguration(f.dir, { ...values, appId: "cli_partial" }, async () => {}),
+    /同时填写/,
+  );
+});
+
+test("Feishu and Web coexist even with an old Web-only selection file", async (t) => {
+  const f = fixture(t);
+  writeFileSync(join(f.dir, "access.json"), JSON.stringify({ accessMode: "web" }));
+  assert.equal(readDeploymentConfiguration(f.dir).accessMode, "feishu");
+  const saved = await saveDeploymentConfiguration(
+    f.dir,
+    { appId: "cli_both", appSecret: "both-secret", frpc: tunnel("both.example.com") },
+    async () => {},
+  );
+  assert.equal(saved.accessMode, "feishu");
+  assert.equal(saved.appId, "cli_both");
 });

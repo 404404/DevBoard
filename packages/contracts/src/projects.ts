@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { EntityIdSchema, EntityVersionSchema, IsoTimestampSchema } from "./common.js";
 import { ActorRoleSchema, ProjectMemberRoleSchema } from "./domain.js";
-import { FeishuIdentityRefSchema, IdentityRefSchema } from "./identity.js";
+import { UserIdentityRefSchema, IdentityRefSchema } from "./identity.js";
 import { GlobalLabelViewSchema } from "./labels.js";
 
 export const ProjectKeySchema = z
@@ -81,7 +81,7 @@ export const ProjectViewSchema = z.discriminatedUnion("kind", [
 ]);
 
 export const TaskAssigneeCandidateSchema = z.object({
-  identity: FeishuIdentityRefSchema,
+  identity: UserIdentityRefSchema,
   name: z.string().trim().min(1).max(120),
   avatarUrl: z.url().nullable(),
   actorRole: ActorRoleSchema,

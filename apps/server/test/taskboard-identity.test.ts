@@ -66,7 +66,7 @@ it("rejects assigning another verified user or clearing the owner, and permits c
         UpdateTaskCommandSchema.parse({ expectedVersion: task.version, assigneeIdentity }),
         { actor, idempotencyKey: "reject-owner-" + String(assigneeIdentity === null) },
       ),
-    ).toThrow("负责人必须是当前登录的飞书用户");
+    ).toThrow("负责人必须是当前登录用户");
   }
   const claimed = taskboard.updateTask(
     task.id,
@@ -175,7 +175,7 @@ it("requires a Feishu creator and refuses a different tenant's otherwise matchin
         idempotencyKey: "reject-service",
       },
     ),
-  ).toThrow("创建任务需要已登录的飞书用户");
+  ).toThrow("创建任务需要已登录用户");
   expect(database.prepare("SELECT COUNT(*) AS n FROM tasks").get()).toEqual({ n: 0 });
   expect(identityKey(other.identity)).not.toBe(identityKey(actor.identity));
 });
@@ -217,7 +217,7 @@ it("refuses service comments and keeps comment ownership distinct across tenants
         idempotencyKey: "comments-service",
       },
     ),
-  ).toThrow("发布评论需要已登录的飞书用户");
+  ).toThrow("发布评论需要已登录用户");
   expect(workspace.readTaskWorkspace(task.id, actor).comments.map((item) => item.body)).toEqual([
     "Original author",
   ]);

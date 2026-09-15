@@ -205,6 +205,36 @@ describe("event feed HTTP and SSE routes", () => {
     expect(body).not.toContain(`id: ${first.meta.revision}\n`);
   });
 
+  it("closes an existing event stream after logout before sending another heartbeat", async () => {
+    const { app, project, trusted, cookies, csrfToken } = await developmentSetup({
+      LARK_CODEX_SSE_HEARTBEAT_MS: "1000",
+    });
+    const controller = new AbortController();
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/v1/events?projectId=${project.id}`,
+      headers: { host: trusted.host, cookie: cookies, accept: "text/event-stream" },
+      payloadAsStream: true,
+      signal: controller.signal,
+    });
+    const logout = await app.inject({
+      method: "POST",
+      url: "/api/v1/session/logout",
+      headers: { ...trusted, cookie: cookies, "x-csrf-token": csrfToken },
+    });
+    expect(logout.statusCode).toBe(204);
+    const timeout = setTimeout(() => controller.abort(), 2500);
+    let body = "";
+    try {
+      for await (const chunk of response.stream()) body += String(chunk);
+    } finally {
+      clearTimeout(timeout);
+      controller.abort();
+    }
+    expect(body).toContain("retry:");
+    expect(body).not.toContain(": heartbeat");
+  });
+
   it("keeps an idle authenticated SSE connection alive with heartbeat comments", async () => {
     const { app, project, trusted, cookies } = await developmentSetup({
       LARK_CODEX_SSE_HEARTBEAT_MS: "1000",

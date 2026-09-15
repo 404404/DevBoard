@@ -136,7 +136,7 @@ describe("Task creation service", () => {
           actor: { ...ACTOR, identity: { kind: "service", serviceId: "local-admin" } },
         },
       ),
-    ).rejects.toThrow("创建任务需要已登录的飞书用户");
+    ).rejects.toThrow("创建任务需要已登录用户");
     expect(provisioner.created).toHaveLength(0);
     expect(database.prepare("SELECT count(*) FROM tasks").pluck().get()).toBe(0);
   });

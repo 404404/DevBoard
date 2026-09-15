@@ -36,6 +36,7 @@ export function hasBoardAccess(database: SqliteDatabase, actor: PrincipalView): 
         .get(key),
     );
   }
+  if (actor.identity.kind === "web") return hasWebIdentity(database, key);
   // Preserve the existing local-only service; caller-supplied names or roles grant nothing.
   return (
     actor.identity.serviceId === "local-admin" &&
@@ -47,6 +48,21 @@ export function hasBoardAccess(database: SqliteDatabase, actor: PrincipalView): 
         .get(key),
     )
   );
+}
+
+export function hasWebIdentity(database: SqliteDatabase, key: string): boolean {
+  return Boolean(
+    database
+      .prepare(
+        `SELECT 1 FROM identities JOIN web_accounts ON web_accounts.id = identities.user_id
+    WHERE identity_key = ? AND kind = 'web' AND active = 1`,
+      )
+      .get(key),
+  );
+}
+export function assertUserAssignee(database: SqliteDatabase, key: string | null): void {
+  if (key && hasWebIdentity(database, key)) return;
+  assertFeishuAssignee(database, key);
 }
 
 export function assertBoardAccess(database: SqliteDatabase, actor: PrincipalView): void {
@@ -79,6 +95,7 @@ const AuditActorRowSchema = z.object({
   active: z.number().int(),
   localService: z.number().int(),
   verified: z.number().int(),
+  webAccount: z.number().int(),
   lastFeishuLoginAt: z.string().nullable(),
   lastLoginAt: z.string().nullable(),
   assignedTasks: z.number().int(),
@@ -92,6 +109,7 @@ export function readIdentityAudit(database: SqliteDatabase) {
     SELECT identities.identity_key AS principalKey, identities.name, identities.role, identities.active,
       (identities.kind = 'service') AS localService,
       (${FEISHU_IDENTITY_SQL}) AS verified,
+      (identities.kind = 'web' AND EXISTS (SELECT 1 FROM web_accounts WHERE id = identities.user_id)) AS webAccount,
       (SELECT MAX(created_at) FROM audit_events WHERE identity_key = identities.identity_key
         AND action = 'session.login' AND outcome = 'allowed'
         AND json_extract(safe_metadata_json, '$.provider') = 'feishu') AS lastFeishuLoginAt,
@@ -104,15 +122,27 @@ export function readIdentityAudit(database: SqliteDatabase) {
     )
     .all();
   const identities = rows.map((row) => {
-    const { localService, verified, active, principalKey, ...actor } =
+    const { localService, verified, webAccount, active, principalKey, ...actor } =
       AuditActorRowSchema.parse(row);
     return {
       ...actor,
       identity: identityFromKey(principalKey),
       active: active === 1,
-      identityKind: localService ? "local_service" : verified ? "feishu" : "unverified",
-      eligibleAssignee: active === 1 && verified === 1,
-      evidence: verified ? "feishu_login" : actor.lastLoginAt ? "historical_login" : "none",
+      identityKind: localService
+        ? "local_service"
+        : verified
+          ? "feishu"
+          : webAccount
+            ? "web"
+            : "unverified",
+      eligibleAssignee: active === 1 && (verified === 1 || webAccount === 1),
+      evidence: verified
+        ? "feishu_login"
+        : webAccount
+          ? "local_provisioning"
+          : actor.lastLoginAt
+            ? "historical_login"
+            : "none",
     };
   });
   return {

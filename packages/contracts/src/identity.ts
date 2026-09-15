@@ -8,8 +8,13 @@ export const ExchangeFeishuCodeSchema = z.object({
 });
 
 export const AuthBootstrapSchema = z.discriminatedUnion("authMode", [
+  z.object({ authMode: z.literal("web"), feishuAppId: z.null(), webLoginEnabled: z.boolean() }),
   z.object({ authMode: z.literal("development"), feishuAppId: z.null() }),
-  z.object({ authMode: z.literal("feishu"), feishuAppId: z.string().trim().min(1) }),
+  z.object({
+    authMode: z.literal("feishu"),
+    feishuAppId: z.string().trim().min(1),
+    webLoginEnabled: z.boolean().default(false),
+  }),
 ]);
 
 const IdentityPartSchema = z
@@ -29,9 +34,17 @@ export const ServiceIdentityRefSchema = z.strictObject({
   serviceId: z.enum(["local-admin", "codex"]),
 });
 
+export const WebIdentityRefSchema = z.strictObject({ kind: z.literal("web"), accountId: z.uuid() });
+export const UserIdentityRefSchema = z.discriminatedUnion("kind", [
+  FeishuIdentityRefSchema,
+  WebIdentityRefSchema,
+]);
+export type UserIdentityRef = z.infer<typeof UserIdentityRefSchema>;
+
 export const IdentityRefSchema = z.discriminatedUnion("kind", [
   FeishuIdentityRefSchema,
   ServiceIdentityRefSchema,
+  WebIdentityRefSchema,
 ]);
 
 export type FeishuIdentityRef = z.infer<typeof FeishuIdentityRefSchema>;
@@ -42,7 +55,9 @@ export function identityKey(ref: IdentityRef): string {
   return JSON.stringify(
     identity.kind === "feishu"
       ? ["feishu", identity.tenantKey, identity.userId]
-      : ["service", identity.serviceId],
+      : identity.kind === "web"
+        ? ["web", identity.accountId]
+        : ["service", identity.serviceId],
   );
 }
 
@@ -54,6 +69,8 @@ export function identityFromKey(key: string): IdentityRef {
     identity = IdentityRefSchema.parse({ kind: "feishu", tenantKey: parts[1], userId: parts[2] });
   } else if (parts[0] === "service" && parts.length === 2) {
     identity = IdentityRefSchema.parse({ kind: "service", serviceId: parts[1] });
+  } else if (parts[0] === "web" && parts.length === 2) {
+    identity = WebIdentityRefSchema.parse({ kind: "web", accountId: parts[1] });
   } else {
     throw new Error("无效身份自然键");
   }

@@ -29,7 +29,7 @@ import { z } from "zod";
 
 import { AppError } from "../../app-error.js";
 import { withTransaction, type SqliteDatabase } from "../database/index.js";
-import { assertFeishuAssignee } from "../identity/identity-policy.js";
+import { assertUserAssignee } from "../identity/identity-policy.js";
 import type { IdentityService } from "../identity/index.js";
 import { Taskboard, type MutationContext } from "./taskboard.js";
 import { assertTaskEditable } from "./task-readonly.js";
@@ -160,10 +160,10 @@ export class TaskWorkspace {
     input: CreateCommentCommand,
     context: MutationContext,
   ): WorkspaceMutationResult<CommentView> {
-    if (context.actor.identity.kind !== "feishu") {
-      throw new AppError("FORBIDDEN", 403, "发布评论需要已登录的飞书用户");
+    if (context.actor.identity.kind === "service") {
+      throw new AppError("FORBIDDEN", 403, "发布评论需要已登录用户");
     }
-    assertFeishuAssignee(this.#database, identityKey(context.actor.identity));
+    assertUserAssignee(this.#database, identityKey(context.actor.identity));
     const command = CreateCommentCommandSchema.parse(input);
     const task = this.#writableTask(taskId, context.actor);
     return this.#idempotent(

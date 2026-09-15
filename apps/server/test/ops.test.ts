@@ -273,7 +273,7 @@ describe("operations CLI", () => {
     expect(JSON.parse(lines[0] as string)).toMatchObject({
       ok: true,
       command: "backup",
-      schemaVersion: 22,
+      schemaVersion: 23,
     });
   });
 });

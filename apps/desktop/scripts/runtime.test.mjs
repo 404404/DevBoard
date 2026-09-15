@@ -272,3 +272,14 @@ test("HTTP deployment opens the Feishu app after checking its public origin", as
     "https://applink.feishu.cn/client/web_app/open?appId=cli_test123",
   ]);
 });
+
+test("Web native runtime does not require or forward a Feishu credentials file", () => {
+  const env = nativeEnvironment(
+    { LARK_CODEX_ORIGIN: "https://web.example.com", LARK_CODEX_AUTH_MODE: "web" },
+    { LARK_CODEX_DATA_DIR: "/data", LARK_CODEX_FEISHU_CREDENTIALS_FILE: "/secrets/feishu.json" },
+    "/runtime",
+  );
+  assert.equal(env.LARK_CODEX_AUTH_MODE, "web");
+  assert.equal(env.LARK_CODEX_FEISHU_CREDENTIALS_FILE, undefined);
+  assert.equal(env.LARK_CODEX_ENV, "production");
+});

@@ -12,7 +12,7 @@
 
 应用自动查找 Codex Desktop / ChatGPT 内置程序及常见 CLI 路径，使用本机登录状态；新安装 Codex 后无需重启管理应用即可重新检测。工作区允许目录在服务启动时读取 Codex Desktop 项目列表。macOS 临时任务根目录由当前用户主目录动态推导为 `~/Documents/Codex`，创建临时任务时自动递归创建目录，不提供路径编辑入口。
 
-在「连接配置」填写 App ID、App Secret 及完整 frpc.toml。两项飞书凭据一起保存到 `secrets/feishu-credentials.json`，隧道配置保存到 `secrets/frpc.toml`；文件权限为 `0600`。公网入口从唯一匹配本机 Caddy 端口的隧道读取：HTTP/HTTPS 隧道按 `type` 识别协议，读取 `customDomains`，分别使用公网 80/443；TCP 使用公网 IPv4 `serverAddr` 和 `remotePort`，固定为 HTTP。没有手动域名、端口或证书配置项。HTTP 公网访问不会加密会话与业务数据。内部桥接令牌首次启动自动生成，之后保持不变。
+「使用引导」可切换查看 Web 或飞书步骤；连接配置不区分互斥模式。飞书应用与 Web 账号可以同时使用：配置飞书凭据启用飞书入口，配置 HTTPS 并在本机「应用设置 → Web 账号」创建账号启用浏览器入口。仅使用 Web 时可同时留空两项飞书凭据。旧 `deploy/access.json` 不再控制运行方式。两项飞书凭据一起保存到 `secrets/feishu-credentials.json`，隧道配置保存到 `secrets/frpc.toml`；文件权限为 `0600`。公网入口从唯一匹配本机 Caddy 端口的隧道读取：HTTP/HTTPS 隧道按 `type` 识别协议，读取 `customDomains`，分别使用公网 80/443；TCP 使用公网 IPv4 `serverAddr` 和 `remotePort`，固定为 HTTP。没有手动域名、端口或证书配置项。HTTP 公网访问不会加密会话与业务数据。内部桥接令牌首次启动自动生成，之后保持不变。
 
 ## 使用引导与检查
 
@@ -117,3 +117,7 @@ codesign --verify --deep --strict "apps/desktop/dist/Lark-Codex.app"
 旧版升级会将 production.env 中的 App ID 与 feishu-app-secret 合并，核对成功后删除两个旧文件。新安装不会创建这两个文件。存在多个匹配隧道或域名、没有匹配本机端口的 HTTP/HTTPS/TCP 隧道等情况会提示修正 frpc.toml，应用不会猜测公网地址。
 
 公开发布内容不包含个人部署记录。新安装按本说明和自己的配置执行。
+
+## 独立 Web 账号
+
+在「应用设置 → Web 账号」创建、停用账号或重置密码，点击「用浏览器打开看板」使用默认浏览器登录。要求 HTTPS，不提供公开注册。Web 账号无需飞书登录；完整说明见 [独立 Web 访问](../../docs/web-access.md)。

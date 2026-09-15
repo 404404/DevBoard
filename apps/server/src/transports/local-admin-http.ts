@@ -1,3 +1,4 @@
+import { WebAccountService } from "../modules/identity/web-account-service.js";
 import { CliAuthService, cliAuthOperation } from "../modules/identity/cli-auth-service.js";
 import { identityKey, sameIdentity } from "@lark-codex/contracts";
 import { randomUUID } from "node:crypto";
@@ -339,6 +340,32 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
         "任务写操作需要先完成 taskctl auth login 和网页授权；不会回退为本地管理员",
       );
     }
+  });
+
+  const webAccounts = new WebAccountService(options.database);
+  function requireAccountManager(request: FastifyRequest) {
+    if (request.headers["x-taskctl-session"] !== undefined)
+      throw new AppError("FORBIDDEN", 403, "账号管理仅允许本机应用操作");
+  }
+  app.get("/api/v1/local/web-accounts", async (request, reply) => {
+    requireAccountManager(request);
+    reply.header("Cache-Control", "no-store");
+    return { data: webAccounts.list() };
+  });
+  app.post("/api/v1/local/web-accounts", async (request, reply) => {
+    requireAccountManager(request);
+    reply.header("Cache-Control", "no-store");
+    return reply.code(201).send({ data: await webAccounts.create(request.body) });
+  });
+  app.patch("/api/v1/local/web-accounts/:id", async (request, reply) => {
+    requireAccountManager(request);
+    reply.header("Cache-Control", "no-store");
+    return {
+      data: await webAccounts.update(
+        z.object({ id: z.uuid() }).parse(request.params).id,
+        request.body,
+      ),
+    };
   });
 
   app.post("/api/v1/local/auth/requests", async (request, reply) => {

@@ -38,8 +38,13 @@ let setupQueuedKey = "";
 let setupLatestRequestKey = "";
 const setupRequests = new Map();
 const setupCheckedVersions = new Map();
-const setupSections = ["tunnel", "dns", "feishu", "codex"];
-const setupSteps = { tunnel: ["tunnel", "dns"], feishu: ["feishu"], codex: ["codex"] };
+const setupSections = ["tunnel", "dns", "feishu", "web", "codex"];
+const setupSteps = {
+  tunnel: ["tunnel", "dns"],
+  feishu: ["feishu"],
+  web: ["web"],
+  codex: ["codex"],
+};
 const pageNames = {
   overview: "服务概览",
   guide: "使用引导",
@@ -48,6 +53,7 @@ const pageNames = {
   settings: "应用设置",
   logs: "运行日志",
 };
+let guideAccessMode = "feishu";
 const connectionFields = ["app-id", "app-secret", "frpc-content"];
 const portFields = [
   ["port-api", "api"],
@@ -198,7 +204,23 @@ const setupExternalTargets = {
 };
 for (const [id, target] of Object.entries(setupExternalTargets))
   $(id).onclick = () => action("control", { action: "setup_open", settings: { target } });
-$("setup-open-board").onclick = () => action("open_board");
+$("setup-open-board").onclick = () =>
+  guideAccessMode === "web"
+    ? action("control", { action: "open_web_board" })
+    : action("open_board");
+$("setup-configure-web").onclick = () => {
+  showPage("settings");
+  $("web-username").focus();
+  action("control", { action: "web_accounts", settings: { operation: "list" } });
+};
+$("connections-web-accounts").onclick = $("setup-configure-web").onclick;
+$("setup-access-mode").onchange = () => {
+  guideAccessMode = $("setup-access-mode").value;
+  setupInputRevision++;
+  renderSetup();
+};
+$("setup-save").onclick = () =>
+  showPage("connections", guideAccessMode === "web" ? "frpc-content" : "app-id");
 function setupContext() {
   return snapshot.setup?.context || snapshot.setupContext || {};
 }
@@ -249,6 +271,7 @@ for (const section of [...setupSections, "all"])
     const settings = {
       section,
       requestKey,
+      accessMode: guideAccessMode,
       appId: $("app-id").value,
       appSecret: $("app-secret").value,
       frpc: $("frpc-content").value,
@@ -261,6 +284,28 @@ for (const section of [...setupSections, "all"])
     renderSetup();
   };
 function renderSetup() {
+  const web = guideAccessMode === "web";
+  $("setup-access-mode").value = web ? "web" : "feishu";
+  $("setup-access-mode").disabled =
+    pending || Boolean(snapshot.deploymentSaving || snapshot.setup?.checking);
+  $("setup-step-feishu").hidden = web;
+  $("setup-step-web").hidden = !web;
+  $("app-id").required = Boolean($("app-secret").value);
+  $("app-secret").required = Boolean($("app-id").value);
+  setText(
+    $("setup-mode-help"),
+    web
+      ? "Web 引导：配置 HTTPS 并在本机创建账号。可与飞书应用同时使用。"
+      : "飞书引导：配置应用凭据并发布。已有 Web 账号仍可从浏览器登录。",
+  );
+  setText($("setup-finish-title"), web ? "保存配置，再到浏览器验证" : "保存配置，再到飞书验证");
+  setText(
+    $("setup-finish-description"),
+    web
+      ? "保存配置并重启服务，创建 Web 账号后在浏览器登录。"
+      : "保存配置并重启服务后，从飞书打开应用验证。",
+  );
+  setText($("setup-open-board"), web ? "打开 Web 验证 ↗" : "打开飞书验证 ↗");
   const setup = snapshot.setup || {};
   const context = setupContext();
   const results = Array.isArray(setup.results) ? setup.results : [];
@@ -413,6 +458,7 @@ function renderSetup() {
   $("setup-open-board").disabled = pending || Boolean(snapshot.boardOpening);
 }
 function render(s) {
+  renderWebAccounts(s);
   snapshot = s;
   setText($("status"), labels[s.phase] || "正在连接");
   $("status").className = "badge " + s.phase;
@@ -453,9 +499,7 @@ function render(s) {
     initialPageChosen = true;
     if (!navigationTouched)
       showPage(
-        ["app-id", "app-secret", "frpc-content"].some((id) => !$(id).value.trim())
-          ? "guide"
-          : "overview",
+        ["frpc-content"].some((id) => !$(id).value.trim()) ? "guide" : "overview",
         undefined,
         true,
       );
@@ -565,4 +609,72 @@ async function poll() {
   }
   setTimeout(poll, 1000);
 }
+$("web-open-board").onclick = () => action("control", { action: "open_web_board" });
+let webAccountsRevision = -1;
+let resettingWebAccount = null;
+$("web-account-form").onsubmit = async (event) => {
+  event.preventDefault();
+  const password = $("web-password").value;
+  $("web-password").value = "";
+  await action("control", {
+    action: "web_accounts",
+    settings: {
+      operation: "create",
+      username: $("web-username").value,
+      name: $("web-name").value,
+      password,
+    },
+  });
+};
+$("web-accounts-refresh").onclick = () =>
+  action("control", { action: "web_accounts", settings: { operation: "list" } });
+$("web-reset-cancel").onclick = () => {
+  $("web-account-reset").hidden = true;
+  $("web-reset-password").value = "";
+  resettingWebAccount = null;
+};
+$("web-account-reset").onsubmit = async (event) => {
+  event.preventDefault();
+  const id = resettingWebAccount;
+  const password = $("web-reset-password").value;
+  $("web-reset-password").value = "";
+  $("web-account-reset").hidden = true;
+  resettingWebAccount = null;
+  if (id)
+    await action("control", {
+      action: "web_accounts",
+      settings: { operation: "update", id, password },
+    });
+};
+function renderWebAccounts(s) {
+  $("web-accounts-message").textContent = s.webAccountsMessage || "启动服务后刷新账号列表。";
+  $("web-account-create").disabled = Boolean(s.webAccountsBusy);
+  $("web-accounts-refresh").disabled = Boolean(s.webAccountsBusy);
+  if (webAccountsRevision === s.webAccountsRevision) return;
+  webAccountsRevision = s.webAccountsRevision;
+  $("web-accounts-list").replaceChildren();
+  for (const account of s.webAccounts || []) {
+    const row = document.createElement("div");
+    row.className = "web-account-row";
+    const label = document.createElement("span");
+    label.textContent = `${account.name} (${account.username}) · ${account.active ? "已启用" : "已停用"}`;
+    const toggle = document.createElement("button");
+    toggle.textContent = account.active ? "停用并退出登录" : "启用";
+    toggle.onclick = () =>
+      action("control", {
+        action: "web_accounts",
+        settings: { operation: "update", id: account.id, active: !account.active },
+      });
+    const reset = document.createElement("button");
+    reset.textContent = "重置密码";
+    reset.onclick = () => {
+      resettingWebAccount = account.id;
+      $("web-account-reset").hidden = false;
+      $("web-reset-password").focus();
+    };
+    row.append(label, toggle, reset);
+    $("web-accounts-list").append(row);
+  }
+}
+
 poll();

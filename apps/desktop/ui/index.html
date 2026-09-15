@@ -86,7 +86,13 @@
       <section id="guide" class="page" hidden>
         <div class="eyebrow">连接你的工作空间</div>
         <h1>使用引导</h1>
-        <p id="setup-intro" class="intro">按三步完成连接。</p>
+        <p id="setup-intro" class="intro">选择访问方式，再按三步完成连接。</p>
+        <label for="setup-access-mode">查看配置引导</label>
+        <select id="setup-access-mode">
+          <option value="feishu">飞书应用</option>
+          <option value="web">Web 账号访问</option>
+        </select>
+        <p id="setup-mode-help" class="hint"></p>
         <aside class="setup-contact">
           如果没有 frp 服务器（步骤 1），联系作者购买，微信号：rocyan921。
         </aside>
@@ -142,6 +148,26 @@
               </div>
               <div id="setup-results-tunnel" class="setup-results" aria-live="polite"></div>
               <div id="setup-results-dns" class="setup-results" aria-live="polite"></div>
+            </div>
+          </details>
+          <details class="setup-step" id="setup-step-web" hidden>
+            <summary>
+              <span class="setup-number">2</span
+              ><span class="setup-step-title"
+                >创建 Web 账号<small>使用浏览器登录，无需飞书</small></span
+              ><span id="setup-status-web" class="setup-status">未检查</span>
+            </summary>
+            <div class="setup-body">
+              <ol>
+                <li>使用 HTTPS 隧道，保存连接配置并启动服务。</li>
+                <li>在本机「应用设置 → Web 账号」创建账号，密码至少 8 位。不提供公开注册。</li>
+                <li>打开 Web 看板，使用创建的账号登录。</li>
+              </ol>
+              <div class="setup-actions">
+                <button id="setup-configure-web" type="button">管理 Web 账号</button
+                ><button id="setup-check-web" type="button">检查 Web 配置</button>
+              </div>
+              <div id="setup-results-web" class="setup-results" aria-live="polite"></div>
             </div>
           </details>
           <details class="setup-step" id="setup-step-feishu">
@@ -209,8 +235,8 @@
           </details>
         </div>
         <div class="setup-finish">
-          <h2>保存配置，再到飞书验证</h2>
-          <p>保存配置并重启服务后，从飞书打开应用验证。</p>
+          <h2 id="setup-finish-title">保存配置，再到飞书验证</h2>
+          <p id="setup-finish-description">保存配置并重启服务后，从飞书打开应用验证。</p>
           <div class="setup-actions">
             <button id="setup-save" type="button" class="primary">前往连接配置</button
             ><button id="setup-open-board" type="button">打开飞书验证 ↗</button>
@@ -223,22 +249,30 @@
         <h1>连接配置</h1>
         <p class="intro">保存到本机后，选择立即重启服务或稍后手动重启。</p>
         <form id="connections-form" autocomplete="off">
-          <label for="app-id">App ID</label>
-          <input id="app-id" required spellcheck="false" placeholder="cli_…" />
-          <p id="app-id-path" class="hint"></p>
-          <label for="app-secret">App Secret</label>
-          <div class="secret-input">
-            <input
-              required
-              id="app-secret"
-              type="password"
-              autocomplete="new-password"
-              spellcheck="false"
-              placeholder="填写飞书应用密钥"
-            />
-            <button id="show-secret" type="button">显示密钥</button>
+          <p class="hint">
+            飞书应用与 Web 账号可同时使用，共用下方公网隧道。仅使用 Web 时，飞书凭据可留空。
+          </p>
+          <div id="feishu-connection-fields" class="connection-fields">
+            <div>
+              <label for="app-id">App ID</label>
+              <input id="app-id" spellcheck="false" placeholder="cli_…" />
+              <p id="app-id-path" class="hint"></p>
+            </div>
+            <div>
+              <label for="app-secret">App Secret</label>
+              <div class="secret-input">
+                <input
+                  id="app-secret"
+                  type="password"
+                  autocomplete="new-password"
+                  spellcheck="false"
+                  placeholder="填写飞书应用密钥"
+                />
+                <button id="show-secret" type="button">显示密钥</button>
+              </div>
+              <p id="secret-hint" class="hint"></p>
+            </div>
           </div>
-          <p id="secret-hint" class="hint"></p>
           <label for="frpc-content">frpc.toml</label>
           <textarea
             required
@@ -248,6 +282,10 @@
             placeholder="粘贴完整的 frpc.toml 内容"
           ></textarea>
           <p id="frpc-hint" class="hint"></p>
+          <div class="connection-account-actions">
+            <button id="connections-web-accounts" type="button">管理 Web 账号</button
+            ><span class="hint">HTTPS 入口和有效账号就绪后，可从浏览器登录。</span>
+          </div>
           <button id="save-connections" class="primary" type="submit">保存配置</button>
           <p id="connections-result" role="status" aria-live="polite"></p>
         </form>
@@ -318,6 +356,55 @@
       <section id="settings" class="page" hidden>
         <div class="eyebrow">偏好设置</div>
         <h1>应用设置</h1>
+        <div class="update-card" aria-labelledby="web-accounts-title">
+          <h2 id="web-accounts-title">Web 账号</h2>
+          <p class="update-help">
+            用浏览器访问公网地址，以账号密码登录。公网需配置
+            HTTPS；账号只能在本机创建，不提供公开注册。每个账号都能访问看板并执行项目任务，请仅分配给信任的人。
+          </p>
+          <form id="web-account-form">
+            <label
+              >账号<input
+                id="web-username"
+                autocomplete="off"
+                pattern="[a-zA-Z0-9][a-zA-Z0-9._-]{2,63}"
+                maxlength="64"
+                required
+                placeholder="3–64 位字母、数字、点、下划线或连字符"
+            /></label>
+            <label>显示名称<input id="web-name" maxlength="120" required /></label>
+            <label
+              >密码<input
+                id="web-password"
+                type="password"
+                autocomplete="new-password"
+                minlength="8"
+                maxlength="256"
+                required
+            /></label>
+            <button id="web-account-create" type="submit">创建账号</button>
+          </form>
+          <p id="web-accounts-message" role="status"></p>
+          <div class="web-account-actions">
+            <button id="web-open-board" type="button">用浏览器打开看板</button>
+            <button id="web-accounts-refresh" type="button">刷新账号列表</button>
+          </div>
+          <div id="web-accounts-list"></div>
+          <form id="web-account-reset" hidden>
+            <label
+              >新密码<input
+                id="web-reset-password"
+                type="password"
+                autocomplete="new-password"
+                minlength="8"
+                maxlength="256"
+                required
+            /></label>
+            <p>重置后，该账号的所有浏览器登录立即失效。</p>
+            <button type="submit">保存新密码</button>
+            <button id="web-reset-cancel" type="button">取消</button>
+          </form>
+        </div>
         <div id="skill-card" class="update-card" aria-labelledby="skill-title">
           <div class="update-heading">
             <h2 id="skill-title">Agent Skill</h2>

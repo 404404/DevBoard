@@ -17,7 +17,12 @@ import {
   type IdentityProvider,
   IdentityProviderError,
 } from "./identity-provider.js";
-import { assertBoardAccess, hasBoardAccess, hasFeishuIdentity } from "./identity-policy.js";
+import {
+  assertBoardAccess,
+  hasBoardAccess,
+  hasFeishuIdentity,
+  hasWebIdentity,
+} from "./identity-policy.js";
 
 const PrincipalRowSchema = z.object({
   principalKey: IdentityKeySchema,
@@ -216,7 +221,30 @@ export class IdentityService {
     return this.#createSession(this.#findActor(identity));
   }
 
-  #createSession(actor: PrincipalView): SessionGrant {
+  loginWebAccount(accountId: string): SessionGrant {
+    const identity = { kind: "web" as const, accountId };
+    const key = identityKey(identity);
+    if (!hasWebIdentity(this.#database, key))
+      throw new AppError("UNAUTHENTICATED", 401, "账号或密码错误");
+    const row = PrincipalRowSchema.parse(
+      this.#database
+        .prepare(
+          `SELECT identity_key AS principalKey, name, avatar_url AS avatarUrl, role, active FROM identities WHERE identity_key = ?`,
+        )
+        .get(key),
+    );
+    return this.#createSession(
+      PrincipalViewSchema.parse({
+        identity,
+        name: row.name,
+        avatarUrl: row.avatarUrl,
+        role: row.role,
+      }),
+      "web",
+    );
+  }
+
+  #createSession(actor: PrincipalView, provider: string = this.#provider.kind): SessionGrant {
     const sessionToken = randomBytes(32).toString("base64url");
     const csrfToken = randomBytes(32).toString("base64url");
     const expiresAt = new Date(
@@ -237,7 +265,7 @@ export class IdentityService {
           expiresAt,
         );
       this.#recordAudit("session.login", "allowed", identityKey(actor.identity), {
-        provider: this.#provider.kind,
+        provider,
       });
     });
 
@@ -276,8 +304,16 @@ export class IdentityService {
     }
 
     if (
+      this.#provider.kind === "web" &&
+      !hasWebIdentity(this.#database, parsed.data.principalKey)
+    ) {
+      throw new AppError("UNAUTHENTICATED", 401, "请使用 Web 账号重新登录");
+    }
+
+    if (
       this.#provider.kind === "feishu" &&
-      !hasFeishuIdentity(this.#database, parsed.data.principalKey)
+      !hasFeishuIdentity(this.#database, parsed.data.principalKey) &&
+      !hasWebIdentity(this.#database, parsed.data.principalKey)
     ) {
       throw new AppError("UNAUTHENTICATED", 401, "需要重新从飞书登录以验证身份");
     }

@@ -8,7 +8,7 @@ import {
 } from "./common.js";
 import { TaskPrioritySchema, TaskStatusSchema } from "./domain.js";
 import { ProjectViewSchema } from "./projects.js";
-import { PrincipalSummarySchema, FeishuIdentityRefSchema, IdentityRefSchema } from "./identity.js";
+import { PrincipalSummarySchema, UserIdentityRefSchema, IdentityRefSchema } from "./identity.js";
 
 export const TaskTitleSchema = z.string().trim().min(1).max(500);
 export const TaskDescriptionSchema = z.string().max(100_000);
@@ -80,7 +80,7 @@ export const CreateTaskCommandSchema = z
     status: TaskStatusSchema.default("backlog"),
     priority: TaskPrioritySchema.default("none"),
     labels: TaskLabelsSchema.default([]),
-    assigneeIdentity: FeishuIdentityRefSchema.nullable().default(null),
+    assigneeIdentity: UserIdentityRefSchema.nullable().default(null),
     startAt: NullableTimestampSchema.default(null),
     dueAt: NullableTimestampSchema.default(null),
     recurrence: TaskRecurrenceRuleSchema.nullable().default(null),
@@ -101,7 +101,7 @@ export const UpdateTaskCommandSchema = z
     description: TaskDescriptionSchema.optional(),
     priority: TaskPrioritySchema.optional(),
     labels: TaskLabelsSchema.optional(),
-    assigneeIdentity: FeishuIdentityRefSchema.nullable().optional(),
+    assigneeIdentity: UserIdentityRefSchema.nullable().optional(),
     startAt: NullableTimestampSchema.optional(),
     dueAt: NullableTimestampSchema.optional(),
     recurrence: TaskRecurrenceRuleSchema.nullable().optional(),

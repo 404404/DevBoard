@@ -1,3 +1,4 @@
+import { WebLogout } from "./web-login";
 import { QueryNotice } from "./query-notice";
 import { userErrorMessage } from "./user-error";
 import { GitManagerDialog } from "./git-manager-dialog";
@@ -52,8 +53,6 @@ import {
   Square,
   TerminalSquare,
   Tags,
-  Wifi,
-  WifiOff,
 } from "./icons";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -72,7 +71,7 @@ import {
   respondToInteraction,
   submitTaskJob,
 } from "./api";
-import { useProjectEvents, visibleRealtimeState, type RealtimeState } from "./event-feed";
+import { useProjectEvents, visibleRealtimeState } from "./event-feed";
 import { isJobActive, isJobCancelable } from "./job-status";
 import { executionAvailability } from "./execution-availability";
 import { jobStatusLabel, useUiCopy } from "./locale";
@@ -297,7 +296,7 @@ export function BoardPage({
                 Remote
               </button>
             )}
-            {visibleRealtime ? <RealtimeBadge state={visibleRealtime} /> : null}
+            {session.actor.identity.kind === "web" && <WebLogout session={session} />}
           </div>
         </header>
 
@@ -401,7 +400,8 @@ export function BoardPage({
                   onClick={() => setTagManagerOpen(true)}
                 >
                   <Tags aria-hidden="true" />
-                  标签管理
+                  <span className="command-label--full">标签管理</span>
+                  <span className="command-label--compact">标签</span>
                 </button>
                 <button
                   className="button"
@@ -410,7 +410,8 @@ export function BoardPage({
                   onClick={() => setGitManagerOpen(true)}
                 >
                   <GitBranch />
-                  分支 / worktree 管理
+                  <span className="command-label--full">分支 / worktree 管理</span>
+                  <span className="command-label--compact">分支</span>
                 </button>
                 <button
                   className="button button--primary"
@@ -554,18 +555,6 @@ export function BoardPage({
       {tagManagerOpen ? (
         <TagManagerDialog csrfToken={session.csrfToken} onClose={() => setTagManagerOpen(false)} />
       ) : null}
-    </div>
-  );
-}
-
-function RealtimeBadge({ state }: { readonly state: RealtimeState }) {
-  const copy = useUiCopy();
-  const label =
-    state === "live" ? copy.live : state === "offline" ? copy.offline : copy.reconnecting;
-  return (
-    <div className={`realtime-badge realtime-badge--${state}`} data-testid="realtime-state">
-      {state === "offline" ? <WifiOff aria-hidden="true" /> : <Wifi aria-hidden="true" />}
-      <span>{label}</span>
     </div>
   );
 }

@@ -505,3 +505,53 @@ test("all runs independent sections concurrently and reports each result as it c
   );
   safe(results);
 });
+
+test("Web all-checks skip Feishu and report HTTPS/account steps", async () => {
+  const results = await runSetupChecks(
+    { ...input, accessMode: "web", section: "all" },
+    {
+      ...deps(),
+    },
+  );
+  assert.equal(
+    results.some((r) => r.section === "feishu"),
+    false,
+  );
+  assert.equal(
+    results.some((r) => r.id === "web.account" && r.status === "failed"),
+    true,
+  );
+});
+
+for (const [label, accounts, expected] of [
+  ["enabled", [{ active: 1 }], "passed"],
+  ["disabled", [{ active: 0 }], "failed"],
+  ["empty", [], "failed"],
+]) {
+  test(`Web account check reads fresh local ${label} state`, async () => {
+    let calls = 0;
+    const results = await runSetupChecks(
+      { ...input, section: "web" },
+      deps({
+        readWebAccounts: async () => {
+          calls++;
+          return accounts;
+        },
+      }),
+    );
+    assert.equal(calls, 1);
+    assert.equal(one(results, "web.account").status, expected);
+  });
+}
+test("Web account check cannot pass when local lookup fails", async () => {
+  const results = await runSetupChecks(
+    { ...input, section: "web" },
+    deps({
+      readWebAccounts: async () => {
+        throw Error("private details");
+      },
+    }),
+  );
+  assert.equal(one(results, "web.account").status, "failed");
+  assert.doesNotMatch(JSON.stringify(results), /private details/);
+});

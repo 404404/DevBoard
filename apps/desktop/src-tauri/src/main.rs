@@ -47,6 +47,8 @@ fn control(
         "deployment",
         "ports",
         "setup_check",
+        "web_accounts",
+        "open_web_board",
         "setup_open",
     ]
     .contains(&action.as_str())

@@ -1,7 +1,7 @@
 import {
   sameIdentity,
-  FeishuIdentityRefSchema,
-  type FeishuIdentityRef,
+  UserIdentityRefSchema,
+  type UserIdentityRef,
   type TaskView,
 } from "@lark-codex/contracts";
 
@@ -18,7 +18,7 @@ export const EDITABLE_TASK_FIELDS = [
 export type EditableTaskField = (typeof EDITABLE_TASK_FIELDS)[number];
 export type TaskDraft = Pick<TaskView, EditableTaskField>;
 export type TaskDraftPatch = Partial<Omit<TaskDraft, "assigneeIdentity">> & {
-  assigneeIdentity?: FeishuIdentityRef | null;
+  assigneeIdentity?: UserIdentityRef | null;
 };
 type Persist = (task: TaskView, patch: TaskDraftPatch) => Promise<TaskView>;
 
@@ -169,7 +169,7 @@ export class TaskAutosave {
       try {
         const patch: TaskDraftPatch =
           field === "assigneeIdentity"
-            ? { assigneeIdentity: FeishuIdentityRefSchema.nullable().parse(value) }
+            ? { assigneeIdentity: UserIdentityRefSchema.nullable().parse(value) }
             : { [field]: value };
         const updated = await this.persist(this.snapshot.task, patch);
         const draft = { ...this.snapshot.draft };

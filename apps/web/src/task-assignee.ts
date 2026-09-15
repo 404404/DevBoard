@@ -1,8 +1,8 @@
 import {
-  FeishuIdentityRefSchema,
+  UserIdentityRefSchema,
   identityFromKey,
   sameIdentity,
-  type FeishuIdentityRef,
+  type UserIdentityRef,
   type IdentityRef,
   type TaskAssigneeCandidate,
 } from "@lark-codex/contracts";
@@ -15,6 +15,6 @@ export function currentAssignee(
 }
 
 /** Picker keys stay in the UI; API payloads always receive a structured Feishu identity. */
-export function assigneeFromSelection(value: string): FeishuIdentityRef | null {
-  return value === "" ? null : FeishuIdentityRefSchema.parse(identityFromKey(value));
+export function assigneeFromSelection(value: string): UserIdentityRef | null {
+  return value === "" ? null : UserIdentityRefSchema.parse(identityFromKey(value));
 }

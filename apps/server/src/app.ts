@@ -1,3 +1,4 @@
+import { WebAccountService } from "./modules/identity/web-account-service.js";
 import { CliAuthService } from "./modules/identity/cli-auth-service.js";
 import { registerRemoteRoutes, type RemoteClient } from "./modules/codex/remote-routes.js";
 import { GitManagement } from "./modules/project-registry/git-management.js";
@@ -154,7 +155,12 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
     identityService.ensureDevelopmentActor(DEVELOPMENT_IDENTITY);
   }
   const cliAuth = new CliAuthService();
-  registerIdentityRoutes(app, { config: options.config, service: identityService, cliAuth });
+  registerIdentityRoutes(app, {
+    webAccounts: new WebAccountService(options.database),
+    config: options.config,
+    service: identityService,
+    cliAuth,
+  });
   const eventFeed = new EventFeed({
     database: options.database,
     historyLimit: options.config.LARK_CODEX_EVENT_HISTORY_LIMIT,
@@ -401,6 +407,14 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
 }
 
 function createIdentityProvider(config: AppConfig): IdentityProvider {
+  if (config.LARK_CODEX_AUTH_MODE === "web") {
+    return {
+      kind: "web",
+      async exchangeCode() {
+        throw new AppError("FORBIDDEN", 403, "请使用 Web 账号登录");
+      },
+    };
+  }
   if (config.LARK_CODEX_AUTH_MODE === "development") {
     return new DevelopmentIdentityAdapter();
   }

@@ -12,9 +12,12 @@ body {
   margin: 0;
   display: flex;
   height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
 aside {
   width: 225px;
+  overflow-y: auto;
   background: #f0f2f5;
   border-right: 1px solid #e4e7ec;
   padding: 32px 16px;
@@ -49,6 +52,7 @@ nav {
 }
 button {
   font: inherit;
+  line-height: 20px;
   border: 1px solid #dde2e9;
   border-radius: 9px;
   background: white;
@@ -129,7 +133,7 @@ header {
 }
 .page {
   padding: 32px 36px;
-  max-width: 1000px;
+  width: 100%;
 }
 .eyebrow {
   font-size: 10px;
@@ -193,7 +197,9 @@ h2 {
 }
 .actions {
   display: flex;
-  gap: 9px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
   margin-top: 21px;
 }
 .primary {
@@ -322,13 +328,42 @@ input:focus-visible {
   display: none !important;
 }
 
-#connections-form {
-  max-width: 680px;
+#connections-form,
+#ports-form {
+  width: 100%;
+  min-width: 0;
+}
+#connections,
+#ports {
+  container-type: inline-size;
+}
+.connection-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  column-gap: 20px;
+}
+.connection-fields > div {
+  min-width: 0;
+}
+.connection-account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 24px;
+}
+.connection-account-actions button {
+  flex: 0 0 auto;
+}
+#connections-form .connection-account-actions .hint {
+  flex: 1 1 220px;
+  margin: 0;
 }
 #connections-form textarea {
   display: block;
   width: 100%;
-  min-height: 180px;
+  height: clamp(160px, 28vh, 420px);
+  min-height: 160px;
   resize: vertical;
   padding: 12px;
   border: 1px solid #dde2e9;
@@ -627,9 +662,8 @@ textarea:focus-visible {
   gap: 8px;
   margin-top: 16px;
 }
-.setup-actions button {
-  font-size: 12px;
-  padding: 8px 12px;
+.setup-actions {
+  align-items: center;
 }
 .setup-results:not(:empty) {
   margin-top: 18px;
@@ -666,12 +700,9 @@ textarea:focus-visible {
   color: #85919d;
 }
 
-#ports-form {
-  max-width: 680px;
-}
 .port-fields {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
   gap: 0 20px;
 }
 #ports-result {
@@ -866,9 +897,6 @@ textarea:focus-visible {
     margin-right: 24px;
     margin-left: 24px;
   }
-  .port-fields {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 .setup-body a {
@@ -903,4 +931,101 @@ nav button[data-tab="settings"] .nav-icon {
 }
 nav button[data-tab="logs"] .nav-icon {
   --symbol: url("symbols/logs.png");
+}
+
+#web-account-form,
+#web-account-reset {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0;
+}
+#web-account-form label,
+#web-account-reset label {
+  display: grid;
+  gap: 6px;
+}
+#web-account-reset[hidden] {
+  display: none;
+}
+.web-account-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 12px 0;
+}
+.web-account-row span {
+  flex: 1 1 180px;
+}
+
+#setup-access-mode {
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 10px;
+  margin: 8px 0 16px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  color: inherit;
+  font: inherit;
+}
+
+/* Shared form and action rhythm across desktop pages. */
+#web-account-form label,
+#web-account-reset label {
+  margin-bottom: 0;
+}
+#web-account-form input,
+#web-account-reset input {
+  font-family: inherit;
+}
+#web-account-form > button,
+#web-account-reset > button {
+  justify-self: start;
+}
+.web-account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.update-card > h2:first-child {
+  margin-top: 0;
+}
+.web-account-row span,
+.log-row {
+  overflow-wrap: anywhere;
+}
+#setup-access-mode {
+  min-height: 40px;
+  border-color: #dbe1e8;
+  background: #fafbfc;
+}
+select:focus-visible {
+  outline: 2px solid #6283a5;
+  outline-offset: 3px;
+}
+.dialog-actions {
+  flex-wrap: wrap;
+  align-items: center;
+}
+@media (max-height: 650px) {
+  aside {
+    padding-top: 20px;
+    padding-bottom: 20px;
+  }
+  header {
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+  .page {
+    padding-top: 24px;
+    padding-bottom: 24px;
+  }
+}
+@container (max-width: 560px) {
+  #connections-form,
+  #ports-form {
+    padding: 20px;
+  }
 }

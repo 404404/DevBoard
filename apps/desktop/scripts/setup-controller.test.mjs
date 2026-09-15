@@ -181,3 +181,17 @@ remotePort = 18080
     caddyPort: 8443,
   });
 });
+
+test("switching guide content does not mark saved connections as unapplied", async () => {
+  let checked;
+  const controller = createSetupController({
+    getConfiguration: () => ({ ...configuration(), accessMode: "feishu" }),
+    check: async (input) => {
+      checked = input;
+      return [];
+    },
+  });
+  await controller.check({ section: "all", accessMode: "web" });
+  assert.equal(checked.restartRequired, false);
+  assert.equal(controller.state.notice, "");
+});

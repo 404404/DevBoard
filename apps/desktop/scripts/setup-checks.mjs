@@ -11,7 +11,7 @@ import { promisify } from "node:util";
 import { parse } from "smol-toml";
 import { readFrpcOrigin } from "./frpc-config.mjs";
 
-export const SETUP_SECTIONS = Object.freeze(["feishu", "tunnel", "dns", "codex"]);
+export const SETUP_SECTIONS = Object.freeze(["feishu", "web", "tunnel", "dns", "codex"]);
 const FEISHU_ENDPOINT = "https://open.feishu.cn/open-apis/auth/v3/app_access_token/internal";
 const MAX_BYTES = 64 * 1024;
 const execFile = promisify(execFileCallback);
@@ -147,7 +147,12 @@ export async function runSetupChecks(input, options = {}) {
     Number.isFinite(options.timeoutMs) && options.timeoutMs > 0
       ? Math.min(options.timeoutMs, 5000)
       : 3500;
-  const selected = input.section === "all" || !input.section ? SETUP_SECTIONS : [input.section];
+  const selected =
+    input.section === "all" || !input.section
+      ? SETUP_SECTIONS.filter((section) =>
+          input.accessMode === "web" ? section !== "feishu" : section !== "web",
+        )
+      : [input.section];
   if (selected.some((section) => !SETUP_SECTIONS.includes(section)))
     throw new Error("不支持的检查项目");
   async function run(section) {
@@ -179,6 +184,42 @@ export async function runSetupChecks(input, options = {}) {
         timeoutMs,
       );
 
+    if (section === "web") {
+      let secure = false;
+      try {
+        secure = new URL(readFrpcOrigin(input.frpc, input.caddyPort)).protocol === "https:";
+      } catch {
+        /* Invalid drafts are reported below. */
+      }
+      emit(
+        "web.https",
+        "HTTPS 访问",
+        secure ? "passed" : "failed",
+        secure ? "已配置 HTTPS 公网入口。" : "Web 账号访问必须配置 HTTPS 隧道。",
+      );
+      if (!input.servicesRunning || input.restartRequired) {
+        emit("web.account", "Web 账号", "warning", "请先保存配置并启动或重启服务，再检查账号。");
+      } else {
+        try {
+          if (typeof deps.readWebAccounts !== "function") throw new Error("Unavailable");
+          const accounts = await limited(() => deps.readWebAccounts(), timeoutMs);
+          if (!Array.isArray(accounts)) throw new Error("Invalid account list");
+          const count = accounts.filter(
+            (account) => account.active === true || account.active === 1,
+          ).length;
+          emit(
+            "web.account",
+            "Web 账号",
+            count ? "passed" : "failed",
+            count
+              ? `已检测到 ${count} 个启用的 Web 账号。账号配置可用；实际密码登录需在浏览器验证。`
+              : "尚无启用的 Web 账号，请在本机应用设置中创建或启用账号。",
+          );
+        } catch {
+          emit("web.account", "Web 账号", "failed", "无法读取本机账号状态，请确认服务正常后重试。");
+        }
+      }
+    }
     if (section === "feishu") {
       if (!input.appId?.trim() || !input.appSecret?.trim()) {
         emit(

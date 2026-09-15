@@ -1,3 +1,4 @@
+import type { WebAccountService } from "./web-account-service.js";
 import { FeishuJsapiService } from "./feishu-jsapi-service.js";
 import { AppError } from "../../app-error.js";
 import { z } from "zod";
@@ -18,6 +19,7 @@ interface IdentityRoutesOptions {
   readonly config: AppConfig;
   readonly service: IdentityService;
   readonly cliAuth: CliAuthService;
+  readonly webAccounts: WebAccountService;
 }
 
 interface CookieNames {
@@ -76,7 +78,17 @@ function setSessionCookies(
 }
 
 export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRoutesOptions): void {
-  const { config, service, cliAuth } = options;
+  const { config, service, cliAuth, webAccounts } = options;
+  const webLoginSecure = new URL(config.LARK_CODEX_ORIGIN).protocol === "https:";
+  app.post("/api/v1/auth/web/login", async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    if (!webLoginSecure || !webAccounts.enabled())
+      throw new AppError("FORBIDDEN", 403, "Web 登录未启用；请在本机应用创建账号并配置 HTTPS");
+    const accountId = await webAccounts.verify(request.body);
+    return reply
+      .code(201)
+      .send({ data: setSessionCookies(reply, config, service.loginWebAccount(accountId)) });
+  });
   const names = sessionCookieNames(config);
   const jsapi =
     config.LARK_CODEX_AUTH_MODE === "feishu" &&
@@ -134,20 +146,24 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
     };
   });
 
-  app.get("/api/v1/auth/config", async () => ({
-    data: AuthBootstrapSchema.parse({
-      authMode: config.LARK_CODEX_AUTH_MODE,
-      feishuAppId:
-        config.LARK_CODEX_AUTH_MODE === "feishu" ? config.LARK_CODEX_FEISHU_APP_ID : null,
-    }),
-  }));
+  app.get("/api/v1/auth/config", async (_request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    return {
+      data: AuthBootstrapSchema.parse({
+        authMode: config.LARK_CODEX_AUTH_MODE,
+        webLoginEnabled: webLoginSecure && webAccounts.enabled(),
+        feishuAppId:
+          config.LARK_CODEX_AUTH_MODE === "feishu" ? config.LARK_CODEX_FEISHU_APP_ID : null,
+      }),
+    };
+  });
 
   if (config.LARK_CODEX_AUTH_MODE === "development") {
     app.post("/api/v1/auth/development", async (_request, reply) => {
       const grant = await service.loginDevelopment();
       await reply.code(201).send({ data: setSessionCookies(reply, config, grant) });
     });
-  } else {
+  } else if (config.LARK_CODEX_AUTH_MODE === "feishu") {
     app.post("/api/v1/auth/feishu/exchange", async (request, reply) => {
       const command = ExchangeFeishuCodeSchema.parse(request.body);
       const grant = await service.exchangeCode(command.code);
@@ -155,7 +171,8 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
     });
   }
 
-  app.get("/api/v1/session", async (request) => {
+  app.get("/api/v1/session", async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
     const context = service.authenticate(
       request.cookies[sessionCookieNames(config, request.cookies).session],
     );

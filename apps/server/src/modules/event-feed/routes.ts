@@ -110,6 +110,7 @@ async function streamEvents(
   projectId: string,
   afterRevision: number,
   config: AppConfig,
+  revalidate: () => void,
 ): Promise<void> {
   const controller = new AbortController();
   const abort = () => controller.abort();
@@ -138,6 +139,7 @@ async function streamEvents(
         heartbeatWait.promise.then(() => ({ kind: "heartbeat" as const })),
       ]);
       heartbeatWait.cancel();
+      revalidate();
 
       if (result.kind === "heartbeat") {
         const writable = await writeChunk(
@@ -211,7 +213,18 @@ export function registerEventFeedRoutes(
       "content-type": "text/event-stream; charset=utf-8",
       "x-accel-buffering": "no",
     });
-    await streamEvents(request, reply.raw, eventFeed, query.projectId, afterRevision, config);
+    await streamEvents(
+      request,
+      reply.raw,
+      eventFeed,
+      query.projectId,
+      afterRevision,
+      config,
+      () => {
+        const current = authenticate(request, config, identityService);
+        identityService.authorizeProject(current.actor, query.projectId, "read");
+      },
+    );
     return reply;
   });
 }

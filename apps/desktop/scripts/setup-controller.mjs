@@ -71,6 +71,7 @@ export function createSetupController({
   getConfiguration,
   onChange = () => {},
   check = runSetupChecks,
+  readWebAccounts,
   open = openSetupTarget,
 }) {
   const state = {
@@ -98,11 +99,18 @@ export function createSetupController({
         state.requestKey = settings.requestKey;
       try {
         const section = settings.section || "all";
-        const limits = { appId: 256, appSecret: 4096, frpc: 262144, requestKey: 128 };
+        const limits = {
+          accessMode: 16,
+          appId: 256,
+          appSecret: 4096,
+          frpc: 262144,
+          requestKey: 128,
+        };
         if (
+          (settings.accessMode !== undefined && !["web", "feishu"].includes(settings.accessMode)) ||
           !settings ||
           typeof settings !== "object" ||
-          !["all", "feishu", "tunnel", "dns", "codex"].includes(section) ||
+          !["all", "feishu", "web", "tunnel", "dns", "codex"].includes(section) ||
           Object.keys(settings).some((key) => key !== "section" && !Object.hasOwn(limits, key)) ||
           Object.entries(limits).some(
             ([key, limit]) =>
@@ -116,13 +124,14 @@ export function createSetupController({
         }
         const saved = getConfiguration();
         const input = { ...saved, section };
-        for (const key of ["appId", "appSecret", "frpc"])
+        for (const key of ["accessMode", "appId", "appSecret", "frpc"])
           if (settings[key] !== undefined) input[key] = settings[key];
         const currentInput = fingerprint(input);
         savedAtCheck = fingerprint(saved);
-        if (currentInput !== lastInput || section === "all") state.results = [];
+        const checkKey = `${currentInput}:${input.accessMode || "feishu"}`;
+        if (checkKey !== lastInput || section === "all") state.results = [];
         else state.results = state.results.filter((item) => item.section !== section);
-        lastInput = currentInput;
+        lastInput = checkKey;
         state.section = section;
         state.requestKey = settings.requestKey || "";
         state.checking = true;
@@ -151,7 +160,7 @@ export function createSetupController({
           state.results = [...state.results.filter((item) => item.id !== result.id), result];
           onChange();
         };
-        const results = await check(input, { onResult });
+        const results = await check(input, { onResult, readWebAccounts });
         for (const result of results) onResult(result);
         state.checkedAt = new Date().toISOString();
         refresh();

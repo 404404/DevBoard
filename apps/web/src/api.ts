@@ -23,7 +23,7 @@ import {
   TaskRelationViewSchema,
   TaskWorkspaceViewSchema,
   type AuthBootstrap,
-  type FeishuIdentityRef,
+  type UserIdentityRef,
   type BoardView,
   type CommentView,
   type DashboardView,
@@ -171,6 +171,15 @@ export async function readAuthBootstrap(): Promise<AuthBootstrap> {
 
 export async function readSession(): Promise<SessionView> {
   return (await apiRequest("/api/v1/session", SessionResponseSchema)).data;
+}
+
+export async function loginWeb(username: string, password: string): Promise<SessionView> {
+  const result = await apiRequest("/api/v1/auth/web/login", SessionResponseSchema, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  return result.data;
 }
 
 export async function loginDevelopment(): Promise<SessionView> {
@@ -441,7 +450,7 @@ export async function createTask(
     status: TaskStatus;
     priority: TaskPriority;
     labels: string[];
-    assigneeIdentity: FeishuIdentityRef | null;
+    assigneeIdentity: UserIdentityRef | null;
     developmentContextId: string | null;
     links: string[];
     initialRelations: InitialTaskRelations;
@@ -465,7 +474,7 @@ export async function updateTask(
     title?: string;
     description?: string;
     priority?: TaskPriority;
-    assigneeIdentity?: FeishuIdentityRef | null;
+    assigneeIdentity?: UserIdentityRef | null;
     labels?: string[];
     links?: string[];
     startAt?: string | null;
