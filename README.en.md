@@ -10,6 +10,17 @@ Lark-Codex connects a Lark task board to Codex running on your Mac. Organize pro
 
 Current release: **0.1.2 preview**, for **Apple Silicon Macs running macOS 13 or later**.
 
+## Access methods
+
+|            | Web                                            | Lark                                                 |
+| ---------- | ---------------------------------------------- | ---------------------------------------------------- |
+| Open in    | Desktop or mobile browser                      | Lark desktop or mobile client                        |
+| Identity   | Web account created locally                    | Lark user within the custom app's availability scope |
+| Setup      | HTTPS public entry point; no Lark app required | Lark custom app and public tunnel                    |
+| CLI writes | Web sign-in does not authorize CLI writes      | Pair with a real Lark user                           |
+
+Both methods can remain enabled and share the same board and local Codex.
+
 ## What you can do
 
 - Manage tasks by project using a dashboard, board, or list, with statuses, priorities, labels, comments, and attachments.
@@ -24,26 +35,30 @@ Local services and task data stay on your Mac. Lark sign-in, public access, and 
 
 ## Screenshots
 
-### Desktop task board
+### Lark · Desktop, mobile, and Remote
 
-View and manage tasks by status in the Lark desktop client.
+Manage tasks in the Lark custom app. Mobile Remote supports Codex conversations, streamed output, attachments, approvals, and code review.
 
-![Lark-Codex task board in Lark on desktop](docs/images/desktop-taskboard.png)
+<table>
+  <tr><th>Desktop board</th><th>Mobile board</th><th>Remote</th></tr>
+  <tr>
+    <td align="center"><a href="docs/images/desktop-taskboard.png"><img src="docs/images/desktop-taskboard.png" alt="Desktop board" width="340" /></a></td>
+    <td align="center"><a href="docs/images/mobile-taskboard.png"><img src="docs/images/mobile-taskboard.png" alt="Mobile board" height="200" /></a></td>
+    <td align="center"><a href="docs/images/mobile-remote.png"><img src="docs/images/mobile-remote.png" alt="Remote" height="200" /></a></td>
+  </tr>
+</table>
 
-### Mobile task board and Remote
+### Web · Desktop and mobile browsers
 
-Remote connects Lark on your phone to Codex on your Mac, drawing on the main interaction patterns of Codex Desktop. When both devices are in mainland China, using an frp server in mainland China can keep remote-access traffic on domestic routes and reduce cross-border relays, helping interactions feel responsive. Model requests still go from your local Codex to its configured service.
+Sign in over HTTPS with a locally created Web account, without Lark. Click a thumbnail to view the full image.
 
-- Browse conversations by project, start a new conversation, or continue an existing one.
-- View streaming results, handle approvals, and provide additional input.
-- Send attachments and images, view code diffs, and review changes.
-
-The mobile task board is on the left; the Remote entry screen is on the right.
-
-<p>
-  <img src="docs/images/mobile-taskboard.png" alt="Lark-Codex task board in Lark on mobile" width="48%" />
-  <img src="docs/images/mobile-remote.jpg" alt="Lark-Codex Remote entry screen in Lark on mobile" width="48%" />
-</p>
+<table>
+  <tr><th>Desktop browser</th><th>Mobile browser</th></tr>
+  <tr>
+    <td align="center"><a href="docs/images/web-desktop-redacted.png"><img src="docs/images/web-desktop-redacted.png" alt="Desktop browser" width="420" /></a></td>
+    <td align="center"><a href="docs/images/web-mobile-redacted.png"><img src="docs/images/web-mobile-redacted.png" alt="Mobile browser" height="220" /></a></td>
+  </tr>
+</table>
 
 ## Prerequisites
 

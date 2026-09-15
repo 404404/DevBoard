@@ -10,6 +10,17 @@ Lark-Codex 将 Web / 飞书任务看板与本机 Codex 连接起来。你可以�
 
 当前为 **0.1.2 预览版**，支持 **Apple Silicon Mac · macOS 13 或更新版本**。
 
+## 访问方式
+
+|            | Web                          | 飞书                         |
+| ---------- | ---------------------------- | ---------------------------- |
+| 打开方式   | 桌面或移动浏览器             | 飞书桌面端或移动端           |
+| 登录身份   | 本机应用创建的 Web 账号      | 自建应用可用范围内的飞书用户 |
+| 配置要求   | HTTPS 公网入口，无需飞书应用 | 飞书自建应用与公网隧道       |
+| CLI 写操作 | Web 登录不能代替 CLI 授权    | 使用真实飞书用户配对         |
+
+两种方式可同时启用，共用同一看板和本机 Codex。
+
 ## 可以做什么
 
 - 按项目管理任务，通过仪表盘、看板和列表查看工作，维护状态、优先级、标签、评论和附件。
@@ -25,26 +36,30 @@ Lark-Codex 将 Web / 飞书任务看板与本机 Codex 连接起来。你可以�
 
 ## 界面预览
 
-### 桌面端任务看板
+### 飞书 · 桌面端、移动端与 Remote
 
-在飞书桌面端按状态查看和管理任务。
+在飞书自建应用中管理任务；移动端 Remote 支持 Codex 对话、流式结果、附件、审批与代码审查。
 
-![飞书桌面端的 Lark-Codex 任务看板](docs/images/desktop-taskboard.png)
+<table>
+  <tr><th>桌面看板</th><th>移动看板</th><th>Remote</th></tr>
+  <tr>
+    <td align="center"><a href="docs/images/desktop-taskboard.png"><img src="docs/images/desktop-taskboard.png" alt="桌面看板" width="340" /></a></td>
+    <td align="center"><a href="docs/images/mobile-taskboard.png"><img src="docs/images/mobile-taskboard.png" alt="移动看板" height="200" /></a></td>
+    <td align="center"><a href="docs/images/mobile-remote.png"><img src="docs/images/mobile-remote.png" alt="Remote" height="200" /></a></td>
+  </tr>
+</table>
 
-### 移动端看板与 Remote
+### Web · 桌面与移动浏览器
 
-Remote 让你在飞书移动端连接 Mac 上的 Codex，参考 Codex Desktop 的主要交互体验。手机和 Mac 都在国内时，搭配国内 frp 服务器，远程访问可走国内链路、减少跨境中转，有助于交互流畅；模型请求仍由本机 Codex 连接其服务。
+通过 HTTPS 和本机创建的 Web 账号登录，无需飞书。点击缩略图可查看大图。
 
-- 按项目查看会话，创建新对话或继续已有对话。
-- 实时查看流式结果，处理审批和补充输入。
-- 发送附件和图片，查看代码 diff 并审查改动。
-
-左侧为手机端任务看板，右侧为 Remote 入口。
-
-<p>
-  <img src="docs/images/mobile-taskboard.png" alt="飞书移动端的 Lark-Codex 任务看板" width="48%" />
-  <img src="docs/images/mobile-remote.jpg" alt="飞书移动端的 Lark-Codex 远程入口" width="48%" />
-</p>
+<table>
+  <tr><th>桌面浏览器</th><th>移动浏览器</th></tr>
+  <tr>
+    <td align="center"><a href="docs/images/web-desktop-redacted.png"><img src="docs/images/web-desktop-redacted.png" alt="桌面浏览器" width="420" /></a></td>
+    <td align="center"><a href="docs/images/web-mobile-redacted.png"><img src="docs/images/web-mobile-redacted.png" alt="移动浏览器" height="220" /></a></td>
+  </tr>
+</table>
 
 ## 安装前准备
 
