@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod updater;
+mod tray_icon;
 mod skills;
 mod skills_commit;
 mod app_data;
@@ -182,7 +183,7 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
             _ => {}
         });
     if let Some(icon) = app.default_window_icon() {
-        tray = tray.icon(icon.clone());
+        tray = tray.icon(tray_icon::template(icon)).icon_as_template(true);
     }
     tray.build(app)?;
     Ok(())

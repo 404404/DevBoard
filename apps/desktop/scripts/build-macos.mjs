@@ -131,6 +131,18 @@ writeFileSync(
   join(contents, "Info.plist"),
   `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>codexboard-desktop</string><key>CFBundleIdentifier</key><string>cn.rocyan.codexboard.desktop</string><key>CFBundleName</key><string>CodexBoard</string><key>CFBundleDisplayName</key><string>CodexBoard</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>${version}</string><key>CFBundleVersion</key><string>${version.split("-")[0]}</string><key>LSMinimumSystemVersion</key><string>13.0</string><key>NSHighResolutionCapable</key><true/></dict></plist>`,
 );
+const roundedIcon = join(cache, "CodexBoard-rounded.png");
+const iconRenderer = join(cache, "icon-mask");
+run("swiftc", [
+  "-framework",
+  "AppKit",
+  "-framework",
+  "QuartzCore",
+  join(desktop, "scripts/icon-mask.swift"),
+  "-o",
+  iconRenderer,
+]);
+run(iconRenderer, [roundedIcon, join(desktop, "src-tauri/icons/icon.png")]);
 const iconset = join(cache, "CodexBoard.iconset");
 mkdirSync(iconset, { recursive: true });
 for (const size of [16, 32, 128, 256, 512])
@@ -141,7 +153,7 @@ for (const size of [16, 32, 128, 256, 512])
         "-z",
         String(size * scale),
         String(size * scale),
-        join(desktop, "src-tauri/icons/icon.png"),
+        roundedIcon,
         "--out",
         join(iconset, `icon_${size}x${size}${scale === 2 ? "@2x" : ""}.png`),
       ],

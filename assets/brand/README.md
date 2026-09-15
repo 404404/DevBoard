@@ -1,6 +1,6 @@
 # CodexBoard 品牌资源
 
-最终采用白色底板（桌面界面与 Web 登录页以 22% 圆角裁切显示），深石墨色结形、白色描边卡片和薄荷绿完成卡片。Logo 内部不包含产品文字。
+最终采用白色底板（桌面界面、Web 登录页与安装图标使用 Apple CALayer continuous 连续圆角，1024 px 画布的 cornerRadius 为 224 px），深石墨色结形、白色描边卡片和薄荷绿完成卡片。Logo 内部不包含产品文字。
 
 - `codexboard-source.png`：内置 imagegen 从用户选定白底视觉稿提取的原始图像。
 - `codexboard.png`：1024 × 1024 应用主图，RGBA 编码，白色底板为不透明像素。
@@ -13,3 +13,5 @@
 最终图像提示词：
 
 > Produce a square application icon extracted from this approved image. ONLY the exact dark knot and three bottom task cards artwork, centered on SOLID PURE WHITE (#FFFFFF) background filling the ENTIRE canvas. NO text, NO wordmark, NO label, NO shadow, NO rounded outer tile border, NO checkerboard, NO transparency simulation, NO texture. Preserve the exact knot geometry and original relative size/positions/overlap of the three cards, mint green center card with dark checkmark and line, two white cards with dark graphite outlines and inner lines. Artwork occupies 76% of square canvas height, centered with equal white padding. This is an extraction and color-preserving cleanup, NOT a new design. Deliver square high quality PNG.
+
+圆角遮罩由 `apps/desktop/scripts/icon-mask.swift` 使用系统 Core Animation 绘制。菜单栏通过 `tray_icon.rs` 生成黑色与透明像素组成的模板图标，由 macOS 适配外观。

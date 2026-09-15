@@ -35,7 +35,10 @@ aside {
   padding: 0 12px;
 }
 .logo {
-  border-radius: 22%;
+  -webkit-mask-image: url("icon-mask.png");
+  mask-image: url("icon-mask.png");
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
   width: 36px;
   height: 36px;
   object-fit: contain;
