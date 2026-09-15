@@ -1,9 +1,9 @@
 ---
-name: manage-lark-codex
-description: 通过已安装的 Lark-Codex 应用查询和管理飞书任务看板、任务附件、Codex 执行及任务收尾；当用户要求操作该看板时使用，不用于一般项目开发或普通 Git 操作。
+name: manage-codexboard
+description: 通过已安装的 CodexBoard 应用查询和管理飞书任务看板、任务附件、Codex 执行及任务收尾；当用户要求操作该看板时使用，不用于一般项目开发或普通 Git 操作。
 ---
 
-# 管理 Lark-Codex 任务看板
+# 管理 CodexBoard 任务看板
 
 使用本技能的 [scripts/taskctl.sh](scripts/taskctl.sh) 调用应用内置 CLI。无需源码仓库、全局 Node 或 npm 构建。读取技能不会自动安装应用、授权会话或启动任务。
 
@@ -12,20 +12,20 @@ description: 通过已安装的 Lark-Codex 应用查询和管理飞书任务看�
 先从本次加载的 `SKILL.md` 路径定位同目录下的包装器，将 `TASKCTL` 设为它的实际绝对路径。下面的路径是占位符，替换后再执行；在项目原有工作目录调用，不要为了运行 CLI 切换到技能目录。
 
 ```sh
-TASKCTL="/实际安装目录/manage-lark-codex/scripts/taskctl.sh"
+TASKCTL="/实际安装目录/manage-codexboard/scripts/taskctl.sh"
 "$TASKCTL" --help
 "$TASKCTL" health
 "$TASKCTL" context
 "$TASKCTL" project list
 ```
 
-包装器依次寻找 `/Applications/Lark-Codex.app`、`~/Applications/Lark-Codex.app`，只调用所选应用内的 Node 和 taskctl。自定义安装位置可通过 `LARK_CODEX_APP_PATH` 指定；显式路径无效就报错，不回退到其他应用。默认数据目录是 `~/Library/Application Support/Lark-Codex/data`，显式 `LARK_CODEX_DATA_DIR` 覆盖该目录；仅未设置新变量时兼容旧版数据目录覆盖。覆盖变量不接受空值。旧版数据迁移由应用启动时处理，包装器不移动数据。
+包装器依次寻找 `/Applications/CodexBoard.app`、`~/Applications/CodexBoard.app`，只调用所选应用内的 Node 和 taskctl。自定义安装位置可通过 `CODEXBOARD_APP_PATH` 指定；显式路径无效就报错，不回退到其他应用。默认数据目录是 `~/Library/Application Support/CodexBoard/data`，显式 `CODEXBOARD_DATA_DIR` 覆盖该目录；仅未设置新变量时兼容旧版数据目录覆盖。覆盖变量不接受空值。旧版数据迁移由应用启动时处理，包装器不移动数据。
 
 ```sh
-LARK_CODEX_APP_PATH="/实际位置/Lark-Codex.app" "$TASKCTL" --help
+CODEXBOARD_APP_PATH="/实际位置/CodexBoard.app" "$TASKCTL" --help
 ```
 
-`--help` 无需后台运行，其余命令依赖已启动并配置好的 Lark-Codex。缺少应用或运行信息时，请用户从应用界面完成安装、启动或配置；包装器不启动服务，不搜索凭据。配置页面为「连接配置」「端口设置」「使用引导」。本技能可从首次启动提示或「应用设置 → Agent Skill」安装到 Codex。
+`--help` 无需后台运行，其余命令依赖已启动并配置好的 CodexBoard。缺少应用或运行信息时，请用户从应用界面完成安装、启动或配置；包装器不启动服务，不搜索凭据。配置页面为「连接配置」「端口设置」「使用引导」。本技能可从首次启动提示或「应用设置 → Agent Skill」安装到 Codex。
 
 CLI 自动读取私有运行时描述，不要读取或展示 `runtime.json`、完整 frpc.toml、App Secret、内部令牌或会话文件，也不直接读写 SQLite。`context` 使用调用者的工作目录；空匹配不表示项目不存在，应结合项目列表确认。项目从 Codex Desktop 同步，CLI 不能创建或注册项目。
 

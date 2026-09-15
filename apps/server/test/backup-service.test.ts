@@ -33,7 +33,7 @@ afterEach(() => {
 });
 
 function temporaryDirectory(): string {
-  const directory = mkdtempSync(join("/private/tmp", "lark-codex-backup-"));
+  const directory = mkdtempSync(join("/private/tmp", "codexboard-backup-"));
   temporaryDirectories.push(directory);
   return directory;
 }

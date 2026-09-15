@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { identityKey } from "@lark-codex/contracts";
+import { identityKey } from "@codexboard/contracts";
 import { CliAuthService } from "../src/modules/identity/cli-auth-service.js";
 import { IdentityService } from "../src/modules/identity/identity-service.js";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
@@ -37,15 +37,15 @@ afterEach(async () => {
 function setup(
   options: { readonly backupRunner?: BackupRunner; readonly adminPort?: number } = {},
 ) {
-  const root = mkdtempSync(join(tmpdir(), "lark-codex-admin-"));
+  const root = mkdtempSync(join(tmpdir(), "codexboard-admin-"));
   temporaryDirectories.push(root);
   const config = loadConfig({
-    LARK_CODEX_ENV: "test",
-    LARK_CODEX_WORKSPACE_ROOTS: root,
-    LARK_CODEX_DATA_DIR: root,
+    CODEXBOARD_ENV: "test",
+    CODEXBOARD_WORKSPACE_ROOTS: root,
+    CODEXBOARD_DATA_DIR: root,
     ...(options.adminPort === undefined
       ? {}
-      : { LARK_CODEX_ADMIN_PORT: String(options.adminPort) }),
+      : { CODEXBOARD_ADMIN_PORT: String(options.adminPort) }),
   });
   const database = initializeDatabase(":memory:");
   openDatabases.push(database);

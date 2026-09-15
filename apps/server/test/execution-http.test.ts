@@ -1,4 +1,4 @@
-import { identityKey } from "@lark-codex/contracts";
+import { identityKey } from "@codexboard/contracts";
 import { seedFeishuTestActor, TEST_FEISHU_IDENTITY } from "./helpers/identity.js";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -142,7 +142,7 @@ function cookieHeader(response: Awaited<ReturnType<FastifyInstance["inject"]>>):
 }
 
 async function setup(executor?: CodexExecutor, projectCount = 1) {
-  const root = mkdtempSync(join(tmpdir(), "lark-codex-execution-http-"));
+  const root = mkdtempSync(join(tmpdir(), "codexboard-execution-http-"));
   temporaryDirectories.push(root);
   const database = initializeDatabase(":memory:");
   openDatabases.push(database);
@@ -170,8 +170,8 @@ async function setup(executor?: CodexExecutor, projectCount = 1) {
     projects.push(project);
   }
   const config = loadConfig({
-    LARK_CODEX_ENV: "test",
-    LARK_CODEX_WORKSPACE_ROOTS: root,
+    CODEXBOARD_ENV: "test",
+    CODEXBOARD_WORKSPACE_ROOTS: root,
   });
   const app = createApp({
     config,

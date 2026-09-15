@@ -134,17 +134,17 @@ function dependencyFixture(t) {
     dependencies: { "smol-toml": "1.0.0" },
     devDependencies: { typescript: "1.0.0" },
   });
-  addPackage("apps/server", "@lark-codex/server", {
+  addPackage("apps/server", "@codexboard/server", {
     dependencies: { fastify: "1.0.0", "better-sqlite3": "1.0.0", ws: "1.0.0" },
   });
-  addPackage("apps/web", "@lark-codex/web", {
+  addPackage("apps/web", "@codexboard/web", {
     dependencies: { react: "1.0.0", mermaid: "1.0.0" },
   });
-  addPackage("packages/contracts", "@lark-codex/contracts", { dependencies: { zod: "1.0.0" } });
-  addPackage("packages/taskctl", "@lark-codex/taskctl", {
-    dependencies: { "@lark-codex/contracts": "1.0.0" },
+  addPackage("packages/contracts", "@codexboard/contracts", { dependencies: { zod: "1.0.0" } });
+  addPackage("packages/taskctl", "@codexboard/taskctl", {
+    dependencies: { "@codexboard/contracts": "1.0.0" },
   });
-  mkdirSync(join(fixture, "node_modules/@lark-codex"), { recursive: true });
+  mkdirSync(join(fixture, "node_modules/@codexboard"), { recursive: true });
   for (const workspace of workspaces) {
     const path = `node_modules/${packages[workspace].name}`;
     symlinkSync(join(fixture, workspace), join(fixture, path));
@@ -206,7 +206,7 @@ test("npm selects server/CLI/root dependencies and copied packages retain nested
       readFileSync(join(runtime, path, "LICENSE")),
       readFileSync(join(fixture, path, "LICENSE")),
     );
-  for (const name of ["react", "mermaid", "typescript", "@lark-codex"])
+  for (const name of ["react", "mermaid", "typescript", "@codexboard"])
     assert.equal(existsSync(join(runtime, "node_modules", name)), false);
 });
 

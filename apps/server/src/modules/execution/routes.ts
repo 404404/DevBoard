@@ -4,7 +4,7 @@ import {
   InteractionDecisionSchema,
   SubmitExecutionCommandSchema,
   TEMPORARY_PROJECT_ID,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { isAbsolute } from "node:path";
 import { z } from "zod";

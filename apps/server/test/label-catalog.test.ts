@@ -1,7 +1,7 @@
 import { seedFeishuTestActor } from "./helpers/identity.js";
 import { describe, expect, it, vi } from "vitest";
 
-import { identityKey, type PrincipalView } from "@lark-codex/contracts";
+import { identityKey, type PrincipalView } from "@codexboard/contracts";
 
 import { AppError } from "../src/app-error.js";
 import { initializeDatabase } from "../src/modules/database/index.js";

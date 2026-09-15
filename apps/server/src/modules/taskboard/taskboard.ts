@@ -5,7 +5,7 @@ import {
   IdentityKeySchema,
   UserIdentityRefSchema,
   type UserIdentityRef,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 import { createHash, randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
@@ -36,7 +36,7 @@ import {
   type TaskStatus,
   type TaskView,
   type UpdateTaskCommand,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 import { z } from "zod";
 
 import { AppError } from "../../app-error.js";

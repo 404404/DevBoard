@@ -91,7 +91,7 @@ describe("SQLite foundation", () => {
   });
 
   it("refuses to open a database path whose final node is a symbolic link", () => {
-    const directory = mkdtempSync(join(tmpdir(), "lark-codex-db-symlink-"));
+    const directory = mkdtempSync(join(tmpdir(), "codexboard-db-symlink-"));
     temporaryDirectories.push(directory);
     const outside = join(directory, "outside.sqlite");
     writeFileSync(outside, "do not open");
@@ -295,7 +295,7 @@ describe("SQLite foundation", () => {
   });
 
   it("uses WAL and private permissions for a file database", () => {
-    const directory = mkdtempSync(join(tmpdir(), "lark-codex-db-"));
+    const directory = mkdtempSync(join(tmpdir(), "codexboard-db-"));
     temporaryDirectories.push(directory);
     const filename = join(directory, "taskboard.sqlite");
     const database = track(initializeDatabase(filename));
@@ -496,7 +496,7 @@ describe("SQLite foundation", () => {
     runMigrations(database, CORE_MIGRATIONS.slice(0, 6));
     const allProjectId = "00000000-0000-4000-8000-0000000000a1";
     const temporaryProjectId = "00000000-0000-4000-8000-0000000000a2";
-    const larkProjectId = "10000000-0000-4000-8000-000000000001";
+    const boardProjectId = "10000000-0000-4000-8000-000000000001";
     const dockerProjectId = "10000000-0000-4000-8000-000000000002";
 
     database
@@ -507,12 +507,12 @@ describe("SQLite foundation", () => {
         ) VALUES (?, ?, ?, ?, 'codex', ?, ?, ?, ?)`,
       )
       .run(
-        larkProjectId,
-        "LCTB",
-        "lark-codex",
-        "/Users/test/Projects/lark-codex",
+        boardProjectId,
+        "BOARD",
+        "codexboard",
+        "/Users/test/Projects/codexboard",
         "47c1610d-f646-47f6-8fe3-28824096c2fe",
-        '["/Users/test/Projects/lark-codex"]',
+        '["/Users/test/Projects/codexboard"]',
         0,
         "2026-09-01T00:00:00.000Z",
       );
@@ -538,8 +538,8 @@ describe("SQLite foundation", () => {
       `INSERT INTO tasks (id, identifier, project_id, task_number, title, status)
       VALUES (?, ?, ?, ?, ?, 'todo')`,
     );
-    insertTask.run("task-lark-1", "LCTB-1", larkProjectId, 1, "任务一");
-    insertTask.run("task-lark-12", "LCTB-12", larkProjectId, 12, "任务十二");
+    insertTask.run("task-project-1", "BOARD-1", boardProjectId, 1, "任务一");
+    insertTask.run("task-project-12", "BOARD-12", boardProjectId, 12, "任务十二");
     insertTask.run("task-temp-1", "SYS-TEMP-1", temporaryProjectId, 1, "临时任务");
     insertTask.run(
       "task-docker-1000",
@@ -564,13 +564,13 @@ describe("SQLite foundation", () => {
     ).toEqual([
       { id: allProjectId, projectKey: null },
       { id: temporaryProjectId, projectKey: "TEMP" },
-      { id: larkProjectId, projectKey: "LACV" },
+      { id: boardProjectId, projectKey: "COPA" },
       { id: dockerProjectId, projectKey: "DOVO" },
     ]);
     expect(database.prepare("SELECT id, identifier FROM tasks ORDER BY id").all()).toEqual([
       { id: "task-docker-1000", identifier: "DOVO-1000" },
-      { id: "task-lark-1", identifier: "LACV-001" },
-      { id: "task-lark-12", identifier: "LACV-012" },
+      { id: "task-project-1", identifier: "COPA-001" },
+      { id: "task-project-12", identifier: "COPA-012" },
       { id: "task-temp-1", identifier: "TEMP-001" },
     ]);
     expect(
@@ -730,7 +730,7 @@ describe("SQLite foundation", () => {
   });
 
   it("creates a consistent pre-migration backup before upgrading an existing database", async () => {
-    const directory = mkdtempSync(join("/private/tmp", "lark-codex-migration-backup-"));
+    const directory = mkdtempSync(join("/private/tmp", "codexboard-migration-backup-"));
     temporaryDirectories.push(directory);
     const database = track(openDatabase(join(directory, "taskboard.sqlite")));
     runMigrations(database, CORE_MIGRATIONS.slice(0, 4));
@@ -897,7 +897,7 @@ describe("SQLite foundation", () => {
   });
 
   it("does not start a migration until its pre-migration backup is durably published", async () => {
-    const directory = mkdtempSync(join("/private/tmp", "lark-codex-migration-order-"));
+    const directory = mkdtempSync(join("/private/tmp", "codexboard-migration-order-"));
     temporaryDirectories.push(directory);
     const events: string[] = [];
     const database = track(

@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { assertDistributionClean } from "./release-macos.mjs";
 
 function fixture(t) {
-  const root = mkdtempSync(join(tmpdir(), "lark-release-scan-"));
+  const root = mkdtempSync(join(tmpdir(), "codexboard-release-scan-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   return root;
 }
@@ -36,8 +36,8 @@ test("release rejects compiler metadata containing the local home directory", (t
 test("release preserves internal workspace links and rejects links outside the application", (t) => {
   const root = fixture(t);
   mkdirSync(join(root, "runtime/packages/contracts"), { recursive: true });
-  mkdirSync(join(root, "runtime/node_modules/@lark-codex"), { recursive: true });
-  const link = join(root, "runtime/node_modules/@lark-codex/contracts");
+  mkdirSync(join(root, "runtime/node_modules/@codexboard"), { recursive: true });
+  const link = join(root, "runtime/node_modules/@codexboard/contracts");
   symlinkSync("../../packages/contracts", link);
   assert.doesNotThrow(() => assertDistributionClean(root));
   rmSync(link);

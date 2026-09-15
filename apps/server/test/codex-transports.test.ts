@@ -79,7 +79,7 @@ describe("Codex transports", () => {
   });
 
   it("uses one JSON-RPC message per WebSocket frame over a Unix socket", async () => {
-    const directory = mkdtempSync(join(tmpdir(), "lark-codex-ws-"));
+    const directory = mkdtempSync(join(tmpdir(), "codexboard-ws-"));
     socketDirectories.push(directory);
     const socketPath = join(directory, "app-server.sock");
     const server = createServer();
@@ -120,7 +120,7 @@ describe("Codex transports", () => {
   });
 
   it("authenticates a loopback TCP WebSocket with a private capability token", async () => {
-    const directory = mkdtempSync(join(tmpdir(), "lark-codex-ws-token-"));
+    const directory = mkdtempSync(join(tmpdir(), "codexboard-ws-token-"));
     socketDirectories.push(directory);
     const tokenFile = join(directory, "codex-token");
     writeFileSync(tokenFile, "capability-token\n", { mode: 0o600 });

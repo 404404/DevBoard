@@ -12,7 +12,7 @@ import type {
   TaskRelationCandidate,
   TaskStatus,
   TaskView,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUpToLine,

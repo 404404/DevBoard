@@ -4,15 +4,16 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-const dataDirectory = mkdtempSync(join(tmpdir(), "lark-codex-e2e-"));
+const dataDirectory = mkdtempSync(join(tmpdir(), "codexboard-e2e-"));
 const temporaryProjectRoot = join(dataDirectory, "temporary-project-root");
 mkdirSync(temporaryProjectRoot);
 const fakeCodexCommand = resolve("scripts/fake-codex-app-server.mjs");
-// Both naming generations may be configured in a developer's shell. Keep
+// All naming generations may be configured in a developer's shell. Keep
 // deployment endpoints, credentials and directories out of synthetic tests.
 const testEnvironment = Object.fromEntries(
   Object.entries(process.env).filter(
-    ([key]) => !key.startsWith("LARK_CODEX_") && !key.startsWith("LARK_TASKBOARD_"),
+    ([key]) =>
+      !["CODEXBOARD_", "LARK_CODEX_", "LARK_TASKBOARD_"].some((prefix) => key.startsWith(prefix)),
   ),
 );
 
@@ -69,21 +70,21 @@ try {
       env: {
         ...testEnvironment,
         FAKE_CODEX_HOME: fakeCodexHome,
-        LARK_CODEX_ENV: "test",
-        LARK_CODEX_AUTH_MODE: "development",
-        LARK_CODEX_HOST: "127.0.0.1",
-        LARK_CODEX_ADMIN_HOST: "127.0.0.1",
-        LARK_CODEX_CODEX_TRANSPORT: "managed-unix",
-        LARK_CODEX_DATA_DIR: dataDirectory,
-        LARK_CODEX_TEMPORARY_PROJECT_ROOT: temporaryProjectRoot,
-        LARK_CODEX_WORKSPACE_ROOTS: dataDirectory,
-        LARK_CODEX_CODEX_COMMAND: fakeCodexCommand,
-        LARK_CODEX_PORT: String(publicPort),
-        LARK_CODEX_ADMIN_PORT: String(adminPort),
-        LARK_CODEX_ALLOWED_HOSTS: `127.0.0.1:${publicPort},localhost:${publicPort}`,
-        LARK_CODEX_ORIGIN: `http://127.0.0.1:${webPort}`,
-        LARK_CODEX_WEB_PORT: String(webPort),
-        LARK_CODEX_WEB_API_TARGET: `http://127.0.0.1:${publicPort}`,
+        CODEXBOARD_ENV: "test",
+        CODEXBOARD_AUTH_MODE: "development",
+        CODEXBOARD_HOST: "127.0.0.1",
+        CODEXBOARD_ADMIN_HOST: "127.0.0.1",
+        CODEXBOARD_CODEX_TRANSPORT: "managed-unix",
+        CODEXBOARD_DATA_DIR: dataDirectory,
+        CODEXBOARD_TEMPORARY_PROJECT_ROOT: temporaryProjectRoot,
+        CODEXBOARD_WORKSPACE_ROOTS: dataDirectory,
+        CODEXBOARD_CODEX_COMMAND: fakeCodexCommand,
+        CODEXBOARD_PORT: String(publicPort),
+        CODEXBOARD_ADMIN_PORT: String(adminPort),
+        CODEXBOARD_ALLOWED_HOSTS: `127.0.0.1:${publicPort},localhost:${publicPort}`,
+        CODEXBOARD_ORIGIN: `http://127.0.0.1:${webPort}`,
+        CODEXBOARD_WEB_PORT: String(webPort),
+        CODEXBOARD_WEB_API_TARGET: `http://127.0.0.1:${publicPort}`,
         FAKE_CODEX_INTERRUPT_DELAY_MS: "1500",
       },
     },

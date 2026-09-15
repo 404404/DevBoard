@@ -19,7 +19,7 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { createSkillManager } from "./skill-manager.mjs";
 
-const NAME = "manage-lark-codex";
+const NAME = "manage-codexboard";
 const digest = (value) => createHash("sha256").update(value).digest("hex");
 function write(path, value, mode = 0o644) {
   mkdirSync(dirname(path), { recursive: true });
@@ -28,12 +28,12 @@ function write(path, value, mode = 0o644) {
 }
 
 function fixture(t, overrides = {}) {
-  const directory = realpathSync(mkdtempSync(join(tmpdir(), "lark-skill-manager-")));
+  const directory = realpathSync(mkdtempSync(join(tmpdir(), "codexboard-skill-manager-")));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   const home = join(directory, "home");
   mkdirSync(home);
   const runtimeRoot = join(directory, "runtime");
-  const appData = join(home, "Library/Application Support/Lark-Codex");
+  const appData = join(home, "Library/Application Support/CodexBoard");
   const target = join(home, ".agents/skills", NAME);
   const source = join(runtimeRoot, "skills", NAME);
   const stateFile = join(appData, "skill-install-state.json");
@@ -107,7 +107,7 @@ function fixture(t, overrides = {}) {
     staging: () =>
       existsSync(dirname(target))
         ? readdirSync(dirname(target)).filter((name) =>
-            name.startsWith(".manage-lark-codex.install-"),
+            name.startsWith(".manage-codexboard.install-"),
           )
         : [],
   };
@@ -205,10 +205,10 @@ test("actual content, modes, extra entries and a rewritten receipt each make own
     (f) => write(join(f.target, "extra.txt"), "extra"),
     (f) => mkdirSync(join(f.target, "extra-directory")),
     (f) => chmodSync(join(f.target, "scripts"), 0o755),
-    (f) => write(join(f.target, ".lark-codex-skill.json"), "{}"),
+    (f) => write(join(f.target, ".codexboard-skill.json"), "{}"),
     (f) => {
       write(join(f.target, "SKILL.md"), "user edit");
-      const path = join(f.target, ".lark-codex-skill.json");
+      const path = join(f.target, ".codexboard-skill.json");
       const value = JSON.parse(readFileSync(path));
       value.files.find((file) => file.path === "SKILL.md").sha256 = digest("user edit");
       write(path, JSON.stringify(value));
@@ -326,7 +326,7 @@ test("pre-rename Skill directories remain untouched and block duplicate installa
 test("a legacy receipt owner at the renamed target remains protected as modified", async (t) => {
   const f = fixture(t);
   await f.manager.install();
-  const receiptFile = join(f.target, ".lark-codex-skill.json");
+  const receiptFile = join(f.target, ".codexboard-skill.json");
   const receipt = JSON.parse(readFileSync(receiptFile));
   receipt.owner = "cn.rocyan.taskboard.desktop";
   const bytes = JSON.stringify(receipt) + "\n";

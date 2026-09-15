@@ -1,4 +1,4 @@
-import type { JobStatus } from "@lark-codex/contracts";
+import type { JobStatus } from "@codexboard/contracts";
 import { isJobActive } from "./job-status";
 
 export function executionAvailability(input: {

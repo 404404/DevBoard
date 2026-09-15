@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
-import { identityKey } from "@lark-codex/contracts";
+import { identityKey } from "@codexboard/contracts";
 import { z } from "zod";
 import { AppError } from "../../app-error.js";
 import { withTransaction, type SqliteDatabase } from "../database/index.js";

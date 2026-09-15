@@ -3,7 +3,7 @@ import {
   type BoardView,
   type TaskView,
   type TaskWorkspaceView,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 
 export interface TaskMoveCacheSnapshot {

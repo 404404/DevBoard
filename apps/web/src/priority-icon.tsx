@@ -1,4 +1,4 @@
-import type { TaskPriority } from "@lark-codex/contracts";
+import type { TaskPriority } from "@codexboard/contracts";
 import { priorityBarStates } from "./task-create-model";
 
 export function PriorityIcon({

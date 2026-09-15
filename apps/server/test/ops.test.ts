@@ -18,15 +18,15 @@ afterEach(() => {
 
 describe("operations CLI", () => {
   it("creates and verifies a backup with stable JSON output", async () => {
-    const dataDirectory = mkdtempSync(join(tmpdir(), "lark-codex-ops-"));
+    const dataDirectory = mkdtempSync(join(tmpdir(), "codexboard-ops-"));
     temporaryDirectories.push(dataDirectory);
     initializeDatabase(join(dataDirectory, "taskboard.sqlite")).close();
     const destination = join(dataDirectory, "backups", "cli-backup");
     const lines: string[] = [];
     const environment = {
-      LARK_CODEX_ENV: "test",
-      LARK_CODEX_DATA_DIR: dataDirectory,
-      LARK_CODEX_WORKSPACE_ROOTS: dataDirectory,
+      CODEXBOARD_ENV: "test",
+      CODEXBOARD_DATA_DIR: dataDirectory,
+      CODEXBOARD_WORKSPACE_ROOTS: dataDirectory,
     };
 
     expect(
@@ -61,9 +61,9 @@ describe("operations CLI", () => {
     database.close();
     const destination = join(dataDirectory, "backups", "audit");
     const environment = {
-      LARK_CODEX_ENV: "test",
-      LARK_CODEX_DATA_DIR: dataDirectory,
-      LARK_CODEX_WORKSPACE_ROOTS: dataDirectory,
+      CODEXBOARD_ENV: "test",
+      CODEXBOARD_DATA_DIR: dataDirectory,
+      CODEXBOARD_WORKSPACE_ROOTS: dataDirectory,
     };
     expect(await runOperations(["backup", "--output", destination], environment, () => {})).toBe(0);
     const snapshot = join(destination, "taskboard.sqlite");
@@ -90,7 +90,7 @@ describe("operations CLI", () => {
   });
 
   it("refuses an offline CLI backup while restore owns the data-directory lock", async () => {
-    const dataDirectory = mkdtempSync(join(tmpdir(), "lark-codex-ops-locked-"));
+    const dataDirectory = mkdtempSync(join(tmpdir(), "codexboard-ops-locked-"));
     temporaryDirectories.push(dataDirectory);
     initializeDatabase(join(dataDirectory, "taskboard.sqlite")).close();
     const lock = acquireDataDirectoryLock(dataDirectory, "restore-test");
@@ -100,9 +100,9 @@ describe("operations CLI", () => {
         await runOperations(
           ["backup"],
           {
-            LARK_CODEX_ENV: "test",
-            LARK_CODEX_DATA_DIR: dataDirectory,
-            LARK_CODEX_WORKSPACE_ROOTS: dataDirectory,
+            CODEXBOARD_ENV: "test",
+            CODEXBOARD_DATA_DIR: dataDirectory,
+            CODEXBOARD_WORKSPACE_ROOTS: dataDirectory,
           },
           (line) => lines.push(line),
         ),
@@ -120,7 +120,7 @@ describe("operations CLI", () => {
   it.each([47824, 80])(
     "routes backup through the protected local API on port %s while the service is running",
     async (adminPort) => {
-      const dataDirectory = mkdtempSync(join(tmpdir(), "lark-codex-ops-online-"));
+      const dataDirectory = mkdtempSync(join(tmpdir(), "codexboard-ops-online-"));
       temporaryDirectories.push(dataDirectory);
       mkdirSync(join(dataDirectory, "run"));
       writeFileSync(
@@ -142,10 +142,10 @@ describe("operations CLI", () => {
         await runOperations(
           ["backup"],
           {
-            LARK_CODEX_ENV: "test",
-            LARK_CODEX_DATA_DIR: dataDirectory,
-            LARK_CODEX_WORKSPACE_ROOTS: dataDirectory,
-            LARK_CODEX_ADMIN_PORT: String(adminPort),
+            CODEXBOARD_ENV: "test",
+            CODEXBOARD_DATA_DIR: dataDirectory,
+            CODEXBOARD_WORKSPACE_ROOTS: dataDirectory,
+            CODEXBOARD_ADMIN_PORT: String(adminPort),
           },
           (line) => lines.push(line),
           {
@@ -203,7 +203,7 @@ describe("operations CLI", () => {
     "http://127.0.0.1:80/?q=1",
     "http://127.0.0.1:80/#fragment",
   ])("rejects a noncanonical admin runtime address %s", async (localAdminBaseUrl) => {
-    const dataDirectory = mkdtempSync(join(tmpdir(), "lark-codex-ops-admin-url-"));
+    const dataDirectory = mkdtempSync(join(tmpdir(), "codexboard-ops-admin-url-"));
     temporaryDirectories.push(dataDirectory);
     mkdirSync(join(dataDirectory, "run"));
     writeFileSync(
@@ -223,10 +223,10 @@ describe("operations CLI", () => {
       await runOperations(
         ["backup"],
         {
-          LARK_CODEX_ENV: "test",
-          LARK_CODEX_DATA_DIR: dataDirectory,
-          LARK_CODEX_WORKSPACE_ROOTS: dataDirectory,
-          LARK_CODEX_ADMIN_PORT: "80",
+          CODEXBOARD_ENV: "test",
+          CODEXBOARD_DATA_DIR: dataDirectory,
+          CODEXBOARD_WORKSPACE_ROOTS: dataDirectory,
+          CODEXBOARD_ADMIN_PORT: "80",
         },
         (line) => lines.push(line),
         {
@@ -240,7 +240,7 @@ describe("operations CLI", () => {
   });
 
   it("falls back to the kernel lock when a stale runtime descriptor is unreachable", async () => {
-    const dataDirectory = mkdtempSync(join(tmpdir(), "lark-codex-ops-stale-runtime-"));
+    const dataDirectory = mkdtempSync(join(tmpdir(), "codexboard-ops-stale-runtime-"));
     temporaryDirectories.push(dataDirectory);
     initializeDatabase(join(dataDirectory, "taskboard.sqlite")).close();
     mkdirSync(join(dataDirectory, "run"), { recursive: true });
@@ -262,9 +262,9 @@ describe("operations CLI", () => {
       await runOperations(
         ["backup"],
         {
-          LARK_CODEX_ENV: "test",
-          LARK_CODEX_DATA_DIR: dataDirectory,
-          LARK_CODEX_WORKSPACE_ROOTS: dataDirectory,
+          CODEXBOARD_ENV: "test",
+          CODEXBOARD_DATA_DIR: dataDirectory,
+          CODEXBOARD_WORKSPACE_ROOTS: dataDirectory,
         },
         (line) => lines.push(line),
         { fetch: async () => Promise.reject(new TypeError("connection refused")) },

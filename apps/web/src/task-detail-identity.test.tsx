@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { PrincipalView, TaskView } from "@lark-codex/contracts";
+import type { PrincipalView, TaskView } from "@codexboard/contracts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import { TaskDetail } from "./task-detail";

@@ -13,7 +13,7 @@ import type {
   RemoteThread,
   RemoteThreadSummary,
   SessionView,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 import { BoardPage } from "./board";
 import { listProjects } from "./api";
 import {

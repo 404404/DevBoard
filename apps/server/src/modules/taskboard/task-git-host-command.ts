@@ -1,4 +1,4 @@
-import { GitOriginLookupResultSchema } from "@lark-codex/contracts";
+import { GitOriginLookupResultSchema } from "@codexboard/contracts";
 import type { GitOriginReader } from "../project-registry/git-origin.js";
 import { z } from "zod";
 import { AppError } from "../../app-error.js";

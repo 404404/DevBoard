@@ -1,4 +1,4 @@
-import { ErrorEnvelopeSchema } from "@lark-codex/contracts";
+import { ErrorEnvelopeSchema } from "@codexboard/contracts";
 import { z } from "zod";
 import { ApiError } from "./api";
 

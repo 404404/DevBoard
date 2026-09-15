@@ -6,7 +6,7 @@ import {
   FeishuIdentityRefSchema,
   RuntimeDescriptorSchema,
   type RuntimeDescriptor,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 
 import { z } from "zod";
 import {
@@ -23,7 +23,7 @@ import {
 } from "./auth.js";
 import { runtimeDataDirectory } from "./runtime-path.js";
 
-export const TASKCTL_PACKAGE_NAME = "@lark-codex/taskctl";
+export const TASKCTL_PACKAGE_NAME = "@codexboard/taskctl";
 
 export interface TaskctlDependencies {
   readonly readRuntimeDescriptor: () => Promise<RuntimeDescriptor>;

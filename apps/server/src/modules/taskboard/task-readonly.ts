@@ -1,4 +1,4 @@
-import type { TaskStatus } from "@lark-codex/contracts";
+import type { TaskStatus } from "@codexboard/contracts";
 import { AppError } from "../../app-error.js";
 
 export function assertTaskEditable(task: { readonly status: TaskStatus }): void {

@@ -16,7 +16,7 @@ import {
   UpdateCommentCommandSchema,
   TEMPORARY_PROJECT_ID,
   TaskLifecycleCommandSchema,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 
@@ -123,7 +123,7 @@ export function registerTaskboardRoutes(
     const session = authenticate(request, config, identityService);
     const { projectId } = ProjectParamsSchema.parse(request.params);
     const optionsView = taskboard.readTaskCreationOptions(projectId, session.actor, () => [], {
-      attachmentMaxBytes: config.LARK_CODEX_ATTACHMENT_MAX_BYTES,
+      attachmentMaxBytes: config.CODEXBOARD_ATTACHMENT_MAX_BYTES,
     });
     if (projectId === TEMPORARY_PROJECT_ID) {
       return { data: optionsView };
@@ -317,7 +317,7 @@ export function registerTaskboardRoutes(
   app.post(
     "/api/v1/tasks/:taskId/attachments",
     {
-      bodyLimit: config.LARK_CODEX_ATTACHMENT_MAX_BYTES,
+      bodyLimit: config.CODEXBOARD_ATTACHMENT_MAX_BYTES,
       onRequest: (request, _reply, done) => {
         try {
           const context = mutationContext(request, config, identityService);

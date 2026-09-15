@@ -9,7 +9,7 @@ import {
   ExchangeFeishuCodeSchema,
   SessionViewSchema,
   type SessionView,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 import type { FastifyInstance, FastifyReply } from "fastify";
 
 import type { AppConfig } from "../../config.js";
@@ -31,18 +31,23 @@ export function sessionCookieNames(
   config: AppConfig,
   cookies?: Readonly<Record<string, string | undefined>>,
 ): CookieNames {
-  const prefix = new URL(config.LARK_CODEX_ORIGIN).protocol === "https:" ? "__Host-" : "";
+  const prefix = new URL(config.CODEXBOARD_ORIGIN).protocol === "https:" ? "__Host-" : "";
   const current = {
-    session: `${prefix}lark_codex_session`,
-    csrf: `${prefix}lark_codex_csrf`,
+    session: `${prefix}codexboard_session`,
+    csrf: `${prefix}codexboard_csrf`,
   };
-  // Do not combine a new identity with a legacy CSRF token. Even an empty new
-  // cookie selects the new pair and must fail normal authentication checks.
-  if (cookies && !Object.hasOwn(cookies, current.session) && !Object.hasOwn(cookies, current.csrf))
-    return {
-      session: `${prefix}lark_taskboard_session`,
-      csrf: `${prefix}lark_taskboard_csrf`,
-    };
+  // Select a whole generation; even an empty newer cookie prevents fallback.
+  if (
+    cookies &&
+    !Object.hasOwn(cookies, current.session) &&
+    !Object.hasOwn(cookies, current.csrf)
+  ) {
+    for (const brand of ["lark_codex", "lark_taskboard"]) {
+      const previous = { session: `${prefix}${brand}_session`, csrf: `${prefix}${brand}_csrf` };
+      if (Object.hasOwn(cookies, previous.session) || Object.hasOwn(cookies, previous.csrf))
+        return previous;
+    }
+  }
   return current;
 }
 
@@ -52,8 +57,8 @@ function setSessionCookies(
   grant: SessionGrant,
 ): SessionView {
   const names = sessionCookieNames(config);
-  const secure = new URL(config.LARK_CODEX_ORIGIN).protocol === "https:";
-  const maxAge = config.LARK_CODEX_SESSION_TTL_SECONDS;
+  const secure = new URL(config.CODEXBOARD_ORIGIN).protocol === "https:";
+  const maxAge = config.CODEXBOARD_SESSION_TTL_SECONDS;
   const common = {
     path: "/",
     secure,
@@ -79,7 +84,7 @@ function setSessionCookies(
 
 export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRoutesOptions): void {
   const { config, service, cliAuth, webAccounts } = options;
-  const webLoginSecure = new URL(config.LARK_CODEX_ORIGIN).protocol === "https:";
+  const webLoginSecure = new URL(config.CODEXBOARD_ORIGIN).protocol === "https:";
   app.post("/api/v1/auth/web/login", async (request, reply) => {
     reply.header("Cache-Control", "no-store");
     if (!webLoginSecure || !webAccounts.enabled())
@@ -91,14 +96,14 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
   });
   const names = sessionCookieNames(config);
   const jsapi =
-    config.LARK_CODEX_AUTH_MODE === "feishu" &&
-    config.LARK_CODEX_FEISHU_APP_ID &&
-    config.LARK_CODEX_FEISHU_APP_SECRET
+    config.CODEXBOARD_AUTH_MODE === "feishu" &&
+    config.CODEXBOARD_FEISHU_APP_ID &&
+    config.CODEXBOARD_FEISHU_APP_SECRET
       ? new FeishuJsapiService({
-          appId: config.LARK_CODEX_FEISHU_APP_ID,
-          appSecret: config.LARK_CODEX_FEISHU_APP_SECRET,
-          apiBaseUrl: config.LARK_CODEX_FEISHU_API_BASE_URL,
-          origin: config.LARK_CODEX_ORIGIN,
+          appId: config.CODEXBOARD_FEISHU_APP_ID,
+          appSecret: config.CODEXBOARD_FEISHU_APP_SECRET,
+          apiBaseUrl: config.CODEXBOARD_FEISHU_API_BASE_URL,
+          origin: config.CODEXBOARD_ORIGIN,
         })
       : null;
   app.get("/api/v1/auth/feishu/jsapi-config", async (request, reply) => {
@@ -150,20 +155,20 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
     reply.header("Cache-Control", "no-store");
     return {
       data: AuthBootstrapSchema.parse({
-        authMode: config.LARK_CODEX_AUTH_MODE,
+        authMode: config.CODEXBOARD_AUTH_MODE,
         webLoginEnabled: webLoginSecure && webAccounts.enabled(),
         feishuAppId:
-          config.LARK_CODEX_AUTH_MODE === "feishu" ? config.LARK_CODEX_FEISHU_APP_ID : null,
+          config.CODEXBOARD_AUTH_MODE === "feishu" ? config.CODEXBOARD_FEISHU_APP_ID : null,
       }),
     };
   });
 
-  if (config.LARK_CODEX_AUTH_MODE === "development") {
+  if (config.CODEXBOARD_AUTH_MODE === "development") {
     app.post("/api/v1/auth/development", async (_request, reply) => {
       const grant = await service.loginDevelopment();
       await reply.code(201).send({ data: setSessionCookies(reply, config, grant) });
     });
-  } else if (config.LARK_CODEX_AUTH_MODE === "feishu") {
+  } else if (config.CODEXBOARD_AUTH_MODE === "feishu") {
     app.post("/api/v1/auth/feishu/exchange", async (request, reply) => {
       const command = ExchangeFeishuCodeSchema.parse(request.body);
       const grant = await service.exchangeCode(command.code);
@@ -199,12 +204,14 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
     );
     service.revoke(context);
 
-    const secure = new URL(config.LARK_CODEX_ORIGIN).protocol === "https:";
+    const secure = new URL(config.CODEXBOARD_ORIGIN).protocol === "https:";
     reply.clearCookie(names.session, { path: "/", secure, sameSite: "lax" });
     reply.clearCookie(names.csrf, { path: "/", secure, sameSite: "lax" });
-    const legacy = sessionCookieNames(config, {});
-    reply.clearCookie(legacy.session, { path: "/", secure, sameSite: "lax" });
-    reply.clearCookie(legacy.csrf, { path: "/", secure, sameSite: "lax" });
+    for (const brand of ["lark_codex", "lark_taskboard"]) {
+      const prefix = secure ? "__Host-" : "";
+      reply.clearCookie(`${prefix}${brand}_session`, { path: "/", secure, sameSite: "lax" });
+      reply.clearCookie(`${prefix}${brand}_csrf`, { path: "/", secure, sameSite: "lax" });
+    }
     await reply.code(204).send();
   });
 }

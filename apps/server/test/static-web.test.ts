@@ -20,7 +20,7 @@ afterEach(async () => {
 
 describe("production web hosting", () => {
   it("serves only the root and built assets without masking probes as SPA HTML", async () => {
-    const webRoot = mkdtempSync(join(tmpdir(), "lark-codex-web-"));
+    const webRoot = mkdtempSync(join(tmpdir(), "codexboard-web-"));
     directories.push(webRoot);
     mkdirSync(join(webRoot, "assets"));
     writeFileSync(join(webRoot, "index.html"), "<!doctype html><title>生产看板</title>");
@@ -30,15 +30,15 @@ describe("production web hosting", () => {
     writeFileSync(codexTokenFile, "test-token\n");
     chmodSync(codexTokenFile, 0o600);
     const config = loadConfig({
-      LARK_CODEX_ENV: "production",
-      LARK_CODEX_AUTH_MODE: "feishu",
-      LARK_CODEX_FEISHU_APP_ID: "cli_test_app",
-      LARK_CODEX_FEISHU_APP_SECRET: "test-secret",
-      LARK_CODEX_ORIGIN: "https://tasks.example.com",
-      LARK_CODEX_ALLOWED_HOSTS: "tasks.example.com",
-      LARK_CODEX_WEB_ROOT: webRoot,
-      LARK_CODEX_CODEX_TRANSPORT: "websocket",
-      LARK_CODEX_CODEX_TOKEN_FILE: codexTokenFile,
+      CODEXBOARD_ENV: "production",
+      CODEXBOARD_AUTH_MODE: "feishu",
+      CODEXBOARD_FEISHU_APP_ID: "cli_test_app",
+      CODEXBOARD_FEISHU_APP_SECRET: "test-secret",
+      CODEXBOARD_ORIGIN: "https://tasks.example.com",
+      CODEXBOARD_ALLOWED_HOSTS: "tasks.example.com",
+      CODEXBOARD_WEB_ROOT: webRoot,
+      CODEXBOARD_CODEX_TRANSPORT: "websocket",
+      CODEXBOARD_CODEX_TOKEN_FILE: codexTokenFile,
     });
     const app = createApp({ config, database: initializeDatabase(":memory:") });
     apps.push(app);

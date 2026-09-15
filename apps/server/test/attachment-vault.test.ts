@@ -15,7 +15,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { CreateTaskCommandSchema, type PrincipalView } from "@lark-codex/contracts";
+import { CreateTaskCommandSchema, type PrincipalView } from "@codexboard/contracts";
 
 import { AttachmentService, AttachmentVault } from "../src/modules/attachments/index.js";
 import { initializeDatabase, type SqliteDatabase } from "../src/modules/database/index.js";
@@ -41,7 +41,7 @@ afterEach(() => {
 });
 
 function setup(maxBytes = 1_024) {
-  const root = mkdtempSync(join(tmpdir(), "lark-codex-vault-"));
+  const root = mkdtempSync(join(tmpdir(), "codexboard-vault-"));
   temporaryDirectories.push(root);
   return { root, vault: new AttachmentVault({ rootDirectory: root, maxBytes }) };
 }

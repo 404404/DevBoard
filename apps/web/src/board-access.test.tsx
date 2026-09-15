@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ProjectViewSchema, SessionViewSchema } from "@lark-codex/contracts";
+import { ProjectViewSchema, SessionViewSchema } from "@codexboard/contracts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, expect, it, vi } from "vitest";
 import { BoardPage } from "./board";

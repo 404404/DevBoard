@@ -167,10 +167,10 @@ fn show_main_window(app: &tauri::AppHandle) {
 fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show-main", "显示主窗口", true, None::<&str>)?;
     let update = MenuItem::with_id(app, "check-updates", "检查更新…", true, None::<&str>)?;
-    let exit = MenuItem::with_id(app, "quit-app", "退出 Lark-Codex", true, None::<&str>)?;
+    let exit = MenuItem::with_id(app, "quit-app", "退出 CodexBoard", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &update, &exit])?;
-    let mut tray = TrayIconBuilder::with_id("lark-codex")
-        .tooltip("Lark-Codex")
+    let mut tray = TrayIconBuilder::with_id("codexboard")
+        .tooltip("CodexBoard")
         .menu(&menu)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show-main" => show_main_window(app),
@@ -191,13 +191,13 @@ fn main() {
     if let Some(code) = skills::handle_commit_cli() {
         std::process::exit(code);
     }
-    let attempts = if std::env::args().any(|arg| arg == "--lark-codex-updated") { 300 } else { 1 };
+    let attempts = if std::env::args().any(|arg| ["--codexboard-updated", "--lark-codex-updated"].contains(&arg.as_str())) { 300 } else { 1 };
     let prepared = std::env::var_os("HOME")
         .ok_or_else(|| "无法定位当前用户目录".to_string())
         .and_then(|home| app_data::open(&PathBuf::from(home), attempts));
     let (data, lock) = prepared.unwrap_or_else(|message| {
         let _ = Command::new("/usr/bin/osascript")
-            .args(["-e", "on run argv\n display alert \"无法启动 Lark-Codex\" message (item 1 of argv) as critical\nend run", &message])
+            .args(["-e", "on run argv\n display alert \"无法启动 CodexBoard\" message (item 1 of argv) as critical\nend run", &message])
             .stdout(Stdio::null()).stderr(Stdio::null()).status();
         std::process::exit(1);
     });
@@ -213,7 +213,7 @@ fn main() {
   app.manage(Controller{child:Mutex::new(child),input:Mutex::new(input),snapshot,quitting:AtomicBool::new(false),installing:AtomicBool::new(false),update_stop_ack,_lock:lock});Ok(())
  }).invoke_handler(tauri::generate_handler![snapshot,control,open_board,updater::update_status,updater::check_updates,updater::download_update,updater::install_update,skills::skill_status,skills::install_skill,skills::dismiss_skill_offer]).on_window_event(|window,event|{if let tauri::WindowEvent::CloseRequested{api,..}=event{api.prevent_close();let _ = window.hide();
     #[cfg(target_os = "macos")]
-    let _ = window.app_handle().set_activation_policy(tauri::ActivationPolicy::Accessory);}}).build(tauri::generate_context!()).expect("无法启动 Lark-Codex");
+    let _ = window.app_handle().set_activation_policy(tauri::ActivationPolicy::Accessory);}}).build(tauri::generate_context!()).expect("无法启动 CodexBoard");
     app.run(|app, event| {
         #[cfg(target_os = "macos")]
         if let tauri::RunEvent::Reopen { .. } = &event {

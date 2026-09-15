@@ -1,4 +1,4 @@
-import type { SessionView } from "@lark-codex/contracts";
+import type { SessionView } from "@codexboard/contracts";
 import { ApiError, loginDevelopment, loginFeishu, readAuthBootstrap, readSession } from "./api";
 import { requestFeishuAuthCode } from "./feishu";
 

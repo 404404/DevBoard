@@ -1,4 +1,4 @@
-import type { DashboardView, TaskView } from "@lark-codex/contracts";
+import type { DashboardView, TaskView } from "@codexboard/contracts";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";

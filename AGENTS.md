@@ -1,8 +1,8 @@
-# Lark-Codex：Agent 安装与使用指南
+# CodexBoard：Agent 安装与使用指南
 
 [面向用户的 README](README.md)
 
-本指南仅在**用户请求安装、配置、排障或使用 Lark-Codex** 时适用。读取本文件本身不触发安装、配置修改或任务执行，也不要求处理源码的 Agent 先安装应用；既有上级及宿主规则继续适用。
+本指南仅在**用户请求安装、配置、排障或使用 CodexBoard** 时适用。读取本文件本身不触发安装、配置修改或任务执行，也不要求处理源码的 Agent 先安装应用；既有上级及宿主规则继续适用。
 
 以下操作针对已发布的 macOS 应用，无需克隆源码或安装开发环境。命令与界面以实际安装版本为准；命令不匹配时先按第 5 节定位包装器并查看帮助，不要猜测接口。
 
@@ -10,7 +10,7 @@
 
 - 根据用户当前请求推进安装或操作；可逆准备和只读检查不必重复确认。只有缺少具体决定或授权时才询问。
 - 保留现有数据、配置和未完成任务。不要退出 Codex Desktop、接管已有 Codex 会话，或为验证安装而启动真实任务。
-- 优先通过 Lark-Codex 的「连接配置」「端口设置」「使用引导」操作；当前没有对外承诺的无头配置 CLI。
+- 优先通过 CodexBoard 的「连接配置」「端口设置」「使用引导」操作；当前没有对外承诺的无头配置 CLI。
 - App Secret、完整 frpc.toml（可能含隧道 token）、CLI 会话文件、内部令牌和 `runtime.json` 不得输出到对话、日志或 Issue。请用户在应用界面输入凭据；不要索要密码、复制飞书客户端 token 或关闭脱敏。
 - 创建任务、评论、执行任务、响应审批、删除数据等写操作必须符合用户请求。CLI 写操作仍使用真实飞书用户配对授权；Web 登录使用本机创建的账号身份，不能作为 CLI 配对凭据。安装授权本身不包含业务操作。
 
@@ -25,17 +25,17 @@ sw_vers -productVersion
 
 如果 `uname -m` 返回 `x86_64`，继续用 `sysctl -n hw.optional.arm64` 判断是否为 Rosetta 下的 Apple Silicon；结果为 `1` 才支持当前 arm64 包。确认前不要安装。
 
-检查 `/Applications/Lark-Codex.app` 和以下目录是否存在，只读取必要元信息，不展示私密文件内容：
+检查 `/Applications/CodexBoard.app` 和以下目录是否存在，只读取必要元信息，不展示私密文件内容：
 
 ```text
-~/Library/Application Support/Lark-Codex/
+~/Library/Application Support/CodexBoard/
 ├── data/       数据库、附件、运行时信息
 ├── secrets/    飞书凭据、frpc 配置、内部令牌
 ├── deploy/     本机端口配置
 └── caddy/      证书与 Caddy 状态
 ```
 
-存在数据目录就按升级处理；不要清空目录或覆盖成发布者的配置。首次升级启动时，若新目录不存在且旧版已退出，应用会自动迁移旧版数据目录；新旧目录同时存在或目录受其他进程占用时按提示处理，不手工合并或覆盖。正常替换 `.app` 保留这些数据。需要备份时先确认备份位置及访问权限；复制整个数据目录应先正常退出 Lark-Codex，避免只复制正在写入的 SQLite 主文件。
+存在数据目录就按升级处理；不要清空目录或覆盖成发布者的配置。首次升级启动时，若新目录不存在且旧版已退出，应用会自动迁移旧版数据目录；新旧目录同时存在或目录受其他进程占用时按提示处理，不手工合并或覆盖。正常替换 `.app` 保留这些数据。需要备份时先确认备份位置及访问权限；复制整个数据目录应先正常退出 CodexBoard，避免只复制正在写入的 SQLite 主文件。
 
 应用内置 Node、后端、网页前端、Codex 桥接、SQLite 组件、Caddy 和 frpc 客户端。用户仍需安装并登录 Codex，并准备公网 frp 服务；使用飞书入口或 CLI 配对时，还需飞书客户端和自己的飞书应用。仅用 Web 看板无需飞书登录。**不需要另外安装 Node、Docker、Rust 或 Homebrew。**
 
@@ -47,14 +47,14 @@ sw_vers -productVersion
 
    ```sh
    cd "$HOME/Downloads"
-   shasum -a 256 -c "Lark-Codex-0.1.2-macos-arm64.dmg.sha256"
+   shasum -a 256 -c "CodexBoard-0.1.3-macos-arm64.dmg.sha256"
    ```
 
    其他版本使用实际文件名。检查校验文件中的文件名与下载的 DMG 一致；必须得到 `OK`。失败就停止安装并重新核对下载来源，不修改校验值来通过检查。校验和用于检查文件完整性，不等于 Apple 公证或发布者身份认证。
 
-4. 升级前通过菜单栏「退出 Lark-Codex」或 Command-Q 正常退出旧版，等待它启动的服务停止。关闭窗口只会隐藏应用，不能作为退出判断；不要使用范围过大的 `pkill node` 或结束 Codex。
-5. 挂载 DMG，将完整的 `Lark-Codex.app` 拖入「Applications」。已有旧版时替换整个应用包，不合并内部文件，也不从挂载卷直接作为长期安装运行。
-6. 从 `/Applications/Lark-Codex.app` 启动应用，然后推出 DMG。
+4. 升级前通过菜单栏「退出 CodexBoard」或 Command-Q 正常退出旧版，等待它启动的服务停止。关闭窗口只会隐藏应用，不能作为退出判断；不要使用范围过大的 `pkill node` 或结束 Codex。
+5. 挂载 DMG，将完整的 `CodexBoard.app` 拖入「Applications」。已有旧版时替换整个应用包，不合并内部文件，也不从挂载卷直接作为长期安装运行。
+6. 从 `/Applications/CodexBoard.app` 启动应用，然后推出 DMG。
 
 当前版本使用本地 ad-hoc 签名，尚无 Developer ID 签名及 Apple 公证。若 macOS 拦截，说明当前状态与实际提示，请用户在确认来源后通过系统「隐私与安全性」处理首次打开。此系统安全决定交给用户；不要自动清除 quarantine、关闭 Gatekeeper 或执行绕过系统保护的命令。若系统报告恶意软件或文件损坏，应停止并核对原包，不能把所有拦截都归因于未公证。
 
@@ -103,13 +103,13 @@ Web 账号不能替代第 6 节的 CLI 飞书配对；仅使用 Web 的安装不
 2. 先检查当前 frpc 表单，让「使用引导」生成该用户自己的地址；不要沿用截图、历史部署记录或发布者的域名。
 3. 按引导的复制按钮填写桌面端主页、移动端主页、同源 H5 可信域名和重定向 URL。重定向 URL 保留引导提供的末尾 `/`，不要自行猜测 `/callback` 路径。
 4. 申请「获取用户 user ID」权限 `contact:user.employee_id:readonly`，完成开放平台版本发布，并设置需要使用该应用的人员可用范围。
-5. 用户在飞书客户端登录；部署就绪后，通过 Lark-Codex「使用引导 → 打开飞书验证」进入自己的飞书应用并验证实际登录。
+5. 用户在飞书客户端登录；部署就绪后，通过 CodexBoard「使用引导 → 打开飞书验证」进入自己的飞书应用并验证实际登录。
 
 App ID/App Secret 检查仅验证凭据；不能据此判断应用已发布、可用范围正确或用户登录已成功。当前没有应用发布状态查询能力，这些项目需要通过飞书后台和实际登录确认。
 
 ### Codex 与保存生效
 
-请用户安装并登录 Codex。Lark-Codex 自动检测本机 Codex 程序和登录状态，项目来自 Codex Desktop 项目列表。需要添加项目时在 Codex Desktop 中完成；不要尝试用 taskctl 创建或注册项目。
+请用户安装并登录 Codex。CodexBoard 自动检测本机 Codex 程序和登录状态，项目来自 Codex Desktop 项目列表。需要添加项目时在 Codex Desktop 中完成；不要尝试用 taskctl 创建或注册项目。
 
 「使用引导」检查的是当前表单，不自动保存、不自动重启。按结果修正后保存配置，再按用户当前意图选择立即重启或稍后重启；稍后重启时运行服务仍使用旧配置。相同配置无需反复保存和重启。
 
@@ -117,23 +117,23 @@ App ID/App Secret 检查仅验证凭据；不能据此判断应用已发布、�
 
 ## 5. 安装 Skill 并调用内置 taskctl
 
-首次启动且尚未安装配套技能时，「让 Codex 使用 Lark-Codex」提示提供「安装到 Codex」和稍后选项；之后可通过「应用设置 → Agent Skill」安装、更新或重新检查。首版仅支持 Codex，默认将 `manage-lark-codex` 安装到 `~/.agents/skills/`。
+首次启动且尚未安装配套技能时，「让 Codex 使用 CodexBoard」提示提供「安装到 Codex」和稍后选项；之后可通过「应用设置 → Agent Skill」安装、更新或重新检查。首版仅支持 Codex，默认将 `manage-codexboard` 安装到 `~/.agents/skills/`。
 
-安装只写入技能文件，不包含 CLI 身份授权。已有用户修改时，只有用户明确选择「使用随包版本」才替换；符号链接或受其他工具管理的目录不直接覆盖。若已有旧版名称 `manage-lark-taskboard` 的技能，或旧 `~/.codex/skills`、`$CODEX_HOME/skills` 中已有同名技能，按提示在原位置或管理器处理，不再复制第二份，也不自动改名。应用升级仅提示技能可更新，不静默覆盖。
+安装只写入技能文件，不包含 CLI 身份授权。已有用户修改时，只有用户明确选择「使用随包版本」才替换；符号链接或受其他工具管理的目录不直接覆盖。若已有旧版名称 `manage-lark-codex` 或 `manage-lark-taskboard` 的技能，或旧 `~/.codex/skills`、`$CODEX_HOME/skills` 中已有同名技能，按提示在原位置或管理器处理，不再复制第二份，也不自动改名。应用升级仅提示技能可更新，不静默覆盖。
 
 成功状态只证明文件已安装。先在 Codex 技能列表确认，未识别时由用户按需强制重新加载技能或重新打开 Codex，再在新任务核验；不要为验证而退出 Codex Desktop、接管已有会话或启动真实业务任务。
 
 CLI 示例使用该技能中的包装器，直接调用完整 `.app` 内的 Node 和 taskctl，不依赖源码目录或全局 Node。默认安装时：
 
 ```sh
-TASKCTL="$HOME/.agents/skills/manage-lark-codex/scripts/taskctl.sh"
+TASKCTL="$HOME/.agents/skills/manage-codexboard/scripts/taskctl.sh"
 "$TASKCTL" --help
 "$TASKCTL" health
 "$TASKCTL" auth status
 "$TASKCTL" project list
 ```
 
-若技能已由其他目录管理，从实际加载的 `SKILL.md` 所在目录定位 `scripts/taskctl.sh` 并调整 `TASKCTL`；缺少包装器时先更新原管理器中的技能。包装器优先探测 `/Applications/Lark-Codex.app`，其次是 `~/Applications/Lark-Codex.app`。`LARK_CODEX_APP_PATH` 可覆盖应用位置，`LARK_CODEX_DATA_DIR` 可显式覆盖数据目录；默认仍为应用的 AppSupport `data` 目录。包装器保持调用工作目录，便于 `context` 定位项目，不自动启动服务。
+若技能已由其他目录管理，从实际加载的 `SKILL.md` 所在目录定位 `scripts/taskctl.sh` 并调整 `TASKCTL`；缺少包装器时先更新原管理器中的技能。包装器优先探测 `/Applications/CodexBoard.app`，其次是 `~/Applications/CodexBoard.app`。`CODEXBOARD_APP_PATH` 可覆盖应用位置，`CODEXBOARD_DATA_DIR` 可显式覆盖数据目录；默认仍为应用的 AppSupport `data` 目录。包装器保持调用工作目录，便于 `context` 定位项目，不自动启动服务。
 
 CLI 自动从 `data/run/runtime.json` 读取本机管理地址和能力令牌；不要 `cat` 此文件，也不要在命令行拼接令牌。`--help` 不需要后台运行；其他命令依赖当前服务。找不到运行信息时先检查应用状态与数据路径，不启动第二套后端或创建伪造的 runtime 文件。
 
@@ -206,7 +206,7 @@ CLI 自动从 `data/run/runtime.json` 读取本机管理地址和能力令牌；
 
 | 现象                                      | 优先检查                                                                               |
 | ----------------------------------------- | -------------------------------------------------------------------------------------- |
-| 关闭窗口后服务仍运行                      | 这是正常行为；用菜单栏恢复窗口，完全退出使用「退出 Lark-Codex」                        |
+| 关闭窗口后服务仍运行                      | 这是正常行为；用菜单栏恢复窗口，完全退出使用「退出 CodexBoard」                        |
 | 提示配置需检查或待重启                    | 核对表单是否实际修改、结果是否过期、配置是否保存以及是否已重启；不清空现有配置         |
 | 找不到 taskctl 运行信息                   | 核对 `.app` 真实位置、数据路径和桌面服务状态                                           |
 | 本机正常，公网不可用                      | 查看唯一匹配的 frpc 代理、服务商认证/额度、DNS、标准公网端口、HTTPS 证书及看板健康响应 |

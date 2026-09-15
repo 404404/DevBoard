@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
-import { FeishuJsapiConfigSchema } from "@lark-codex/contracts";
+import { FeishuJsapiConfigSchema } from "@codexboard/contracts";
 import { AppError } from "../../app-error.js";
 
 interface Options {

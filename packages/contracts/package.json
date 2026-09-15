@@ -1,5 +1,5 @@
 {
-  "name": "@lark-codex/contracts",
+  "name": "@codexboard/contracts",
   "version": "0.1.0",
   "private": true,
   "type": "module",

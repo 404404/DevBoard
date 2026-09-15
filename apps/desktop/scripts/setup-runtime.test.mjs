@@ -12,7 +12,7 @@ test(
   "desktop command protocol publishes draft check results without saving config or starting services",
   { timeout: 8000 },
   async () => {
-    const directory = await mkdtemp(join(tmpdir(), "lark-setup-runtime-"));
+    const directory = await mkdtemp(join(tmpdir(), "codexboard-setup-runtime-"));
     const child = spawn(
       process.execPath,
       [

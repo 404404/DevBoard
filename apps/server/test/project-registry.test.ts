@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ALL_PROJECT_ID, TEMPORARY_PROJECT_ID } from "@lark-codex/contracts";
+import { ALL_PROJECT_ID, TEMPORARY_PROJECT_ID } from "@codexboard/contracts";
 
 import { AppError } from "../src/app-error.js";
 import { initializeDatabase, type SqliteDatabase } from "../src/modules/database/index.js";
@@ -49,7 +49,7 @@ function createGitRepository(parent: string): string {
 }
 
 function setup() {
-  const allowedRoot = temporaryDirectory("lark-codex-registry-");
+  const allowedRoot = temporaryDirectory("codexboard-registry-");
   const database = initializeDatabase(":memory:");
   openDatabases.push(database);
   const administration = new ProjectAdministration(database);
@@ -301,7 +301,7 @@ describe("Project Registry module", () => {
       }),
     ).rejects.toMatchObject({ code: "DUPLICATE_REQUEST" });
 
-    const outsideRoot = temporaryDirectory("lark-codex-outside-");
+    const outsideRoot = temporaryDirectory("codexboard-outside-");
     const outsideRepository = createGitRepository(outsideRoot);
     const escape = join(allowedRoot, "escape");
     symlinkSync(outsideRepository, escape);

@@ -1,4 +1,4 @@
-import { HealthResponseSchema } from "@lark-codex/contracts";
+import { HealthResponseSchema } from "@codexboard/contracts";
 import { execFile as execFileCallback } from "node:child_process";
 import { lookup, resolve4, resolve6, resolveCname } from "node:dns/promises";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
@@ -302,7 +302,7 @@ export async function runSetupChecks(input, options = {}) {
       let directory;
       try {
         if (!input.frpcBinary) throw new Error("Missing frpc executable");
-        directory = await mkdtemp(join(tmpdir(), "lark-setup-check-"));
+        directory = await mkdtemp(join(tmpdir(), "codexboard-setup-check-"));
         const file = join(directory, "frpc.toml");
         await writeFile(file, input.frpc, { mode: 0o600, flag: "wx" });
         await command(input.frpcBinary, ["verify", "-c", file]);
@@ -456,8 +456,8 @@ export async function runSetupChecks(input, options = {}) {
             `公网 ${protocolName}`,
             "passed",
             url.protocol === "http:"
-              ? "HTTP 明文测试入口已返回健康的 Lark-Codex 看板服务；此连接不受 TLS 加密保护。"
-              : "TLS 证书有效，公网已返回健康的 Lark-Codex 看板服务。",
+              ? "HTTP 明文测试入口已返回健康的 CodexBoard 看板服务；此连接不受 TLS 加密保护。"
+              : "TLS 证书有效，公网已返回健康的 CodexBoard 看板服务。",
           );
         }
       } catch {

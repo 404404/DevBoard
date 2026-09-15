@@ -4,7 +4,7 @@ import {
   type ComponentCheck,
   type LocalOperationsSnapshot,
   type QueueMetrics,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 
 import type { CodexSupervisorHealth } from "../codex/index.js";
 import { isDatabaseHealthy, type SqliteDatabase } from "../database/index.js";

@@ -1,6 +1,6 @@
-import { validateRemoteApprovalContent } from "@lark-codex/contracts";
+import { validateRemoteApprovalContent } from "@codexboard/contracts";
 import { useState } from "react";
-import type { RemoteAction, RemoteApproval, RemoteApprovalContent } from "@lark-codex/contracts";
+import type { RemoteAction, RemoteApproval, RemoteApprovalContent } from "@codexboard/contracts";
 import { RemoteNotice } from "./remote-notice";
 
 export function RemoteApprovalForm({

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Lark-Codex",
-  "version": "0.1.2",
-  "identifier": "cn.rocyan.larkcodex.desktop",
+  "productName": "CodexBoard",
+  "version": "0.1.3",
+  "identifier": "cn.rocyan.codexboard.desktop",
   "build": {
     "frontendDist": "../ui"
   },
@@ -11,7 +11,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Lark-Codex",
+        "title": "CodexBoard",
         "width": 1000,
         "height": 730,
         "minWidth": 780,
@@ -33,7 +33,7 @@
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRDQTM5MkIzNEYxNDg0OTUKUldTVmhCUlBzNUtqVEwwUGUxdk1YNjFUZWwxZys0MC9MM0lITEVtNUttMmhHUmN0Y3FrRXdCRVgK",
-      "endpoints": ["https://github.com/RocYan98/Lark-Codex/releases/latest/download/latest.json"]
+      "endpoints": ["https://github.com/RocYan98/CodexBoard/releases/latest/download/latest.json"]
     }
   }
 }

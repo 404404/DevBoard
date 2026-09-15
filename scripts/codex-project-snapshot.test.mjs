@@ -42,7 +42,7 @@ function state(projectOrder = [PROJECT_A], overrides = {}) {
 }
 
 function fixture() {
-  const directory = mkdtempSync(join(tmpdir(), "lark-codex-project-snapshot-"));
+  const directory = mkdtempSync(join(tmpdir(), "codexboard-project-snapshot-"));
   const stateFile = join(directory, ".codex-global-state.json");
   const snapshotFile = join(directory, "run", "codex-projects.json");
   writeFileSync(stateFile, `${JSON.stringify(state())}\n`, { mode: 0o600 });

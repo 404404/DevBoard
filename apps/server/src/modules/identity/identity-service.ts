@@ -4,10 +4,10 @@ import {
   IdentityKeySchema,
   IdentityRefSchema,
   type IdentityRef,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 
-import { PrincipalViewSchema, type PrincipalView } from "@lark-codex/contracts";
+import { PrincipalViewSchema, type PrincipalView } from "@codexboard/contracts";
 import { z } from "zod";
 
 import { AppError } from "../../app-error.js";

@@ -29,7 +29,7 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
             paths: { credentials: "/test/credentials.json", frpc: "/test/frpc.toml" },
           },
           settings: { configDirectory: "/test/config", codexPath: "/test/bin/codex" },
-          services: [{ name: "Lark-Codex 后端", status: "ready" }],
+          services: [{ name: "CodexBoard 后端", status: "ready" }],
           logs: [{ time: "12:00", component: "Caddy", message: "服务已启动" }],
           setup: {
             context: { origin: "https://example.test", domain: "example.test" },
@@ -146,7 +146,7 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
       await page.mouse.down();
       await page.mouse.move(box.x + box.width - 1, box.y + box.height / 2, { steps: 12 });
       const dragged = await page.evaluate(() => window.getSelection().toString());
-      assert.ok(dragged.includes("Lark-Codex"));
+      assert.ok(dragged.includes("CodexBoard"));
       await page.evaluate(() => window.nextPoll());
       await page.mouse.up();
       await page.evaluate(() => window.nextPoll());

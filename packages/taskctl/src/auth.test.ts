@@ -11,7 +11,7 @@ import {
   readCredential,
   runtimeScope,
 } from "./auth.js";
-import type { RuntimeDescriptor } from "@lark-codex/contracts";
+import type { RuntimeDescriptor } from "@codexboard/contracts";
 
 const runtime: RuntimeDescriptor = {
   descriptorVersion: 1,
@@ -38,20 +38,20 @@ describe("private CLI credential files", () => {
     });
     expect(
       authFileLocations(
-        { LARK_TASKBOARD_AUTH_FILE: "/old/auth", LARK_CODEX_AUTH_FILE: "/new/auth" },
+        { LARK_TASKBOARD_AUTH_FILE: "/old/auth", CODEXBOARD_AUTH_FILE: "/new/auth" },
         "/fake/home",
       ),
     ).toEqual({ current: "/new/auth" });
     expect(() =>
-      authFileLocations({ LARK_TASKBOARD_AUTH_FILE: "/old/auth", LARK_CODEX_AUTH_FILE: "" }),
-    ).toThrow("LARK_CODEX_AUTH_FILE 不能为空");
+      authFileLocations({ LARK_TASKBOARD_AUTH_FILE: "/old/auth", CODEXBOARD_AUTH_FILE: "" }),
+    ).toThrow("CODEXBOARD_AUTH_FILE 不能为空");
   });
 
   it("reads only matching legacy scopes and logout removes both generations", async () => {
     const root = await temporary();
     const locations = authFileLocations({ XDG_CONFIG_HOME: root }, root);
     const current = credentialPaths(runtime, locations.current);
-    const legacy = credentialPaths(runtime, locations.legacy!);
+    const legacy = credentialPaths(runtime, (locations.legacy as string[])[0]!);
     const different = credentialPaths(
       { ...runtime, publicBaseUrl: "https://other.example" },
       locations.current,
@@ -82,7 +82,7 @@ describe("private CLI credential files", () => {
     const root = await temporary();
     const locations = authFileLocations({ XDG_CONFIG_HOME: root }, root);
     const paths = credentialPaths(runtime, locations.current);
-    const old = credentialPaths(runtime, locations.legacy!);
+    const old = credentialPaths(runtime, (locations.legacy as string[])[0]!);
     const store = compatibleCredentialStore(locations);
     await defaultCredentialStore.write(
       old.pending,

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { SessionView } from "@lark-codex/contracts";
+import type { SessionView } from "@codexboard/contracts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CliAuthApproval } from "./cli-auth-approval";

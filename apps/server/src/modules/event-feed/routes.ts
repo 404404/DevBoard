@@ -5,7 +5,7 @@ import {
   EventStreamMessageSchema,
   RevisionSchema,
   type EventStreamMessage,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import type { AppConfig } from "../../config.js";
@@ -124,16 +124,16 @@ async function streamEvents(
     if (
       !(await writeChunk(
         response,
-        `retry: ${config.LARK_CODEX_SSE_RETRY_MS}\n\n`,
+        `retry: ${config.CODEXBOARD_SSE_RETRY_MS}\n\n`,
         controller.signal,
-        config.LARK_CODEX_SSE_WRITE_TIMEOUT_MS,
+        config.CODEXBOARD_SSE_WRITE_TIMEOUT_MS,
       ))
     ) {
       return;
     }
     let nextMessage = iterator.next();
     while (!controller.signal.aborted) {
-      const heartbeatWait = heartbeat(config.LARK_CODEX_SSE_HEARTBEAT_MS);
+      const heartbeatWait = heartbeat(config.CODEXBOARD_SSE_HEARTBEAT_MS);
       const result = await Promise.race([
         nextMessage.then((value) => ({ kind: "message" as const, value })),
         heartbeatWait.promise.then(() => ({ kind: "heartbeat" as const })),
@@ -146,7 +146,7 @@ async function streamEvents(
           response,
           `: heartbeat ${Date.now()}\n\n`,
           controller.signal,
-          config.LARK_CODEX_SSE_WRITE_TIMEOUT_MS,
+          config.CODEXBOARD_SSE_WRITE_TIMEOUT_MS,
         );
         if (!writable) {
           return;
@@ -160,7 +160,7 @@ async function streamEvents(
         response,
         serializeSseMessage(result.value.value),
         controller.signal,
-        config.LARK_CODEX_SSE_WRITE_TIMEOUT_MS,
+        config.CODEXBOARD_SSE_WRITE_TIMEOUT_MS,
       );
       if (!writable || result.value.value.kind === "refresh_required") {
         return;

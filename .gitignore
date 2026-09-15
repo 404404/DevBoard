@@ -8,6 +8,8 @@ test-results/
 .env
 .env.*
 !.env.example
+.codexboard/
+# Protect data and configuration created by published versions.
 .lark-codex/
 .lark-taskboard/
 .firecrawl/

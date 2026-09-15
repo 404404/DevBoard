@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components -- filter primitives are colocated with the three shared task views */
-import type { DashboardView, TaskPriority } from "@lark-codex/contracts";
+import type { DashboardView, TaskPriority } from "@codexboard/contracts";
 import { EMPTY_TASK_FILTERS, filterTasks, type TaskFilters } from "./task-filters";
 
 export type WorkspaceViewMode = "dashboard" | "board" | "list";

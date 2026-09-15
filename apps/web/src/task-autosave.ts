@@ -3,7 +3,7 @@ import {
   UserIdentityRefSchema,
   type UserIdentityRef,
   type TaskView,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 
 export const EDITABLE_TASK_FIELDS = [
   "title",

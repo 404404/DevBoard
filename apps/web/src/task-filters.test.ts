@@ -1,4 +1,4 @@
-import type { TaskView } from "@lark-codex/contracts";
+import type { TaskView } from "@codexboard/contracts";
 import { describe, expect, it } from "vitest";
 
 import { availableFilterOptions, filterTasks, type TaskFilters } from "./task-filters";

@@ -1,4 +1,4 @@
-import type { TaskView } from "@lark-codex/contracts";
+import type { TaskView } from "@codexboard/contracts";
 import { useMemo, useState } from "react";
 
 import { SfSymbol } from "./sf-symbol";

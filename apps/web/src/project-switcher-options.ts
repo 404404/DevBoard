@@ -1,4 +1,4 @@
-import type { ProjectKind, ProjectView } from "@lark-codex/contracts";
+import type { ProjectKind, ProjectView } from "@codexboard/contracts";
 
 import type { SfSymbolName } from "./sf-symbol-names";
 

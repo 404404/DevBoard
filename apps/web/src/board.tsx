@@ -5,10 +5,10 @@ import { GitManagerDialog } from "./git-manager-dialog";
 import { GitBranch } from "./git-branch-icon";
 import { Notice } from "./notification-center";
 import { notify } from "./notifications";
-import type { JobView } from "@lark-codex/contracts";
+import type { JobView } from "@codexboard/contracts";
 import { TaskCardPresentation } from "./task-card";
 import { createUuid } from "./random-id";
-import { readLarkCodexStorage } from "./brand-storage";
+import { readCodexBoardStorage } from "./brand-storage";
 /* eslint-disable react-hooks/refs -- dnd-kit exposes callback refs and reactive drag state for DOM binding */
 import {
   DndContext,
@@ -39,8 +39,8 @@ import type {
   ProjectView,
   SessionView,
   TaskView,
-} from "@lark-codex/contracts";
-import { ALL_PROJECT_ID, TEMPORARY_PROJECT_ID } from "@lark-codex/contracts";
+} from "@codexboard/contracts";
+import { ALL_PROJECT_ID, TEMPORARY_PROJECT_ID } from "@codexboard/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
@@ -175,7 +175,7 @@ export function BoardPage({
   const [selectedProjectId, setSelectedProjectId] = useState(
     () =>
       new URL(window.location.href).searchParams.get("project") ??
-      readLarkCodexStorage(window.localStorage, "selected-project") ??
+      readCodexBoardStorage(window.localStorage, "selected-project") ??
       "",
   );
   const [selectedTaskId, setSelectedTaskId] = useState<string | undefined>(
@@ -195,8 +195,8 @@ export function BoardPage({
   const copy = useUiCopy();
   useEffect(() => {
     document.documentElement.lang = "zh-CN";
-    window.localStorage.removeItem("lark-codex:locale");
-    window.localStorage.removeItem("lark-taskboard:locale");
+    window.localStorage.removeItem("codexboard:locale");
+    window.localStorage.removeItem("codexboard:locale");
   }, []);
   const projects = useQuery({
     queryKey: ["projects"],
@@ -255,7 +255,7 @@ export function BoardPage({
   );
 
   const selectProject = (projectId: string) => {
-    window.localStorage.setItem("lark-codex:selected-project", projectId);
+    window.localStorage.setItem("codexboard:selected-project", projectId);
     setSelectedProjectId(projectId);
     setSelectedTaskId(undefined);
   };
@@ -352,7 +352,7 @@ export function BoardPage({
               url.searchParams.delete("task");
               url.searchParams.delete("project");
               if (effectiveProjectId)
-                window.localStorage.setItem("lark-codex:selected-project", effectiveProjectId);
+                window.localStorage.setItem("codexboard:selected-project", effectiveProjectId);
               window.history.replaceState(null, "", url);
               setSelectedTaskId(undefined);
             }}

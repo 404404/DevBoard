@@ -1,4 +1,4 @@
-import type { JobStatus, TaskPriority, TaskStatus } from "@lark-codex/contracts";
+import type { JobStatus, TaskPriority, TaskStatus } from "@codexboard/contracts";
 
 const STATUS_LABELS: Readonly<Record<TaskStatus, string>> = {
   backlog: "待立项",

@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 const project = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const desktop = join(project, "apps/desktop");
 const output = join(desktop, "dist");
-const repository = process.env.LARK_CODEX_RELEASE_REPOSITORY ?? "RocYan98/Lark-Codex";
+const repository = process.env.CODEXBOARD_RELEASE_REPOSITORY ?? "RocYan98/CodexBoard";
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, { cwd: project, stdio: "inherit", ...options });
@@ -98,7 +98,10 @@ function release() {
   if (!publicKey) throw new Error("必须配置更新签名公钥");
   const privateKey = realpathSync(
     process.env.TAURI_SIGNING_PRIVATE_KEY_PATH ??
-      join(homedir(), ".config/lark-codex/release/updater.key"),
+      ["codexboard", "lark-codex"]
+        .map((name) => join(homedir(), ".config", name, "release/updater.key"))
+        .find((path) => existsSync(path)) ??
+      join(homedir(), ".config/codexboard/release/updater.key"),
   );
   const keyRelative = relative(realpathSync(project), privateKey);
   if (!isAbsolute(keyRelative) && keyRelative !== ".." && !keyRelative.startsWith("../"))
@@ -122,7 +125,7 @@ function release() {
       .join("\x1f"),
   };
   run(process.execPath, [join(desktop, "scripts/build-macos.mjs")], { env: buildEnv });
-  const app = join(output, "Lark-Codex.app");
+  const app = join(output, "CodexBoard.app");
   const builtVersion = run(
     "/usr/libexec/PlistBuddy",
     ["-c", "Print :CFBundleShortVersionString", join(app, "Contents/Info.plist")],
@@ -132,9 +135,9 @@ function release() {
   run("codesign", ["--verify", "--deep", "--strict", app]);
   assertDistributionClean(app);
 
-  const stem = `Lark-Codex-${version}-macos-arm64`;
+  const stem = `CodexBoard-${version}-macos-arm64`;
   const archive = join(output, `${stem}.app.tar.gz`);
-  run("/usr/bin/tar", ["-czf", archive, "-C", output, "Lark-Codex.app"], {
+  run("/usr/bin/tar", ["-czf", archive, "-C", output, "CodexBoard.app"], {
     env: { ...process.env, COPYFILE_DISABLE: "1" },
   });
   const signingEnv = {
@@ -149,7 +152,7 @@ function release() {
     { env: signingEnv, stdio: "pipe" },
   );
   const signature = readFileSync(`${archive}.sig`, "utf8").trim();
-  const staging = mkdtempSync(join(tmpdir(), "lark-codex-release-"));
+  const staging = mkdtempSync(join(tmpdir(), "codexboard-release-"));
   try {
     const publicKeyFile = join(staging, "updater.pub");
     writeFileSync(publicKeyFile, publicKey);
@@ -184,20 +187,20 @@ function release() {
         "--",
         "--ignored",
       ],
-      { env: { ...buildEnv, LARK_CODEX_UPDATE_ARCHIVE: archive } },
+      { env: { ...buildEnv, CODEXBOARD_UPDATE_ARCHIVE: archive } },
     );
     rmSync(publicKeyFile);
-    cpSync(app, join(staging, "Lark-Codex.app"), { recursive: true, verbatimSymlinks: true });
+    cpSync(app, join(staging, "CodexBoard.app"), { recursive: true, verbatimSymlinks: true });
     symlinkSync("/Applications", join(staging, "Applications"));
     writeFileSync(
       join(staging, "安装说明.txt"),
-      `Lark-Codex ${version}\n\n适用于 Apple Silicon Mac，macOS 13 或更新版本。\n\n1. 更新旧版前，请先处理执行中的任务并正常退出 Lark-Codex。\n2. 将 Lark-Codex.app 拖入 Applications（应用程序）。\n3. 打开应用，按“使用引导”完成配置，然后推出本安装磁盘。\n\n当前未完成 Apple Developer ID 签名和公证。确认来源可信后，首次打开方法见：\nhttps://support.apple.com/en-mo/102445\n无需关闭系统整体安全检查。\n\n已安装版本可在“应用设置 → 应用更新”中检查、下载并确认安装更新。\n更新包通过独立签名校验；更新不会覆盖应用的数据目录。\n\n安装包包含 Node.js、前后端、Codex 桥接、SQLite、Caddy、frp 客户端。\nCodex、公网 frp 服务端需自行准备；使用飞书入口或 CLI 配对时另需飞书客户端与自建应用。Web 账号登录需要 HTTPS。\n\n用户指南：https://github.com/${repository}\nAgent 指南：https://github.com/${repository}/blob/main/AGENTS.md\n`,
+      `CodexBoard ${version}\n\n适用于 Apple Silicon Mac，macOS 13 或更新版本。\n\n1. 更新旧版前，请先处理执行中的任务并正常退出 CodexBoard。\n2. 将 CodexBoard.app 拖入 Applications（应用程序）。\n3. 打开应用，按“使用引导”完成配置，然后推出本安装磁盘。\n\n当前未完成 Apple Developer ID 签名和公证。确认来源可信后，首次打开方法见：\nhttps://support.apple.com/en-mo/102445\n无需关闭系统整体安全检查。\n\n已安装版本可在“应用设置 → 应用更新”中检查、下载并确认安装更新。\n更新包通过独立签名校验；更新不会覆盖应用的数据目录。\n\n安装包包含 Node.js、前后端、Codex 桥接、SQLite、Caddy、frp 客户端。\nCodex、公网 frp 服务端需自行准备；使用飞书入口或 CLI 配对时另需飞书客户端与自建应用。Web 账号登录需要 HTTPS。\n\n用户指南：https://github.com/${repository}\nAgent 指南：https://github.com/${repository}/blob/main/AGENTS.md\n`,
     );
     const dmg = join(output, `${stem}.dmg`);
     run("hdiutil", [
       "create",
       "-volname",
-      "Lark-Codex",
+      "CodexBoard",
       "-srcfolder",
       staging,
       "-ov",
@@ -212,9 +215,9 @@ function release() {
       `${dmg}.sha256`,
       `${createHash("sha256").update(readFileSync(dmg)).digest("hex")}  ${stem}.dmg\n`,
     );
-    const notes = process.env.LARK_CODEX_RELEASE_NOTES_FILE
-      ? readFileSync(process.env.LARK_CODEX_RELEASE_NOTES_FILE, "utf8")
-      : `Lark-Codex ${version} 更新`;
+    const notes = process.env.CODEXBOARD_RELEASE_NOTES_FILE
+      ? readFileSync(process.env.CODEXBOARD_RELEASE_NOTES_FILE, "utf8")
+      : `CodexBoard ${version} 更新`;
     writeFileSync(
       join(output, "latest.json"),
       JSON.stringify(

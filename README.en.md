@@ -1,4 +1,6 @@
-# Lark-Codex
+# CodexBoard
+
+<img src="assets/brand/codexboard.png" alt="CodexBoard" width="112" />
 
 [简体中文](README.md) · **English**
 
@@ -6,9 +8,9 @@ Manage tasks in a browser or Lark and let Codex on your Mac help execute them.
 
 **User guide** · [Agent operating guide (Chinese)](AGENTS.md)
 
-Lark-Codex connects a Lark task board to Codex running on your Mac. Organize projects and tasks, submit requests, track execution, and handle approvals or requests for more information. The Mac app starts and manages local services; you access the board through HTTPS with a locally created Web account, through Lark, or both.
+CodexBoard connects a Lark task board to Codex running on your Mac. Organize projects and tasks, submit requests, track execution, and handle approvals or requests for more information. The Mac app starts and manages local services; you access the board through HTTPS with a locally created Web account, through Lark, or both.
 
-Current release: **0.1.2 preview**, for **Apple Silicon Macs running macOS 13 or later**.
+Current release: **0.1.3 preview**, for **Apple Silicon Macs running macOS 13 or later**.
 
 ## Access methods
 
@@ -74,15 +76,15 @@ The installer includes **Node.js, the board's frontend and backend, the Codex br
 
 ## Download and install
 
-1. Open the repository's [Releases page](https://github.com/RocYan98/Lark-Codex/releases) and download `Lark-Codex-VERSION-macos-arm64.dmg` from the selected release's **Assets**. The `Source code` archives are not installers.
-2. If an older version is installed, finish or safely handle any running board tasks, then quit Lark-Codex normally from its menu.
-3. Open the DMG and drag `Lark-Codex.app` into **Applications**.
-4. Open Lark-Codex from Applications, then eject the installer disk.
+1. Open the repository's [Releases page](https://github.com/RocYan98/CodexBoard/releases) and download `CodexBoard-VERSION-macos-arm64.dmg` from the selected release's **Assets**. The `Source code` archives are not installers.
+2. If an older version is installed, finish or safely handle any running board tasks, then quit CodexBoard normally from its menu.
+3. Open the DMG and drag `CodexBoard.app` into **Applications**.
+4. Open CodexBoard from Applications, then eject the installer disk.
 
-To check download integrity, also download the corresponding `.dmg.sha256` file and run the following in the directory containing both files. For version 0.1.2:
+To check download integrity, also download the corresponding `.dmg.sha256` file and run the following in the directory containing both files. For version 0.1.3:
 
 ```sh
-shasum -a 256 -c Lark-Codex-0.1.2-macos-arm64.dmg.sha256
+shasum -a 256 -c CodexBoard-0.1.3-macos-arm64.dmg.sha256
 ```
 
 An `OK` result means the file matches the publisher's checksum.
@@ -139,23 +141,23 @@ Once **服务概览 (Service Overview)** shows that the backend, Caddy, and publ
 
 Manage projects in Codex Desktop, select a synced project on the board, and create a task describing what you need. After starting Codex execution, use the task details to view progress, results, approvals, and requests for more input. Review and accept the result when execution finishes.
 
-- **Close the Lark-Codex window:** the app remains in the menu bar and services keep running.
-- **Quit Lark-Codex or click 停止服务 (Stop Services):** local services stop, and the board becomes temporarily unavailable in both browsers and Lark.
+- **Close the CodexBoard window:** the app remains in the menu bar and services keep running.
+- **Quit CodexBoard or click 停止服务 (Stop Services):** local services stop, and the board becomes temporarily unavailable in both browsers and Lark.
 - **Shut down, put your Mac to sleep, or disconnect it from the network:** public access may be interrupted. Keep your Mac online when using remote features.
 
-Quitting Lark-Codex does not close Codex Desktop. Handle any executing board tasks before updating or stopping services.
+Quitting CodexBoard does not close Codex Desktop. Handle any executing board tasks before updating or stopping services.
 
 ## Install and use the Codex Skill
 
-The companion Skill lets Codex query and modify tasks and assist with execution through the app's built-in command-line tool, without cloning the source or installing Node.js. Installation currently supports Codex; the Skill is named `manage-lark-codex`.
+The companion Skill lets Codex query and modify tasks and assist with execution through the app's built-in command-line tool, without cloning the source or installing Node.js. Installation currently supports Codex; the Skill is named `manage-codexboard`.
 
-On first launch, if the companion Skill is not installed, the app displays **让 Codex 使用 Lark-Codex (Let Codex use Lark-Codex)**. Choose **安装到 Codex (Install to Codex)**, or install it later from **应用设置 → Agent Skill (App Settings → Agent Skill)**. The installation directory is `~/.agents/skills/manage-lark-codex`.
+On first launch, if the companion Skill is not installed, the app displays **让 Codex 使用 CodexBoard (Let Codex use CodexBoard)**. Choose **安装到 Codex (Install to Codex)**, or install it later from **应用设置 → Agent Skill (App Settings → Agent Skill)**. The installation directory is `~/.agents/skills/manage-codexboard`.
 
 The card shows the file installation status; use **重新检查 (Check Again)** to refresh it. After an app upgrade, it will indicate when a newer Skill is available, and replacement happens only when you click to update. If you have edited the Skill, you must explicitly choose **使用随包版本 (Use Bundled Version)** to replace it. Symbolic links, directories managed by another tool, Skills using the old name, or matching Skills in legacy locations prompt you to handle them at their original location or in their manager, avoiding duplicate installations.
 
 An installed-file status does not mean the Skill is loaded in your current Codex conversation. Check the Skill list in Codex. If it is not recognized, force a Skill reload or reopen Codex when convenient, then use it in a new conversation:
 
-> Please use $manage-lark-codex to first list my projects and tasks, then help me handle the task I specify.
+> Please use $manage-codexboard to first list my projects and tasks, then help me handle the task I specify.
 
 Installing the Skill does not grant permission to write to Lark. You still need to complete pairing confirmation in Lark before an agent first acts on your behalf.
 
@@ -163,7 +165,7 @@ Installing the Skill does not grant permission to write to Lark. You still need 
 
 To have an agent help install the app, configure it, or troubleshoot a problem, give it this repository's [AGENTS.md (Chinese)](AGENTS.md) and explain what you want to accomplish. For example:
 
-> Please read AGENTS.md, check whether my Mac meets the requirements, and help me install and configure Lark-Codex. Clearly tell me when I need to sign in or confirm something in the Lark developer console.
+> Please read AGENTS.md, check whether my Mac meets the requirements, and help me install and configure CodexBoard. Clearly tell me when I need to sign in or confirm something in the Lark developer console.
 
 The agent guide covers the built-in `taskctl` entry point, identity pairing, read-only checks, and common operations. It does not require cloning the source or installing development dependencies. Agents differ in how they automatically load instruction files; if yours cannot load the file automatically, provide its contents or a link directly.
 
@@ -171,10 +173,10 @@ The agent guide covers the built-in `taskctl` entry point, identity pairing, rea
 
 Check for a new version under **应用设置 → 应用更新 (App Settings → App Updates)**, or check manually from the menu bar. The app also checks automatically once a day and displays a notification and release notes when a new version is available. Once the download has been verified, click **安装并重启 (Install and Restart)**, handle running tasks as prompted, and confirm installation. Services keep running during checks and downloads; installation briefly stops the local services.
 
-Update packages are verified with a separate signing key. If automatic updating is unavailable, quit the old version normally and replace `Lark-Codex.app` in Applications using the new DMG. Configuration, the database, and attachments are stored in:
+Update packages are verified with a separate signing key. If automatic updating is unavailable, quit the old version normally and replace `CodexBoard.app` in Applications using the new DMG. Configuration, the database, and attachments are stored in:
 
 ```text
-~/Library/Application Support/Lark-Codex/
+~/Library/Application Support/CodexBoard/
 ```
 
 On the first launch after upgrading, if the new directory does not exist, the app automatically migrates the existing data after the old version has exited. If directories conflict, it preserves the existing data and prompts you to resolve the conflict. Replacing the app normally preserves your data. Deleting the data directory affects configuration and tasks; do not treat it as an installer cache or share it with other people alongside the installer.

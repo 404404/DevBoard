@@ -1,4 +1,4 @@
-import { identityKey, identityFromKey, IdentityKeySchema } from "@lark-codex/contracts";
+import { identityKey, identityFromKey, IdentityKeySchema } from "@codexboard/contracts";
 import { createHash, randomUUID } from "node:crypto";
 
 import {
@@ -24,7 +24,7 @@ import {
   type TaskWorkspaceView,
   type UpdateCommentCommand,
   type WorkspaceMutationResult,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 import { z } from "zod";
 
 import { AppError } from "../../app-error.js";

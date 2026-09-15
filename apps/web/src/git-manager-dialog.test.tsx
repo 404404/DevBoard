@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
-import type { GitCreationOrigin, ProjectView } from "@lark-codex/contracts";
+import type { GitCreationOrigin, ProjectView } from "@codexboard/contracts";
 import { GitManagerDialog } from "./git-manager-dialog";
 
 function render(branchOrigin?: GitCreationOrigin, worktreeOrigin?: GitCreationOrigin) {

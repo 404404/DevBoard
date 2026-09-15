@@ -1,6 +1,6 @@
 import { useRef, useState, type SetStateAction } from "react";
 import { z } from "zod";
-import { RemoteAttachmentSchema, type RemoteModel } from "@lark-codex/contracts";
+import { RemoteAttachmentSchema, type RemoteModel } from "@codexboard/contracts";
 export const DEFAULT_REMOTE_MODEL = "gpt-6-astra";
 export const DEFAULT_REMOTE_EFFORT = "medium";
 const OptionsSchema = z.object({

@@ -1,5 +1,5 @@
 {
-  "name": "@lark-codex/web",
+  "name": "@codexboard/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",

@@ -61,9 +61,9 @@ for (const [name, engine] of Object.entries({ chromium, webkit }))
       assert.deepEqual(await page.evaluate(() => window.updateCalls), ["download_update"]);
       const card = await page.locator("#update-card").boundingBox();
       assert.ok(card.x >= 0 && card.x + card.width <= 1000);
-      if (process.env.LARK_UPDATER_SCREENSHOTS)
+      if (process.env.CODEXBOARD_UPDATER_SCREENSHOTS)
         await page.screenshot({
-          path: join(process.env.LARK_UPDATER_SCREENSHOTS, `updater-${name}.png`),
+          path: join(process.env.CODEXBOARD_UPDATER_SCREENSHOTS, `updater-${name}.png`),
         });
       await page.locator("#update-install").click();
       assert.equal(await page.locator("#update-dialog").isVisible(), true);

@@ -1,6 +1,6 @@
-import { identityKey } from "@lark-codex/contracts";
+import { identityKey } from "@codexboard/contracts";
 import { TEST_FEISHU_ACTOR, seedFeishuTestActor } from "./helpers/identity.js";
-import type { PrincipalView, JobView } from "@lark-codex/contracts";
+import type { PrincipalView, JobView } from "@codexboard/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TaskWorkspace } from "../src/modules/taskboard/index.js";
@@ -223,7 +223,7 @@ describe("Codex execution orchestration", () => {
     const originalTask = workspace.readTaskWorkspace(TASK_ID, ACTOR).task;
     submit(queue);
     await orchestrator.runNext();
-    expect(executor.starts[0]!.prompt).toContain("$manage-lark-codex");
+    expect(executor.starts[0]!.prompt).toContain("$manage-codexboard");
     expect(executor.starts[0]!.prompt).toContain("完成任务");
     const first = workspace.createComment(TASK_ID, { body: "修复键盘导航" }, context()).data;
     expect(workspace.readTaskWorkspace(TASK_ID, ACTOR).task.status).toBe("todo");
@@ -243,7 +243,7 @@ describe("Codex execution orchestration", () => {
     await orchestrator.runNext();
     expect(executor.continuations[0]).toMatchObject({ threadId: "codex-thread-1" });
     const prompt = executor.continuations[0]!.prompt;
-    expect(prompt).toContain("$manage-lark-codex");
+    expect(prompt).toContain("$manage-codexboard");
     expect(prompt).toContain("修复键盘和焦点");
     expect(prompt).toContain("补充回归测试");
     expect(prompt).not.toContain("不要发送已删除内容");

@@ -1,5 +1,5 @@
 import { TEST_FEISHU_ACTOR, seedFeishuTestActor } from "./helpers/identity.js";
-import { CreateTaskCommandSchema, type PrincipalView } from "@lark-codex/contracts";
+import { CreateTaskCommandSchema, type PrincipalView } from "@codexboard/contracts";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { initializeDatabase, type SqliteDatabase } from "../src/modules/database/index.js";

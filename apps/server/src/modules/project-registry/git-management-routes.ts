@@ -1,9 +1,9 @@
-import { identityKey } from "@lark-codex/contracts";
+import { identityKey } from "@codexboard/contracts";
 import {
   CreateGitResourceCommandSchema,
   DeleteGitResourceCommandSchema,
   EntityIdSchema,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { AppError } from "../../app-error.js";

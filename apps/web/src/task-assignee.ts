@@ -5,7 +5,7 @@ import {
   type UserIdentityRef,
   type IdentityRef,
   type TaskAssigneeCandidate,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 
 export function currentAssignee(
   candidates: readonly TaskAssigneeCandidate[],

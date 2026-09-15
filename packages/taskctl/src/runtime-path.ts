@@ -1,7 +1,7 @@
 import { lstatSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { normalizeLarkCodexEnvironment } from "@lark-codex/contracts";
+import { normalizeCodexBoardEnvironment } from "@codexboard/contracts";
 import { TaskctlAuthError } from "./auth.js";
 
 function metadata(path: string) {
@@ -18,19 +18,21 @@ export function runtimeDataDirectory(
   userHome = homedir(),
   cwd = process.cwd(),
 ): string {
-  const env = normalizeLarkCodexEnvironment(environment);
-  const directory = env.LARK_CODEX_DATA_DIR ?? join(cwd, ".data");
+  const env = normalizeCodexBoardEnvironment(environment);
+  const directory = env.CODEXBOARD_DATA_DIR ?? join(cwd, ".data");
   if (!directory.trim())
-    throw new TaskctlAuthError("RUNTIME_PATH_INVALID", "LARK_CODEX_DATA_DIR 不能为空");
-  const oldDefault = join(userHome, "Library/Application Support/Lark Codex Taskboard/data");
-  // Frozen attachment commands used this exact legacy path. Only bridge a
-  // completed default-directory move, never a new setting or a custom path.
+    throw new TaskctlAuthError("RUNTIME_PATH_INVALID", "CODEXBOARD_DATA_DIR 不能为空");
+  // Frozen attachment commands may contain either published default path.
+  // Follow only a completed default migration; explicit current/custom paths win.
+  const oldDefaults = ["Lark-Codex", "Lark Codex Taskboard"].map((name) =>
+    join(userHome, "Library/Application Support", name, "data"),
+  );
   if (
-    environment.LARK_CODEX_DATA_DIR === undefined &&
-    environment.LARK_TASKBOARD_DATA_DIR === oldDefault &&
-    !metadata(oldDefault)
+    environment.CODEXBOARD_DATA_DIR === undefined &&
+    oldDefaults.includes(directory) &&
+    !metadata(directory)
   ) {
-    const current = join(userHome, "Library/Application Support/Lark-Codex/data");
+    const current = join(userHome, "Library/Application Support/CodexBoard/data");
     const runtime = metadata(join(current, "run/runtime.json"));
     if (runtime?.isFile() && !runtime.isSymbolicLink()) return current;
   }

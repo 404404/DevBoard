@@ -1,4 +1,4 @@
-import { identityFromKey, identityKey, type PrincipalView } from "@lark-codex/contracts";
+import { identityFromKey, identityKey, type PrincipalView } from "@codexboard/contracts";
 import { z } from "zod";
 
 import { AppError } from "../../app-error.js";

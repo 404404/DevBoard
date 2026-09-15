@@ -55,37 +55,37 @@ export function parseEnv(text) {
 }
 export function nativeEnvironment(prod, desktop, root, ports = DEFAULT_PORTS) {
   const env = Object.fromEntries(
-    Object.entries(prod).filter(([key]) => key.startsWith("LARK_CODEX_")),
+    Object.entries(prod).filter(([key]) => key.startsWith("CODEXBOARD_")),
   );
-  const data = desktop.LARK_CODEX_DATA_DIR;
+  const data = desktop.CODEXBOARD_DATA_DIR;
   if (!data || !isAbsolute(data)) throw new Error("请配置有效的数据目录");
-  delete env.LARK_CODEX_TEMPORARY_PROJECT_ROOT;
-  delete env.LARK_CODEX_FEISHU_APP_ID;
-  delete env.LARK_CODEX_FEISHU_APP_SECRET;
-  delete env.LARK_CODEX_FEISHU_APP_SECRET_FILE;
+  delete env.CODEXBOARD_TEMPORARY_PROJECT_ROOT;
+  delete env.CODEXBOARD_FEISHU_APP_ID;
+  delete env.CODEXBOARD_FEISHU_APP_SECRET;
+  delete env.CODEXBOARD_FEISHU_APP_SECRET_FILE;
   return {
     ...env,
-    LARK_CODEX_ENV: "production",
-    LARK_CODEX_AUTH_MODE: prod.LARK_CODEX_AUTH_MODE === "web" ? "web" : "feishu",
-    LARK_CODEX_HOST: "127.0.0.1",
-    LARK_CODEX_PORT: String(ports.api),
-    LARK_CODEX_ADMIN_HOST: "127.0.0.1",
-    LARK_CODEX_ADMIN_PORT: String(ports.admin),
-    LARK_CODEX_ALLOWED_HOSTS: env.LARK_CODEX_ORIGIN ? new URL(env.LARK_CODEX_ORIGIN).host : "",
-    LARK_CODEX_CODEX_PROJECT_SNAPSHOT_FILE: join(data, "run/codex-projects.json"),
-    LARK_CODEX_DATA_DIR: data,
-    LARK_CODEX_WEB_ROOT: join(root, "apps/web/dist"),
-    LARK_CODEX_FEISHU_CREDENTIALS_FILE:
-      prod.LARK_CODEX_AUTH_MODE === "web" ? undefined : desktop.LARK_CODEX_FEISHU_CREDENTIALS_FILE,
-    LARK_CODEX_CODEX_TOKEN_FILE: desktop.LARK_CODEX_CODEX_TOKEN_FILE,
-    LARK_CODEX_CODEX_TRANSPORT: "embedded",
-    LARK_CODEX_CODEX_ENDPOINT: `ws://127.0.0.1:${ports.bridge}`,
-    LARK_CODEX_CODEX_PROJECT_STATE_FILE: join(homedir(), ".codex/.codex-global-state.json"),
-    LARK_CODEX_WORKSPACE_ROOTS:
-      desktop.LARK_CODEX_WORKSPACE_ROOTS || desktop.LARK_CODEX_WORKSPACE_ROOT,
-    LARK_CODEX_EXECUTOR_NODE_PATH: join(root, "bin/node"),
-    LARK_CODEX_EXECUTOR_TASKCTL_PATH: join(root, "packages/taskctl/dist/cli.js"),
-    LARK_CODEX_EXECUTOR_DATA_DIR: data,
+    CODEXBOARD_ENV: "production",
+    CODEXBOARD_AUTH_MODE: prod.CODEXBOARD_AUTH_MODE === "web" ? "web" : "feishu",
+    CODEXBOARD_HOST: "127.0.0.1",
+    CODEXBOARD_PORT: String(ports.api),
+    CODEXBOARD_ADMIN_HOST: "127.0.0.1",
+    CODEXBOARD_ADMIN_PORT: String(ports.admin),
+    CODEXBOARD_ALLOWED_HOSTS: env.CODEXBOARD_ORIGIN ? new URL(env.CODEXBOARD_ORIGIN).host : "",
+    CODEXBOARD_CODEX_PROJECT_SNAPSHOT_FILE: join(data, "run/codex-projects.json"),
+    CODEXBOARD_DATA_DIR: data,
+    CODEXBOARD_WEB_ROOT: join(root, "apps/web/dist"),
+    CODEXBOARD_FEISHU_CREDENTIALS_FILE:
+      prod.CODEXBOARD_AUTH_MODE === "web" ? undefined : desktop.CODEXBOARD_FEISHU_CREDENTIALS_FILE,
+    CODEXBOARD_CODEX_TOKEN_FILE: desktop.CODEXBOARD_CODEX_TOKEN_FILE,
+    CODEXBOARD_CODEX_TRANSPORT: "embedded",
+    CODEXBOARD_CODEX_ENDPOINT: `ws://127.0.0.1:${ports.bridge}`,
+    CODEXBOARD_CODEX_PROJECT_STATE_FILE: join(homedir(), ".codex/.codex-global-state.json"),
+    CODEXBOARD_WORKSPACE_ROOTS:
+      desktop.CODEXBOARD_WORKSPACE_ROOTS || desktop.CODEXBOARD_WORKSPACE_ROOT,
+    CODEXBOARD_EXECUTOR_NODE_PATH: join(root, "bin/node"),
+    CODEXBOARD_EXECUTOR_TASKCTL_PATH: join(root, "packages/taskctl/dist/cli.js"),
+    CODEXBOARD_EXECUTOR_DATA_DIR: data,
   };
 }
 export async function assertPortsFree(ports) {
@@ -185,37 +185,37 @@ export async function openFeishuBoard(input, dependencies = {}) {
 }
 
 export function desktopPaths(
-  directory = join(homedir(), "Library/Application Support/Lark-Codex/deploy"),
+  directory = join(homedir(), "Library/Application Support/CodexBoard/deploy"),
 ) {
   const base = dirname(directory);
   return {
-    LARK_CODEX_DATA_DIR: join(base, "data"),
-    LARK_CODEX_FEISHU_CREDENTIALS_FILE: join(base, "secrets/feishu-credentials.json"),
-    LARK_CODEX_CODEX_TOKEN_FILE: join(base, "secrets/codex-app-server-token"),
-    LARK_CODEX_FRPC_CONFIG_FILE: join(base, "secrets/frpc.toml"),
-    LARK_CODEX_PORTS_FILE: join(directory, "ports.json"),
-    LARK_CODEX_CADDY_DATA_DIR: join(base, "caddy/data"),
-    LARK_CODEX_CADDY_CONFIG_DIR: join(base, "caddy/config"),
+    CODEXBOARD_DATA_DIR: join(base, "data"),
+    CODEXBOARD_FEISHU_CREDENTIALS_FILE: join(base, "secrets/feishu-credentials.json"),
+    CODEXBOARD_CODEX_TOKEN_FILE: join(base, "secrets/codex-app-server-token"),
+    CODEXBOARD_FRPC_CONFIG_FILE: join(base, "secrets/frpc.toml"),
+    CODEXBOARD_PORTS_FILE: join(directory, "ports.json"),
+    CODEXBOARD_CADDY_DATA_DIR: join(base, "caddy/data"),
+    CODEXBOARD_CADDY_CONFIG_DIR: join(base, "caddy/config"),
   };
 }
 export function initializeDeployment(directory, defaults = DEFAULT_PORTS) {
   const paths = desktopPaths(directory);
   for (const dir of [
     directory,
-    paths.LARK_CODEX_DATA_DIR,
-    dirname(paths.LARK_CODEX_FEISHU_CREDENTIALS_FILE),
-    paths.LARK_CODEX_CADDY_DATA_DIR,
-    paths.LARK_CODEX_CADDY_CONFIG_DIR,
+    paths.CODEXBOARD_DATA_DIR,
+    dirname(paths.CODEXBOARD_FEISHU_CREDENTIALS_FILE),
+    paths.CODEXBOARD_CADDY_DATA_DIR,
+    paths.CODEXBOARD_CADDY_CONFIG_DIR,
   ])
     mkdirSync(dir, { recursive: true, mode: 0o700 });
   for (const [file, content] of [
-    [paths.LARK_CODEX_FRPC_CONFIG_FILE, ""],
-    [paths.LARK_CODEX_CODEX_TOKEN_FILE, randomUUID() + randomUUID() + "\n"],
+    [paths.CODEXBOARD_FRPC_CONFIG_FILE, ""],
+    [paths.CODEXBOARD_CODEX_TOKEN_FILE, randomUUID() + randomUUID() + "\n"],
     [
-      paths.LARK_CODEX_PORTS_FILE,
+      paths.CODEXBOARD_PORTS_FILE,
       JSON.stringify(
-        existsSync(paths.LARK_CODEX_PORTS_FILE)
-          ? readLocalPorts(paths.LARK_CODEX_PORTS_FILE)
+        existsSync(paths.CODEXBOARD_PORTS_FILE)
+          ? readLocalPorts(paths.CODEXBOARD_PORTS_FILE)
           : defaults,
         null,
         2,
@@ -230,29 +230,29 @@ export function initializeDeployment(directory, defaults = DEFAULT_PORTS) {
   }
   // Import the old two-file layout once; never replace existing credentials.
   const legacyEnv = join(directory, "production.env");
-  const legacySecret = join(dirname(paths.LARK_CODEX_FEISHU_CREDENTIALS_FILE), "feishu-app-secret");
+  const legacySecret = join(dirname(paths.CODEXBOARD_FEISHU_CREDENTIALS_FILE), "feishu-app-secret");
   const legacy = { appId: "", appSecret: "" };
   if (existsSync(legacyEnv)) {
     assertRegularFile(legacyEnv);
     const values = parseEnv(readFileSync(legacyEnv, "utf8"));
-    // Preserve pre-rename production.env imports without silently choosing
-    // between conflicting old/new credential keys.
-    if (
-      values.LARK_CODEX_FEISHU_APP_ID !== undefined &&
-      values.LARK_TASKBOARD_FEISHU_APP_ID !== undefined &&
-      values.LARK_CODEX_FEISHU_APP_ID !== values.LARK_TASKBOARD_FEISHU_APP_ID
-    )
+    // Compare all published key generations before importing credentials.
+    const ids = [
+      values.CODEXBOARD_FEISHU_APP_ID,
+      values.LARK_CODEX_FEISHU_APP_ID,
+      values.LARK_TASKBOARD_FEISHU_APP_ID,
+    ].filter((id) => id !== undefined);
+    if (new Set(ids).size > 1)
       throw new Error("新旧飞书 App ID 配置不一致，旧文件已保留，请核对迁移内容");
-    legacy.appId = values.LARK_CODEX_FEISHU_APP_ID ?? values.LARK_TASKBOARD_FEISHU_APP_ID ?? "";
+    legacy.appId = ids[0] ?? "";
   }
   if (existsSync(legacySecret)) {
     assertRegularFile(legacySecret);
     legacy.appSecret = readFileSync(legacySecret, "utf8").trim();
   }
-  const credentialsFile = paths.LARK_CODEX_FEISHU_CREDENTIALS_FILE;
+  const credentialsFile = paths.CODEXBOARD_FEISHU_CREDENTIALS_FILE;
   if (!existsSync(credentialsFile)) {
     validateCredentials(legacy);
-    const temp = join(dirname(credentialsFile), `.lark-config-${randomUUID()}.json`);
+    const temp = join(dirname(credentialsFile), `.codexboard-config-${randomUUID()}.json`);
     try {
       writeFileSync(temp, JSON.stringify(legacy, null, 2) + "\n", { flag: "wx", mode: 0o600 });
       renameSync(temp, credentialsFile);
@@ -298,8 +298,8 @@ function readCredentials(path) {
 function deploymentPaths(directory) {
   const desktop = desktopPaths(directory);
   const paths = {
-    credentials: desktop.LARK_CODEX_FEISHU_CREDENTIALS_FILE,
-    frpc: desktop.LARK_CODEX_FRPC_CONFIG_FILE,
+    credentials: desktop.CODEXBOARD_FEISHU_CREDENTIALS_FILE,
+    frpc: desktop.CODEXBOARD_FRPC_CONFIG_FILE,
   };
   for (const path of Object.values(paths)) assertRegularFile(path);
   return paths;
@@ -320,7 +320,7 @@ export function readDeploymentConfiguration(directory) {
     try {
       origin = readFrpcOrigin(
         frpc,
-        readLocalPorts(desktopPaths(directory).LARK_CODEX_PORTS_FILE).caddy,
+        readLocalPorts(desktopPaths(directory).CODEXBOARD_PORTS_FILE).caddy,
       );
     } catch (error) {
       originError = error.message;
@@ -347,7 +347,7 @@ export async function saveDeploymentConfiguration(directory, values, verifyFrpc)
   if (!frpc) throw new Error("请填写 frpc.toml 配置");
   const origin = readFrpcOrigin(
     frpc,
-    readLocalPorts(desktopPaths(directory).LARK_CODEX_PORTS_FILE).caddy,
+    readLocalPorts(desktopPaths(directory).CODEXBOARD_PORTS_FILE).caddy,
   );
   if (accessMode === "web" && !origin.startsWith("https://"))
     throw new Error("Web 账号访问必须使用 HTTPS 隧道");
@@ -380,7 +380,7 @@ export async function saveDeploymentConfiguration(directory, values, verifyFrpc)
   const written = [];
   try {
     for (const change of changes) {
-      const temp = join(dirname(change.path), `.lark-config-${randomUUID()}.toml`);
+      const temp = join(dirname(change.path), `.codexboard-config-${randomUUID()}.toml`);
       const previous = existsSync(change.path) ? readFileSync(change.path) : null;
       const mode = previous === null ? 0o600 : statSync(change.path).mode & 0o777;
       writeFileSync(temp, change.content, { mode: 0o600, flag: "wx" });
@@ -504,7 +504,7 @@ async function main() {
     }
     try {
       const paths = desktopPaths(settings.configDirectory);
-      state.ports = readLocalPorts(paths.LARK_CODEX_PORTS_FILE);
+      state.ports = readLocalPorts(paths.CODEXBOARD_PORTS_FILE);
     } catch (error) {
       state.portsMessage = error.message;
     }
@@ -539,7 +539,7 @@ async function main() {
   let healthBusy = false;
   setupController = createSetupController({
     readWebAccounts: () =>
-      manageWebAccounts(desktopPaths(settings.configDirectory).LARK_CODEX_DATA_DIR, "list"),
+      manageWebAccounts(desktopPaths(settings.configDirectory).CODEXBOARD_DATA_DIR, "list"),
     getConfiguration: () => ({
       accessMode: state.deployment.accessMode,
       appId: state.deployment.appId || "",
@@ -563,7 +563,7 @@ async function main() {
       const desktopState = JSON.parse(
         readFileSync(join(homedir(), ".codex/.codex-global-state.json"), "utf8"),
       );
-      c.LARK_CODEX_WORKSPACE_ROOTS = [
+      c.CODEXBOARD_WORKSPACE_ROOTS = [
         ...new Set(
           Object.values(desktopState["local-projects"] || {}).flatMap(
             (project) => project.rootPaths || [],
@@ -576,9 +576,9 @@ async function main() {
       /* Codex may not have been configured yet. */
     }
     const deployment = readDeploymentConfiguration(settings.configDirectory);
-    const ports = readLocalPorts(c.LARK_CODEX_PORTS_FILE);
+    const ports = readLocalPorts(c.CODEXBOARD_PORTS_FILE);
     const env = nativeEnvironment(
-      { LARK_CODEX_ORIGIN: deployment.origin, LARK_CODEX_AUTH_MODE: deployment.accessMode },
+      { CODEXBOARD_ORIGIN: deployment.origin, CODEXBOARD_AUTH_MODE: deployment.accessMode },
       c,
       root,
       ports,
@@ -593,7 +593,7 @@ async function main() {
     )
       throw new Error("请在连接配置中填写 App ID、App Secret 和 frpc 信息");
     if (deployment.originError) throw new Error(deployment.originError);
-    const url = new URL(env.LARK_CODEX_ORIGIN);
+    const url = new URL(env.CODEXBOARD_ORIGIN);
     if (deployment.accessMode === "web" && url.protocol !== "https:")
       throw new Error("Web 账号访问必须使用 HTTPS");
     if (!isSupportedOrigin(url)) throw new Error("公网地址必须是 HTTP/HTTPS 域名或 HTTP 公网 IPv4");
@@ -670,9 +670,9 @@ async function main() {
     try {
       config = configuration();
       const { c, env, url, ports, codex } = config;
-      env.LARK_CODEX_CODEX_COMMAND = codex;
+      env.CODEXBOARD_CODEX_COMMAND = codex;
       await assertPortsFree([ports.api, ports.admin, ports.bridge, ports.caddy]);
-      mkdirSync(join(c.LARK_CODEX_DATA_DIR, "run"), { recursive: true, mode: 0o700 });
+      mkdirSync(join(c.CODEXBOARD_DATA_DIR, "run"), { recursive: true, mode: 0o700 });
       const caddyPath = join(stateDir, "Caddyfile");
       writeFileSync(caddyPath, renderCaddyfile(url, ports), { mode: 0o600 });
       const common = {
@@ -681,11 +681,11 @@ async function main() {
         PATH: `${join(root, "bin")}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin`,
         LANG: "zh_CN.UTF-8",
         ...env,
-        XDG_DATA_HOME: c.LARK_CODEX_CADDY_DATA_DIR,
-        XDG_CONFIG_HOME: c.LARK_CODEX_CADDY_CONFIG_DIR,
+        XDG_DATA_HOME: c.CODEXBOARD_CADDY_DATA_DIR,
+        XDG_CONFIG_HOME: c.CODEXBOARD_CADDY_CONFIG_DIR,
       };
       const node = join(root, "bin/node");
-      launch("Lark-Codex 后端", node, ["apps/server/dist/main.js"], common);
+      launch("CodexBoard 后端", node, ["apps/server/dist/main.js"], common);
       // Do not let Caddy establish a keep-alive connection to another process
       // sharing the wildcard port while our loopback backend is still starting.
       const backendDeadline = Date.now() + 15000;
@@ -700,7 +700,7 @@ async function main() {
         ["run", "--config", caddyPath, "--adapter", "caddyfile"],
         common,
       );
-      launch("公网隧道", join(root, "bin/frpc"), ["-c", c.LARK_CODEX_FRPC_CONFIG_FILE], common);
+      launch("公网隧道", join(root, "bin/frpc"), ["-c", c.CODEXBOARD_FRPC_CONFIG_FILE], common);
       state.url = url.origin;
       state.message = "服务启动中，等待健康检查…";
       publish();
@@ -811,7 +811,7 @@ async function main() {
           state.webAccountsMessage = "正在处理…";
           publish();
           try {
-            const data = desktopPaths(settings.configDirectory).LARK_CODEX_DATA_DIR;
+            const data = desktopPaths(settings.configDirectory).CODEXBOARD_DATA_DIR;
             const { operation, ...input } = request.settings || {};
             const result = await manageWebAccounts(data, operation, input);
             state.webAccounts =
@@ -866,8 +866,8 @@ async function main() {
           try {
             const paths = desktopPaths(settings.configDirectory);
             const savedPorts = await savePorts(
-              paths.LARK_CODEX_PORTS_FILE,
-              paths.LARK_CODEX_FRPC_CONFIG_FILE,
+              paths.CODEXBOARD_PORTS_FILE,
+              paths.CODEXBOARD_FRPC_CONFIG_FILE,
               request.settings || {},
               (file) => verifyFrpcFile(join(root, "bin/frpc"), file),
             );

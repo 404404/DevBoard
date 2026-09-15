@@ -6,7 +6,7 @@ import {
   GitOriginLookupResultSchema,
   type GitCreationOrigin,
   type GitOriginLookup,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 import type { SqliteDatabase } from "../database/index.js";
 
 export type GitOriginReader = (

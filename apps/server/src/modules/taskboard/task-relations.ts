@@ -1,4 +1,4 @@
-import { type CreateTaskRelationCommand } from "@lark-codex/contracts";
+import { type CreateTaskRelationCommand } from "@codexboard/contracts";
 
 import { AppError } from "../../app-error.js";
 import { type SqliteDatabase } from "../database/index.js";

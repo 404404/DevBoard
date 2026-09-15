@@ -42,7 +42,7 @@ if (version !== manifest.codexVersion) {
   );
 }
 
-const outputDirectory = mkdtempSync(join(tmpdir(), "lark-codex-codex-schema-"));
+const outputDirectory = mkdtempSync(join(tmpdir(), "codexboard-codex-schema-"));
 try {
   runCodex(["app-server", "generate-json-schema", "--out", outputDirectory]);
   const schema = JSON.parse(

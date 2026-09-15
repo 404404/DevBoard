@@ -6,19 +6,22 @@ import { defineConfig } from "vite";
 
 // Existing development launch profiles can keep their old variable names.
 const webPort = Number.parseInt(
-  process.env.LARK_CODEX_WEB_PORT ?? process.env.LARK_TASKBOARD_WEB_PORT ?? "5173",
+  process.env.CODEXBOARD_WEB_PORT ??
+    process.env.LARK_CODEX_WEB_PORT ??
+    process.env.LARK_TASKBOARD_WEB_PORT ??
+    "5173",
   10,
 );
 const apiProxyTarget =
-  process.env.LARK_CODEX_WEB_API_TARGET ??
-  process.env.LARK_TASKBOARD_WEB_API_TARGET ??
+  process.env.CODEXBOARD_WEB_API_TARGET ??
+  process.env.CODEXBOARD_WEB_API_TARGET ??
   "http://127.0.0.1:47823";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      "@lark-codex/contracts": fileURLToPath(
+      "@codexboard/contracts": fileURLToPath(
         new URL("../../packages/contracts/src/index.ts", import.meta.url),
       ),
     },

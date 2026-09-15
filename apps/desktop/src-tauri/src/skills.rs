@@ -151,7 +151,7 @@ pub async fn dismiss_skill_offer(app: tauri::AppHandle) -> Result<Value, String>
 // only a fixed canonical target and a sibling staging name, never a UI path.
 pub fn handle_commit_cli() -> Option<i32> {
     let args: Vec<String> = std::env::args().collect();
-    if args.get(1).map(String::as_str) != Some("--lark-codex-skill-commit") {
+    if args.get(1).map(String::as_str) != Some("--codexboard-skill-commit") {
         return None;
     }
     let result = (|| {

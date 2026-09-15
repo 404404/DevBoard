@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { RemoteUploadSchema, REMOTE_UPLOAD_MAX_BYTES } from "@lark-codex/contracts";
+import { RemoteUploadSchema, REMOTE_UPLOAD_MAX_BYTES } from "@codexboard/contracts";
 import { AppError } from "../../app-error.js";
 
 export const REMOTE_CHUNK_BYTES = 192 * 1024;

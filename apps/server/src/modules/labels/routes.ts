@@ -5,7 +5,7 @@ import {
   IdempotencyKeySchema,
   ReorderGlobalLabelsCommandSchema,
   UpdateGlobalLabelCommandSchema,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 

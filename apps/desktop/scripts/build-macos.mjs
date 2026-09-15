@@ -80,7 +80,7 @@ run("cargo", [
   "--manifest-path",
   join(desktop, "src-tauri/Cargo.toml"),
 ]);
-const app = join(desktop, "dist/Lark-Codex.app");
+const app = join(desktop, "dist/CodexBoard.app");
 rmSync(app, { recursive: true, force: true });
 const contents = join(app, "Contents");
 const runtime = join(contents, "Resources/runtime");
@@ -100,12 +100,12 @@ copyRuntimeScripts(project, runtime);
 copyBundledSkill(project, runtime, version);
 writeFileSync(
   join(runtime, "package.json"),
-  JSON.stringify({ name: "lark-codex-desktop-runtime", version, type: "module" }),
+  JSON.stringify({ name: "codexboard-desktop-runtime", version, type: "module" }),
 );
 copyRuntimeDependencies(project, runtime);
-mkdirSync(join(runtime, "node_modules/@lark-codex"), { recursive: true });
+mkdirSync(join(runtime, "node_modules/@codexboard"), { recursive: true });
 for (const name of ["contracts", "taskctl"])
-  symlinkSync(`../../packages/${name}`, join(runtime, "node_modules/@lark-codex", name));
+  symlinkSync(`../../packages/${name}`, join(runtime, "node_modules/@codexboard", name));
 const licenses = join(runtime, "licenses");
 mkdirSync(licenses);
 for (const [name, path] of [
@@ -121,15 +121,17 @@ console.log(`第三方许可：${thirdPartyLicenses.packageCount} 个 npm 包`);
 const cargoLicenses = copyCargoLicenses(project, runtime);
 console.log(`第三方许可：${cargoLicenses.packageCount} 个 Rust crate`);
 cpSync(
-  join(desktop, "src-tauri/target/release/lark-codex-desktop"),
-  join(contents, "MacOS/lark-codex-desktop"),
+  join(desktop, "src-tauri/target/release/codexboard-desktop"),
+  join(contents, "MacOS/codexboard-desktop"),
 );
-const legacyUpdateLauncher = writeLegacyUpdateLauncher(contents);
+const legacyUpdateLaunchers = ["taskboard-desktop", "lark-codex-desktop"].map((name) =>
+  writeLegacyUpdateLauncher(contents, name),
+);
 writeFileSync(
   join(contents, "Info.plist"),
-  `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>lark-codex-desktop</string><key>CFBundleIdentifier</key><string>cn.rocyan.larkcodex.desktop</string><key>CFBundleName</key><string>Lark-Codex</string><key>CFBundleDisplayName</key><string>Lark-Codex</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>${version}</string><key>CFBundleVersion</key><string>${version.split("-")[0]}</string><key>LSMinimumSystemVersion</key><string>13.0</string><key>NSHighResolutionCapable</key><true/></dict></plist>`,
+  `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>codexboard-desktop</string><key>CFBundleIdentifier</key><string>cn.rocyan.codexboard.desktop</string><key>CFBundleName</key><string>CodexBoard</string><key>CFBundleDisplayName</key><string>CodexBoard</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>${version}</string><key>CFBundleVersion</key><string>${version.split("-")[0]}</string><key>LSMinimumSystemVersion</key><string>13.0</string><key>NSHighResolutionCapable</key><true/></dict></plist>`,
 );
-const iconset = join(cache, "Lark-Codex.iconset");
+const iconset = join(cache, "CodexBoard.iconset");
 mkdirSync(iconset, { recursive: true });
 for (const size of [16, 32, 128, 256, 512])
   for (const scale of [1, 2])
@@ -145,13 +147,13 @@ for (const size of [16, 32, 128, 256, 512])
       ],
       { stdio: "ignore" },
     );
-run("iconutil", ["-c", "icns", iconset, "-o", join(contents, "Resources/Lark-Codex.icns")]);
+run("iconutil", ["-c", "icns", iconset, "-o", join(contents, "Resources/CodexBoard.icns")]);
 const plist = join(contents, "Info.plist");
 writeFileSync(
   plist,
   readFileSync(plist, "utf8").replace(
     "</dict>",
-    "<key>CFBundleIconFile</key><string>Lark-Codex.icns</string></dict>",
+    "<key>CFBundleIconFile</key><string>CodexBoard.icns</string></dict>",
   ),
 );
 // Sign every embedded native module before sealing the containing app.
@@ -169,7 +171,7 @@ function signModules(dir) {
 signModules(join(runtime, "node_modules"));
 for (const [name] of assets)
   run("codesign", ["--force", "--sign", "-", join(runtime, "bin", name)]);
-run("codesign", ["--force", "--sign", "-", legacyUpdateLauncher]);
+for (const launcher of legacyUpdateLaunchers) run("codesign", ["--force", "--sign", "-", launcher]);
 run("codesign", ["--force", "--sign", "-", app]);
 run("codesign", ["--verify", "--deep", "--strict", app]);
 run(

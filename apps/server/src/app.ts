@@ -5,7 +5,7 @@ import { GitManagement } from "./modules/project-registry/git-management.js";
 import { registerGitManagementRoutes } from "./modules/project-registry/git-management-routes.js";
 import { join } from "node:path";
 
-import { HealthResponseSchema } from "@lark-codex/contracts";
+import { HealthResponseSchema } from "@codexboard/contracts";
 import cookie from "@fastify/cookie";
 import Fastify, { type FastifyInstance } from "fastify";
 
@@ -126,7 +126,7 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
   });
   const backups = new BackupService({
     database: options.database,
-    dataDirectory: options.config.LARK_CODEX_DATA_DIR,
+    dataDirectory: options.config.CODEXBOARD_DATA_DIR,
   });
   app.addHook("onRequest", async (request, reply) => {
     requestMetrics.begin();
@@ -149,9 +149,9 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
   const identityService = new IdentityService({
     database: options.database,
     provider: identityProvider,
-    sessionTtlSeconds: options.config.LARK_CODEX_SESSION_TTL_SECONDS,
+    sessionTtlSeconds: options.config.CODEXBOARD_SESSION_TTL_SECONDS,
   });
-  if (options.config.LARK_CODEX_AUTH_MODE === "development") {
+  if (options.config.CODEXBOARD_AUTH_MODE === "development") {
     identityService.ensureDevelopmentActor(DEVELOPMENT_IDENTITY);
   }
   const cliAuth = new CliAuthService();
@@ -163,7 +163,7 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
   });
   const eventFeed = new EventFeed({
     database: options.database,
-    historyLimit: options.config.LARK_CODEX_EVENT_HISTORY_LIMIT,
+    historyLimit: options.config.CODEXBOARD_EVENT_HISTORY_LIMIT,
   });
   const projectSync = new ProjectSyncService({
     database: options.database,
@@ -174,14 +174,14 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
     onRevisionCommitted: (revision) => eventFeed.notifyCommitted(revision),
   });
   const projectSnapshotWatcher = new ProjectSnapshotWatcher({
-    snapshotFile: options.config.LARK_CODEX_CODEX_PROJECT_SNAPSHOT_FILE,
+    snapshotFile: options.config.CODEXBOARD_CODEX_PROJECT_SNAPSHOT_FILE,
     service: projectSync,
-    reconcileMs: options.config.LARK_CODEX_PROJECT_SYNC_RECONCILE_MS,
+    reconcileMs: options.config.CODEXBOARD_PROJECT_SYNC_RECONCILE_MS,
   });
   const taskboard = new Taskboard({
     database: options.database,
     identityService,
-    temporaryProjectRoot: options.config.LARK_CODEX_TEMPORARY_PROJECT_ROOT || undefined,
+    temporaryProjectRoot: options.config.CODEXBOARD_TEMPORARY_PROJECT_ROOT || undefined,
     onRevisionCommitted: (revision) => eventFeed.notifyCommitted(revision),
   });
   const workspace = new TaskWorkspace({
@@ -191,8 +191,8 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
     onRevisionCommitted: (revision) => eventFeed.notifyCommitted(revision),
   });
   const attachmentVault = new AttachmentVault({
-    rootDirectory: join(options.config.LARK_CODEX_DATA_DIR, "attachments"),
-    maxBytes: options.config.LARK_CODEX_ATTACHMENT_MAX_BYTES,
+    rootDirectory: join(options.config.CODEXBOARD_DATA_DIR, "attachments"),
+    maxBytes: options.config.CODEXBOARD_ATTACHMENT_MAX_BYTES,
   });
   const attachments = new AttachmentService({
     database: options.database,
@@ -203,13 +203,13 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
   });
   const projectRegistry =
     options.projectRegistry ??
-    new ProjectRegistry(options.database, options.config.LARK_CODEX_WORKSPACE_ROOTS);
+    new ProjectRegistry(options.database, options.config.CODEXBOARD_WORKSPACE_ROOTS);
   const executionQueue = new ExecutionQueue({
     database: options.database,
-    dataDirectory: options.config.LARK_CODEX_DATA_DIR,
-    executorNodePath: options.config.LARK_CODEX_EXECUTOR_NODE_PATH,
-    executorTaskctlPath: options.config.LARK_CODEX_EXECUTOR_TASKCTL_PATH,
-    executorDataDirectory: options.config.LARK_CODEX_EXECUTOR_DATA_DIR,
+    dataDirectory: options.config.CODEXBOARD_DATA_DIR,
+    executorNodePath: options.config.CODEXBOARD_EXECUTOR_NODE_PATH,
+    executorTaskctlPath: options.config.CODEXBOARD_EXECUTOR_TASKCTL_PATH,
+    executorDataDirectory: options.config.CODEXBOARD_EXECUTOR_DATA_DIR,
     onRevisionCommitted: (revision) => eventFeed.notifyCommitted(revision),
   });
   const taskCreation = options.codexThreadProvisioner
@@ -283,7 +283,7 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
     taskboard,
     queue: executionQueue,
     gitFinalizer: new TaskGitFinalizer(
-      options.config.LARK_CODEX_WORKSPACE_ROOTS,
+      options.config.CODEXBOARD_WORKSPACE_ROOTS,
       options.workspaceCommandRunner,
     ),
     scheduleExecution: schedule,
@@ -292,7 +292,7 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
   const gitManagement = new GitManagement(
     options.database,
     projectRegistry,
-    options.config.LARK_CODEX_WORKSPACE_ROOTS,
+    options.config.CODEXBOARD_WORKSPACE_ROOTS,
     options.workspaceCommandRunner,
     options.gitOriginReader,
   );
@@ -389,7 +389,7 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
 
     return HealthResponseSchema.parse({
       status: sqliteHealthy ? "ok" : "degraded",
-      service: "lark-codex-server",
+      service: "codexboard-server",
       version: SERVER_VERSION,
       timestamp: new Date().toISOString(),
       checks: {
@@ -407,7 +407,7 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
 }
 
 function createIdentityProvider(config: AppConfig): IdentityProvider {
-  if (config.LARK_CODEX_AUTH_MODE === "web") {
+  if (config.CODEXBOARD_AUTH_MODE === "web") {
     return {
       kind: "web",
       async exchangeCode() {
@@ -415,12 +415,12 @@ function createIdentityProvider(config: AppConfig): IdentityProvider {
       },
     };
   }
-  if (config.LARK_CODEX_AUTH_MODE === "development") {
+  if (config.CODEXBOARD_AUTH_MODE === "development") {
     return new DevelopmentIdentityAdapter();
   }
 
-  const appId = config.LARK_CODEX_FEISHU_APP_ID;
-  const appSecret = config.LARK_CODEX_FEISHU_APP_SECRET;
+  const appId = config.CODEXBOARD_FEISHU_APP_ID;
+  const appSecret = config.CODEXBOARD_FEISHU_APP_SECRET;
   if (!appId || !appSecret) {
     throw new AppError("CONFIG_INVALID", 500, "飞书认证配置不完整");
   }
@@ -428,6 +428,6 @@ function createIdentityProvider(config: AppConfig): IdentityProvider {
   return new FeishuIdentityAdapter({
     appId,
     appSecret,
-    apiBaseUrl: config.LARK_CODEX_FEISHU_API_BASE_URL,
+    apiBaseUrl: config.CODEXBOARD_FEISHU_API_BASE_URL,
   });
 }

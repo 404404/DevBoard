@@ -11,10 +11,10 @@ import type { AppConfig } from "../config.js";
 const WildcardParamsSchema = z.object({ "*": z.string() });
 
 export function registerProductionWeb(app: FastifyInstance, config: AppConfig): void {
-  if (config.LARK_CODEX_ENV !== "production") return;
+  if (config.CODEXBOARD_ENV !== "production") return;
   app.register(async (web) => {
     await web.register(fastifyStatic, {
-      root: config.LARK_CODEX_WEB_ROOT,
+      root: config.CODEXBOARD_WEB_ROOT,
       wildcard: false,
       index: false,
     });
@@ -24,8 +24,8 @@ export function registerProductionWeb(app: FastifyInstance, config: AppConfig): 
       if (path === "api" || path.startsWith("api/")) {
         throw new AppError("NOT_FOUND", 404, "请求的资源不存在");
       }
-      const candidate = resolve(config.LARK_CODEX_WEB_ROOT, ...path.split("/"));
-      const insideRoot = candidate.startsWith(`${config.LARK_CODEX_WEB_ROOT}${sep}`);
+      const candidate = resolve(config.CODEXBOARD_WEB_ROOT, ...path.split("/"));
+      const insideRoot = candidate.startsWith(`${config.CODEXBOARD_WEB_ROOT}${sep}`);
       if (insideRoot && existsSync(candidate) && lstatSync(candidate).isFile()) {
         return reply.sendFile(path);
       }

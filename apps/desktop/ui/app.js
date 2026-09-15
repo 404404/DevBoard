@@ -68,7 +68,7 @@ const labels = {
   stopping: "正在停止",
   error: "需要处理",
 };
-const names = ["Lark-Codex 后端", "Caddy", "公网隧道"];
+const names = ["CodexBoard 后端", "Caddy", "公网隧道"];
 async function action(name, args = {}) {
   if (pending || !invoke) return false;
   pending = true;
@@ -600,7 +600,7 @@ async function poll() {
     else
       render({
         phase: "stopped",
-        message: "界面预览 · 请在 Lark-Codex 应用中启动服务",
+        message: "界面预览 · 请在 CodexBoard 应用中启动服务",
         services: [],
         logs: [],
       });

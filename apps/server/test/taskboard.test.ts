@@ -1,5 +1,5 @@
 import { seedProjectMember } from "./helpers/project-member-fixture.js";
-import { identityKey, type IdentityRef } from "@lark-codex/contracts";
+import { identityKey, type IdentityRef } from "@codexboard/contracts";
 import { seedFeishuTestActor, TEST_FEISHU_ACTOR } from "./helpers/identity.js";
 import {
   ALL_PROJECT_ID,
@@ -8,7 +8,7 @@ import {
   type PrincipalView,
   type CreateTaskCommand,
   type LocalDevelopmentContextView,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -641,7 +641,7 @@ describe("Taskboard module", () => {
 
   it("allows reassignment when the Thread cwd and target root resolve to the same directory", () => {
     const { database, project, taskboard } = setup();
-    const directory = mkdtempSync(join(tmpdir(), "lark-codex-reassign-"));
+    const directory = mkdtempSync(join(tmpdir(), "codexboard-reassign-"));
     temporaryDirectories.push(directory);
     const sourceRoot = join(directory, "source");
     const targetAlias = join(directory, "target-alias");

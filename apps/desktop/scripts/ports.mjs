@@ -87,7 +87,7 @@ export async function savePorts(file, tunnel, values, verifyFrpc) {
     written = [];
   try {
     for (const change of changes) {
-      const temp = join(dirname(change.path), `.lark-ports-${randomUUID()}.toml`);
+      const temp = join(dirname(change.path), `.codexboard-ports-${randomUUID()}.toml`);
       const old = existsSync(change.path) ? readFileSync(change.path) : null;
       const mode = old === null ? 0o600 : lstatSync(change.path).mode & 0o777;
       writeFileSync(temp, change.content, { flag: "wx", mode: 0o600 });

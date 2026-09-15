@@ -1,8 +1,8 @@
 # taskctl 命令参考
 
 `node packages/taskctl/dist/cli.js --help` 可以在服务未运行时查看全部命令。
-构建：`npm run build -w @lark-codex/taskctl`。运行时从
-`LARK_CODEX_DATA_DIR/run/runtime.json` 读取本机管理地址和能力令牌；源码 CLI 默认使用当前目录下的 `.data`。安装版 Skill 包装器使用 `~/Library/Application Support/Lark-Codex/data`，入口见 [Agent 操作指南](../AGENTS.md#5-安装-skill-并调用内置-taskctl)。新变量未设置时兼容旧 `LARK_TASKBOARD_DATA_DIR`，显式新值优先；开发时应指定独立的数据目录。
+构建：`npm run build -w @codexboard/taskctl`。运行时从
+`CODEXBOARD_DATA_DIR/run/runtime.json` 读取本机管理地址和能力令牌；源码 CLI 默认使用当前目录下的 `.data`。安装版 Skill 包装器使用 `~/Library/Application Support/CodexBoard/data`，入口见 [Agent 操作指南](../AGENTS.md#5-安装-skill-并调用内置-taskctl)。新变量未设置时兼容旧 `CODEXBOARD_DATA_DIR`，显式新值优先；开发时应指定独立的数据目录。
 所有业务操作通过受保护的本机 HTTP 接口执行，结果保持 JSON 格式。退出码：0 成功、1 服务或运行错误、2 用法错误。
 
 | 功能                   | 命令                                                                                     |

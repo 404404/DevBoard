@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { TaskView } from "@lark-codex/contracts";
+import type { TaskView } from "@codexboard/contracts";
 import { TaskAutosave } from "./task-autosave";
 
 const task: TaskView = {

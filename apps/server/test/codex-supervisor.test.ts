@@ -29,7 +29,7 @@ describe("Codex App Server supervisor", () => {
     const child = new FakeProcess();
     const spawnProcess = vi.fn(() => child);
     const supervisor = new CodexAppServerSupervisor({
-      socketPath: "/private/tmp/lark-codex-test.sock",
+      socketPath: "/private/tmp/codexboard-test.sock",
       spawnProcess,
       readinessProbe: async () => true,
       startupTimeoutMs: 200,
@@ -46,7 +46,7 @@ describe("Codex App Server supervisor", () => {
         "--codex",
         "codex",
         "--listen",
-        "unix:///private/tmp/lark-codex-test.sock",
+        "unix:///private/tmp/codexboard-test.sock",
       ],
       expect.objectContaining({ stdio: ["ignore", "ignore", "pipe"] }),
     );
@@ -60,7 +60,7 @@ describe("Codex App Server supervisor", () => {
   it("fails startup without leaking stderr secrets", async () => {
     const child = new FakeProcess();
     const supervisor = new CodexAppServerSupervisor({
-      socketPath: "/private/tmp/lark-codex-test.sock",
+      socketPath: "/private/tmp/codexboard-test.sock",
       spawnProcess: () => {
         queueMicrotask(() => {
           child.stderr.write("Authorization: Bearer very-secret-token\n");
@@ -83,7 +83,7 @@ describe("Codex App Server supervisor", () => {
     const child = new FakeProcess();
     const onUnexpectedExit = vi.fn();
     const supervisor = new CodexAppServerSupervisor({
-      socketPath: "/private/tmp/lark-codex-test.sock",
+      socketPath: "/private/tmp/codexboard-test.sock",
       spawnProcess: () => child,
       readinessProbe: async () => true,
     });
@@ -100,7 +100,7 @@ describe("Codex App Server supervisor", () => {
   it("replays a clean unexpected exit that occurs before the restart handler is registered", async () => {
     const child = new FakeProcess();
     const supervisor = new CodexAppServerSupervisor({
-      socketPath: "/private/tmp/lark-codex-late-handler.sock",
+      socketPath: "/private/tmp/codexboard-late-handler.sock",
       spawnProcess: () => child,
       readinessProbe: async () => true,
     });
@@ -121,7 +121,7 @@ describe("Codex App Server supervisor", () => {
   });
 
   it("refuses to remove a non-socket file from the configured socket path", async () => {
-    const directory = mkdtempSync(join(tmpdir(), "lark-codex-supervisor-"));
+    const directory = mkdtempSync(join(tmpdir(), "codexboard-supervisor-"));
     const socketPath = join(directory, "codex.sock");
     writeFileSync(socketPath, "do-not-delete");
     const spawnProcess = vi.fn(() => new FakeProcess());
@@ -135,7 +135,7 @@ describe("Codex App Server supervisor", () => {
   });
 
   it("turns an asynchronous spawn error into a stable startup failure", async () => {
-    const directory = mkdtempSync(join(tmpdir(), "lark-codex-spawn-error-"));
+    const directory = mkdtempSync(join(tmpdir(), "codexboard-spawn-error-"));
     const missingCommand = join(directory, "missing-codex");
     const child = new FakeProcess();
     const supervisor = new CodexAppServerSupervisor({

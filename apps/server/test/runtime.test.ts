@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, statSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { RuntimeDescriptorSchema } from "@lark-codex/contracts";
+import { RuntimeDescriptorSchema } from "@codexboard/contracts";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { AppError } from "../src/app-error.js";
@@ -18,7 +18,7 @@ afterEach(() => {
 });
 
 function temporaryDirectory(): string {
-  const directory = mkdtempSync(join(tmpdir(), "lark-codex-runtime-"));
+  const directory = mkdtempSync(join(tmpdir(), "codexboard-runtime-"));
   temporaryDirectories.push(directory);
   return directory;
 }
@@ -27,9 +27,9 @@ describe("runtime descriptor", () => {
   it("publishes a private descriptor and removes only its own runtime file", () => {
     const dataDirectory = temporaryDirectory();
     const config = loadConfig({
-      LARK_CODEX_ENV: "test",
-      LARK_CODEX_DATA_DIR: dataDirectory,
-      LARK_CODEX_WORKSPACE_ROOTS: dataDirectory,
+      CODEXBOARD_ENV: "test",
+      CODEXBOARD_DATA_DIR: dataDirectory,
+      CODEXBOARD_WORKSPACE_ROOTS: dataDirectory,
     });
     const capability = createRuntimeCapability();
     const handle = publishRuntimeDescriptor(
@@ -57,9 +57,9 @@ describe("runtime descriptor", () => {
     mkdirSync(join(dataDirectory), { recursive: true });
     symlinkSync(target, join(dataDirectory, "run"));
     const config = loadConfig({
-      LARK_CODEX_ENV: "test",
-      LARK_CODEX_DATA_DIR: dataDirectory,
-      LARK_CODEX_WORKSPACE_ROOTS: dataDirectory,
+      CODEXBOARD_ENV: "test",
+      CODEXBOARD_DATA_DIR: dataDirectory,
+      CODEXBOARD_WORKSPACE_ROOTS: dataDirectory,
     });
 
     expect(() => publishRuntimeDescriptor(config, createRuntimeCapability())).toThrowError(

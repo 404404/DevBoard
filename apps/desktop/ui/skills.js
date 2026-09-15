@@ -25,7 +25,7 @@
   }
 
   function blocked() {
-    return busy || readingFailed || Boolean(window.larkAppUpdateInstalling);
+    return busy || readingFailed || Boolean(window.codexBoardAppUpdateInstalling);
   }
 
   function render() {
@@ -82,7 +82,7 @@
       state?.offerDismissed ||
       state?.status !== "notInstalled" ||
       !state?.canInstall ||
-      window.larkAppUpdateInstalling
+      window.codexBoardAppUpdateInstalling
     )
       return;
     if (
@@ -128,7 +128,7 @@
     const fingerprint = replaceModified ? replaceFingerprint : state.fingerprint;
     if (!fingerprint || (replaceModified && fingerprint !== state.fingerprint)) return;
     busy = true;
-    window.larkSkillInstallPending = true;
+    window.codexBoardSkillInstallPending = true;
     generation++;
     error = "";
     message("skill-offer-error", "");
@@ -146,7 +146,7 @@
       error = String(cause);
     } finally {
       busy = false;
-      window.larkSkillInstallPending = false;
+      window.codexBoardSkillInstallPending = false;
       if (error) {
         message("skill-offer-error", error);
         message("skill-replace-error", error);
@@ -209,7 +209,7 @@
       status: "unavailable",
       canInstall: false,
       canReplace: false,
-      message: "请在 Lark-Codex 应用中安装配套 Skill。",
+      message: "请在 CodexBoard 应用中安装配套 Skill。",
     };
     render();
   }

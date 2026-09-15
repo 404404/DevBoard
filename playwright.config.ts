@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const publicPort = Number.parseInt(process.env.LARK_CODEX_PORT ?? "47823", 10);
-const webPort = Number.parseInt(process.env.LARK_CODEX_WEB_PORT ?? "5173", 10);
+const publicPort = Number.parseInt(process.env.CODEXBOARD_PORT ?? "47823", 10);
+const webPort = Number.parseInt(process.env.CODEXBOARD_WEB_PORT ?? "5173", 10);
 
 export default defineConfig({
   testDir: "./e2e",
@@ -38,7 +38,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "npm run build -w @lark-codex/contracts && npx tsx apps/server/src/main.ts",
+      command: "npm run build -w @codexboard/contracts && npx tsx apps/server/src/main.ts",
       url: `http://127.0.0.1:${publicPort}/api/health`,
       reuseExistingServer: false,
       timeout: 120_000,

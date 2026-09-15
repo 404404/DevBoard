@@ -312,12 +312,12 @@ fn install_and_restart(
     controller.drain_for_update()?;
     // The new process waits for our instance lock. Only quit after spawn succeeds.
     Command::new(&executable)
-        .arg("--lark-codex-updated")
+        .arg("--codexboard-updated")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
-        .map_err(|_| "更新已安装，但无法自动重新启动。请退出并重新打开 Lark-Codex。")?;
+        .map_err(|_| "更新已安装，但无法自动重新启动。请退出并重新打开 CodexBoard。")?;
     controller.quitting.store(true, Ordering::SeqCst);
     app.exit(0);
     Ok(())
@@ -380,7 +380,7 @@ fn validate_archive(bytes: &[u8]) -> Result<(), ()> {
             }
         } else if kind.is_file() {
             files.insert(relative.clone());
-            if relative == Path::new("Contents/MacOS/lark-codex-desktop")
+            if relative == Path::new("Contents/MacOS/codexboard-desktop")
                 && entry.header().mode().map_err(|_| ())? & 0o111 == 0
             {
                 return Err(());
@@ -391,7 +391,7 @@ fn validate_archive(bytes: &[u8]) -> Result<(), ()> {
     }
     for required in [
         "Contents/Info.plist",
-        "Contents/MacOS/lark-codex-desktop",
+        "Contents/MacOS/codexboard-desktop",
         "Contents/Resources/runtime/bin/node",
         "Contents/Resources/runtime/desktop/runtime.mjs",
     ] {
@@ -432,16 +432,16 @@ mod tests {
     #[test]
     fn requires_one_complete_application_archive() {
         let required = [
-            "Lark-Codex.app/Contents/Info.plist",
-            "Lark-Codex.app/Contents/MacOS/lark-codex-desktop",
-            "Lark-Codex.app/Contents/Resources/runtime/bin/node",
-            "Lark-Codex.app/Contents/Resources/runtime/desktop/runtime.mjs",
+            "CodexBoard.app/Contents/Info.plist",
+            "CodexBoard.app/Contents/MacOS/codexboard-desktop",
+            "CodexBoard.app/Contents/Resources/runtime/bin/node",
+            "CodexBoard.app/Contents/Resources/runtime/desktop/runtime.mjs",
         ];
         assert!(validate_archive(&archive(&required)).is_ok());
         // The regular forwarding executable keeps already-published updaters
         // compatible while this version requires the renamed main executable.
         let mut compatible = required.to_vec();
-        compatible.push("Lark-Codex.app/Contents/MacOS/taskboard-desktop");
+        compatible.push("CodexBoard.app/Contents/MacOS/taskboard-desktop");
         assert!(validate_archive(&archive(&compatible)).is_ok());
         assert!(validate_archive(&archive(&required[..3])).is_err());
         let mut mixed = required.to_vec();
@@ -457,10 +457,10 @@ mod tests {
     fn rejects_links_that_escape_the_signed_application_root() {
         fn linked_archive(target: &str) -> Vec<u8> {
             let complete = archive(&[
-                "Lark-Codex.app/Contents/Info.plist",
-                "Lark-Codex.app/Contents/MacOS/lark-codex-desktop",
-                "Lark-Codex.app/Contents/Resources/runtime/bin/node",
-                "Lark-Codex.app/Contents/Resources/runtime/desktop/runtime.mjs",
+                "CodexBoard.app/Contents/Info.plist",
+                "CodexBoard.app/Contents/MacOS/codexboard-desktop",
+                "CodexBoard.app/Contents/Resources/runtime/bin/node",
+                "CodexBoard.app/Contents/Resources/runtime/desktop/runtime.mjs",
             ]);
             let mut source = tar::Archive::new(GzDecoder::new(Cursor::new(complete)));
             let mut result = tar::Builder::new(GzEncoder::new(Vec::new(), Compression::default()));
@@ -474,7 +474,7 @@ mod tests {
             header.set_mode(0o777);
             header.set_size(0);
             result
-                .append_link(&mut header, "Lark-Codex.app/Contents/link", target)
+                .append_link(&mut header, "CodexBoard.app/Contents/link", target)
                 .unwrap();
             result.into_inner().unwrap().finish().unwrap()
         }
@@ -484,10 +484,10 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires the release tar.gz supplied in LARK_CODEX_UPDATE_ARCHIVE"]
+    #[ignore = "Requires the release tar.gz supplied in CODEXBOARD_UPDATE_ARCHIVE"]
     fn packaged_update_archive_matches_native_structure_check() {
-        let path = std::env::var_os("LARK_CODEX_UPDATE_ARCHIVE")
-            .expect("LARK_CODEX_UPDATE_ARCHIVE must point to the release tar.gz");
+        let path = std::env::var_os("CODEXBOARD_UPDATE_ARCHIVE")
+            .expect("CODEXBOARD_UPDATE_ARCHIVE must point to the release tar.gz");
         let bytes = fs::read(path).expect("release archive must be readable");
         assert!(
             validate_archive(&bytes).is_ok(),

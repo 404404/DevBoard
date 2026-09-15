@@ -1,6 +1,6 @@
 # 第三方许可补件
 
-这些文件仅补足上游 npm 和 Cargo 发行包未携带的第三方许可正文，不授予或选择 Lark-Codex 自身的许可证。构建时读取本地副本，不联网获取。
+这些文件仅补足上游 npm 和 Cargo 发行包未携带的第三方许可正文，不授予或选择 CodexBoard 自身的许可证。构建时读取本地副本，不联网获取。
 
 Cargo 补件的逐版本来源、完整性校验和适用条件见 [cargo/supplements.json](cargo/supplements.json)，每个仓库快照目录有独立 README。Cargo 包的正文直接来自本机锁定版本 registry；只有缺失正文的包使用固定上游 commit 补件。生成的 npm 和 Cargo 索引分别位于运行包的 `licenses/npm/index.json` 和 `licenses/cargo/index.json`。
 

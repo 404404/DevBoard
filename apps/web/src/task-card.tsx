@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { readTaskCreationOptions, apiRequest } from "./api";
 import { z } from "zod";
 import { GitBranch } from "./git-branch-icon";
-import { TaskProgressSchema, type ProjectKind, type TaskView } from "@lark-codex/contracts";
+import { TaskProgressSchema, type ProjectKind, type TaskView } from "@codexboard/contracts";
 import {
   useEffect,
   useId,

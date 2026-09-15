@@ -6,9 +6,9 @@ import { homedir } from "node:os";
 import { z } from "zod";
 import {
   FeishuIdentityRefSchema,
-  normalizeLarkCodexEnvironment,
+  normalizeCodexBoardEnvironment,
   type RuntimeDescriptor,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 
 export interface CredentialStore {
   read(path: string): Promise<string | null>;
@@ -57,17 +57,17 @@ export function runtimeScope(runtime: RuntimeDescriptor): string {
 export function authFileLocations(
   environment: NodeJS.ProcessEnv = process.env,
   userHome = homedir(),
-): { current: string; legacy?: string } {
-  const env = normalizeLarkCodexEnvironment(environment);
-  if (env.LARK_CODEX_AUTH_FILE !== undefined) {
-    if (!env.LARK_CODEX_AUTH_FILE.trim())
-      throw new TaskctlAuthError("CLI_AUTH_FILE_INVALID", "LARK_CODEX_AUTH_FILE 不能为空");
-    return { current: env.LARK_CODEX_AUTH_FILE };
+): { current: string; legacy?: string | readonly string[] } {
+  const env = normalizeCodexBoardEnvironment(environment);
+  if (env.CODEXBOARD_AUTH_FILE !== undefined) {
+    if (!env.CODEXBOARD_AUTH_FILE.trim())
+      throw new TaskctlAuthError("CLI_AUTH_FILE_INVALID", "CODEXBOARD_AUTH_FILE 不能为空");
+    return { current: env.CODEXBOARD_AUTH_FILE };
   }
   const directory = env.XDG_CONFIG_HOME ?? join(userHome, ".config");
   return {
-    current: join(directory, "lark-codex", "taskctl-auth"),
-    legacy: join(directory, "lark-taskboard", "taskctl-auth"),
+    current: join(directory, "codexboard", "taskctl-auth"),
+    legacy: ["lark-codex", "lark-taskboard"].map((name) => join(directory, name, "taskctl-auth")),
   };
 }
 export function defaultAuthFile(): string {
@@ -77,33 +77,36 @@ export function defaultAuthFile(): string {
 /** Read only the matching runtime scope from the previous default location.
  * Existing new credentials, including invalid/expired ones, never fall back. */
 export function compatibleCredentialStore(
-  locations: { current: string; legacy?: string },
+  locations: { current: string; legacy?: string | readonly string[] },
   store: CredentialStore = defaultCredentialStore,
 ): CredentialStore {
-  const oldPath = (path: string) => {
+  const oldPaths = (path: string): string[] => {
     const suffix = path.slice(locations.current.length);
-    return locations.legacy &&
-      path.startsWith(locations.current) &&
-      /^\.[a-f0-9]{64}(?:\.pending)?\.json$/.test(suffix)
-      ? `${locations.legacy}${suffix}`
-      : undefined;
+    if (!path.startsWith(locations.current) || !/^\.[a-f0-9]{64}(?:\.pending)?\.json$/.test(suffix))
+      return [];
+    const legacy =
+      typeof locations.legacy === "string" ? [locations.legacy] : (locations.legacy ?? []);
+    return legacy.map((base) => `${base}${suffix}`);
   };
   return {
     async read(path) {
       const value = await store.read(path);
       if (value !== null) return value;
-      const legacy = oldPath(path);
-      return legacy ? store.read(legacy) : null;
+      for (const legacy of oldPaths(path)) {
+        const previous = await store.read(legacy);
+        if (previous !== null) return previous;
+      }
+      return null;
     },
     write: (path, value) => store.write(path, value),
     async remove(path) {
-      const legacy = oldPath(path);
-      // Clear legacy first: a failure must not expose it after removing current.
-      if (legacy) await store.remove(legacy);
+      // Clear all older generations first so logout cannot revive old credentials.
+      for (const legacy of oldPaths(path)) await store.remove(legacy);
       await store.remove(path);
     },
   };
 }
+
 export function credentialPaths(runtime: RuntimeDescriptor, base: string) {
   const scope = runtimeScope(runtime);
   return { scope, session: `${base}.${scope}.json`, pending: `${base}.${scope}.pending.json` };

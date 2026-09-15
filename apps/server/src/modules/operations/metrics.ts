@@ -1,4 +1,4 @@
-import type { RequestMetricsView } from "@lark-codex/contracts";
+import type { RequestMetricsView } from "@codexboard/contracts";
 
 export class RequestMetrics {
   #total = 0;

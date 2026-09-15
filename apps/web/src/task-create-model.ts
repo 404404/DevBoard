@@ -1,4 +1,4 @@
-import type { TaskPriority } from "@lark-codex/contracts";
+import type { TaskPriority } from "@codexboard/contracts";
 
 export type ResizeEdge = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 

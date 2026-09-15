@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { RemoteAction, RemoteThread } from "@lark-codex/contracts";
+import type { RemoteAction, RemoteThread } from "@codexboard/contracts";
 import { remoteErrorMessage } from "./remote-api";
 import { MarkdownContent } from "./markdown";
 import { RemoteEditIcon, RemoteQuestionIcon } from "./remote-message-icons";

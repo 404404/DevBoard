@@ -15,13 +15,13 @@ int main(int argc, char **argv) {
     char *name = strrchr(executable, '/');
     if (name != NULL) {
       size_t available = sizeof(executable) - (size_t)(name + 1 - executable);
-      int written = snprintf(name + 1, available, "%s", "lark-codex-desktop");
+      int written = snprintf(name + 1, available, "%s", "codexboard-desktop");
       if (written > 0 && (size_t)written < available) {
         argv[0] = executable;
         execv(executable, argv);
       }
     }
   }
-  fputs("无法启动更新后的 Lark-Codex，请重新安装完整应用。\n", stderr);
+  fputs("无法启动更新后的 CodexBoard，请重新安装完整应用。\n", stderr);
   return 1;
 }

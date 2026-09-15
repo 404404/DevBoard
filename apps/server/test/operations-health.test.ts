@@ -1,4 +1,4 @@
-import { identityKey } from "@lark-codex/contracts";
+import { identityKey } from "@codexboard/contracts";
 import { seedFeishuTestActor, TEST_FEISHU_IDENTITY } from "./helpers/identity.js";
 import { describe, expect, it } from "vitest";
 

@@ -25,7 +25,7 @@ describe("structured logging", () => {
     });
     const secret = "super-secret-value";
     const app = createApp({
-      config: loadConfig({ LARK_CODEX_ENV: "test" }),
+      config: loadConfig({ CODEXBOARD_ENV: "test" }),
       database: initializeDatabase(":memory:"),
       logger: createLoggerOptions("info", "public-http", stream),
     });

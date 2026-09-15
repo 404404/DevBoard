@@ -8,7 +8,7 @@ import { parse } from "smol-toml";
 const frpc =
   'serverPort = 7000\nauth.token = "private-fixture"\n[[proxies]]\nname = "board"\ntype = "https"\nlocalIP = "127.0.0.1"\nlocalPort = 8443\ncustomDomains = ["tasks.example.com"]\n';
 function fixture(t) {
-  const dir = mkdtempSync(join(tmpdir(), "lark-ports-"));
+  const dir = mkdtempSync(join(tmpdir(), "codexboard-ports-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const file = join(dir, "ports.json"),
     tunnel = join(dir, "frpc.toml");

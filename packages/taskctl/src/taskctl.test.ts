@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import type { RuntimeDescriptor } from "@lark-codex/contracts";
+import type { RuntimeDescriptor } from "@codexboard/contracts";
 import { describe, expect, it } from "vitest";
 
 import { defaultTaskctlDependencies, runTaskctl, type TaskctlDependencies } from "./index";

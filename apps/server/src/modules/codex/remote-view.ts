@@ -9,7 +9,7 @@ import {
   remoteTurnItems,
   describeRemotePermissions,
   type RemoteThread,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 import { createHash } from "node:crypto";
 
 function record(value: unknown): Record<string, unknown> {

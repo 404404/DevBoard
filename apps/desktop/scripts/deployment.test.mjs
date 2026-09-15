@@ -20,7 +20,7 @@ import {
 const tunnel = (domain) =>
   `[[proxies]]\nname = "board"\ntype = "https"\nlocalIP = "127.0.0.1"\nlocalPort = 8443\ncustomDomains = ["${domain}"]\n`;
 function fixture(t) {
-  const base = mkdtempSync(join(tmpdir(), "lark-config-"));
+  const base = mkdtempSync(join(tmpdir(), "codexboard-config-"));
   t.after(() => rmSync(base, { recursive: true, force: true }));
   const dir = join(base, "deploy");
   initializeDeployment(dir);
@@ -157,7 +157,7 @@ test("file reads reflect changed frpc domain while preserving the editable inval
 });
 test("first launch creates credentials and token once without env files", (t) => {
   const f = fixture(t);
-  const token = desktopPaths(f.dir).LARK_CODEX_CODEX_TOKEN_FILE;
+  const token = desktopPaths(f.dir).CODEXBOARD_CODEX_TOKEN_FILE;
   const before = readFileSync(token, "utf8");
   initializeDeployment(f.dir);
   assert.equal(readFileSync(token, "utf8"), before);
@@ -173,7 +173,7 @@ test("migrates legacy credentials once before removing old files", (t) => {
     oldSecret = join(f.base, "secrets/feishu-app-secret");
   writeFileSync(
     oldProd,
-    'LARK_TASKBOARD_FEISHU_APP_ID="cli_migrated"\nLARK_TASKBOARD_ORIGIN=https://stale.test\n',
+    'CODEXBOARD_FEISHU_APP_ID="cli_migrated"\nCODEXBOARD_ORIGIN=https://stale.test\n',
   );
   writeFileSync(oldSecret, "migrated-secret\n", { mode: 0o600 });
   initializeDeployment(f.dir);
@@ -187,7 +187,7 @@ test("migrates legacy credentials once before removing old files", (t) => {
 test("conflicting renamed credential keys preserve the complete legacy configuration", (t) => {
   const f = fixture(t);
   const oldProd = join(f.dir, "production.env");
-  const body = "LARK_CODEX_FEISHU_APP_ID=cli_new\nLARK_TASKBOARD_FEISHU_APP_ID=cli_old\n";
+  const body = "CODEXBOARD_FEISHU_APP_ID=cli_new\nLARK_CODEX_FEISHU_APP_ID=cli_old\n";
   writeFileSync(oldProd, body);
   const before = readFileSync(f.credentials);
   assert.throws(() => initializeDeployment(f.dir), /不一致/);
@@ -198,7 +198,7 @@ test("conflicting renamed credential keys preserve the complete legacy configura
 test("malformed new credential file does not erase legacy data", (t) => {
   const f = fixture(t);
   const oldProd = join(f.dir, "production.env");
-  writeFileSync(oldProd, "LARK_CODEX_FEISHU_APP_ID=cli_old\n");
+  writeFileSync(oldProd, "CODEXBOARD_FEISHU_APP_ID=cli_old\n");
   writeFileSync(f.credentials, "invalid secret-value");
   assert.throws(() => initializeDeployment(f.dir), /凭据/);
   assert.equal(existsSync(oldProd), true);
@@ -228,7 +228,7 @@ test("extra credential JSON fields are reported consistently with the backend", 
 test("an explicit save resolves conflicting legacy credentials without retaining old files", async (t) => {
   const f = fixture(t);
   const legacy = join(f.dir, "production.env");
-  writeFileSync(legacy, "LARK_CODEX_FEISHU_APP_ID=cli_conflict\n");
+  writeFileSync(legacy, "CODEXBOARD_FEISHU_APP_ID=cli_conflict\n");
   assert.throws(() => initializeDeployment(f.dir), /不一致/);
   await saveDeploymentConfiguration(
     f.dir,

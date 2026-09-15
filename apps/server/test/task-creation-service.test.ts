@@ -1,10 +1,10 @@
-import { identityKey } from "@lark-codex/contracts";
+import { identityKey } from "@codexboard/contracts";
 import { seedFeishuTestActor, TEST_FEISHU_ACTOR } from "./helpers/identity.js";
 import {
   CreateTaskCommandSchema,
   TEMPORARY_PROJECT_ID,
   type PrincipalView,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { initializeDatabase, type SqliteDatabase } from "../src/modules/database/index.js";

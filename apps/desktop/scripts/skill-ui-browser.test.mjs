@@ -20,7 +20,7 @@ async function fixture(browser, state = {}) {
       installedVersion: null,
       offerDismissed: false,
       status: "notInstalled",
-      targetPath: "/Users/example/.agents/skills/manage-lark-codex",
+      targetPath: "/Users/example/.agents/skills/manage-codexboard",
       fingerprint: "original",
       message: "",
       canInstall: true,
@@ -76,18 +76,18 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
     try {
       const { page, errors } = await fixture(browser);
       await page.locator("#skill-offer-dialog").waitFor({ state: "visible" });
-      if (process.env.LARK_SKILL_UI_ARTIFACT_DIR)
+      if (process.env.CODEXBOARD_SKILL_UI_ARTIFACT_DIR)
         await page.screenshot({
-          path: `${process.env.LARK_SKILL_UI_ARTIFACT_DIR}/${name}-offer.png`,
+          path: `${process.env.CODEXBOARD_SKILL_UI_ARTIFACT_DIR}/${name}-offer.png`,
         });
       assert.deepEqual(await page.evaluate(() => window.skillCalls), []);
       assert.equal(await page.evaluate(() => document.activeElement.id), "skill-offer-later");
       await page.locator("#skill-offer-later").click();
       assert.equal(await page.locator("#skill-offer-dialog").isVisible(), false);
       await page.locator('[data-tab="settings"]').click();
-      if (process.env.LARK_SKILL_UI_ARTIFACT_DIR)
+      if (process.env.CODEXBOARD_SKILL_UI_ARTIFACT_DIR)
         await page.screenshot({
-          path: `${process.env.LARK_SKILL_UI_ARTIFACT_DIR}/${name}-settings.png`,
+          path: `${process.env.CODEXBOARD_SKILL_UI_ARTIFACT_DIR}/${name}-settings.png`,
         });
       await page.locator("#skill-install").click();
       await page.waitForFunction(() =>
@@ -114,7 +114,7 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
       assert.equal((await page.evaluate(() => window.skillCalls)).length, 2);
       assert.equal(await page.locator("#skill-offer-dialog").isVisible(), false);
       await page.evaluate(() => {
-        window.larkAppUpdateInstalling = true;
+        window.codexBoardAppUpdateInstalling = true;
       });
       await page.locator("#skill-refresh").click();
       await page.waitForFunction(() => document.getElementById("skill-install").disabled);
@@ -138,10 +138,10 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
       await page.locator('[data-tab="settings"]').click();
       await page.locator("#skill-replace").click();
       await page.locator("#skill-replace-dialog").waitFor({ state: "visible" });
-      if (process.env.LARK_SKILL_UI_ARTIFACT_DIR) {
+      if (process.env.CODEXBOARD_SKILL_UI_ARTIFACT_DIR) {
         await page.setViewportSize({ width: 780, height: 580 });
         await page.screenshot({
-          path: `${process.env.LARK_SKILL_UI_ARTIFACT_DIR}/${name}-replace.png`,
+          path: `${process.env.CODEXBOARD_SKILL_UI_ARTIFACT_DIR}/${name}-replace.png`,
         });
       }
       assert.deepEqual(await page.evaluate(() => window.skillCalls), []);

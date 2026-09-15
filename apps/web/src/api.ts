@@ -2,7 +2,7 @@ import {
   GitManagementViewSchema,
   type CreateGitResourceCommand,
   type DeleteGitResourceCommand,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 import { createUuid } from "./random-id";
 import {
   AuthBootstrapSchema,
@@ -45,7 +45,7 @@ import {
   TaskLifecycleViewSchema,
   type TaskLifecycleView,
   type TaskLifecycleCommand,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 import { z } from "zod";
 
 const ProjectListResponseSchema = z.object({ data: z.array(ProjectViewSchema) });

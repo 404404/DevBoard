@@ -24,11 +24,11 @@ function cookies(response: Awaited<ReturnType<FastifyInstance["inject"]>>): stri
 
 describe("global label HTTP routes", () => {
   it("supports authenticated reads and CSRF/idempotency-protected admin CRUD", async () => {
-    const dataDirectory = mkdtempSync(join(tmpdir(), "lark-codex-label-http-"));
+    const dataDirectory = mkdtempSync(join(tmpdir(), "codexboard-label-http-"));
     directories.push(dataDirectory);
     const config = loadConfig({
-      LARK_CODEX_ENV: "test",
-      LARK_CODEX_DATA_DIR: dataDirectory,
+      CODEXBOARD_ENV: "test",
+      CODEXBOARD_DATA_DIR: dataDirectory,
     });
     const app = createApp({ config, database: initializeDatabase(":memory:") });
     apps.push(app);

@@ -16,11 +16,11 @@ import test from "node:test";
 import { copyBundledSkill } from "./package-skills.mjs";
 
 function fixture(t) {
-  const root = mkdtempSync(join(tmpdir(), "lark-skill-package-"));
+  const root = mkdtempSync(join(tmpdir(), "codexboard-skill-package-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  const source = join(root, "skills/manage-lark-codex");
+  const source = join(root, "skills/manage-codexboard");
   mkdirSync(join(source, "scripts"), { recursive: true });
-  writeFileSync(join(source, "SKILL.md"), "---\nname: manage-lark-codex\ndescription: test\n---\n");
+  writeFileSync(join(source, "SKILL.md"), "---\nname: manage-codexboard\ndescription: test\n---\n");
   writeFileSync(join(source, "scripts/taskctl.sh"), "#!/bin/sh\nexit 0\n");
   writeFileSync(join(source, "README.md"), "Repository-only installation guide");
   return { root, source, runtime: join(root, "runtime") };
@@ -35,14 +35,14 @@ test("bundles only runnable Skill files with deterministic hashes and executable
     ["SKILL.md", "scripts/taskctl.sh"],
   );
   for (const file of manifest.files) {
-    const destination = join(runtime, "skills/manage-lark-codex", file.path);
+    const destination = join(runtime, "skills/manage-codexboard", file.path);
     const bytes = readFileSync(destination);
     assert.deepEqual(bytes, readFileSync(join(source, file.path)));
     assert.equal(file.sha256, createHash("sha256").update(bytes).digest("hex"));
     assert.equal(statSync(destination).mode & 0o777, file.mode);
   }
   assert.deepEqual(JSON.parse(readFileSync(join(runtime, "skills/manifest.json"))), manifest);
-  assert.throws(() => statSync(join(runtime, "skills/manage-lark-codex/README.md")), {
+  assert.throws(() => statSync(join(runtime, "skills/manage-codexboard/README.md")), {
     code: "ENOENT",
   });
 });
@@ -74,9 +74,9 @@ test("packaging fixes file permissions even with a restrictive release umask", (
     { encoding: "utf8" },
   );
   assert.equal(child.status, 0, child.stderr);
-  assert.equal(statSync(join(runtime, "skills/manage-lark-codex/SKILL.md")).mode & 0o777, 0o644);
+  assert.equal(statSync(join(runtime, "skills/manage-codexboard/SKILL.md")).mode & 0o777, 0o644);
   assert.equal(
-    statSync(join(runtime, "skills/manage-lark-codex/scripts/taskctl.sh")).mode & 0o777,
+    statSync(join(runtime, "skills/manage-codexboard/scripts/taskctl.sh")).mode & 0o777,
     0o755,
   );
 });

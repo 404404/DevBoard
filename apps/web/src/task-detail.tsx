@@ -3,8 +3,8 @@ import { userErrorMessage } from "./user-error";
 import { TaskBranchProperty } from "./task-branch-property";
 import { Notice } from "./notification-center";
 import { notify } from "./notifications";
-import type { ProjectKind, SessionView, TaskView } from "@lark-codex/contracts";
-import { ALL_PROJECT_ID } from "@lark-codex/contracts";
+import type { ProjectKind, SessionView, TaskView } from "@codexboard/contracts";
+import { ALL_PROJECT_ID } from "@codexboard/contracts";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   useCallback,

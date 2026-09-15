@@ -1,4 +1,4 @@
-import { identityKey, identityFromKey, IdentityKeySchema } from "@lark-codex/contracts";
+import { identityKey, identityFromKey, IdentityKeySchema } from "@codexboard/contracts";
 import { createHash, randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import {
@@ -10,7 +10,7 @@ import {
   type TaskLifecycleCommand,
   type TaskLifecycleView,
   type TaskMutationResult,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 import { z } from "zod";
 import { AppError } from "../../app-error.js";
 import type { SqliteDatabase } from "../database/index.js";

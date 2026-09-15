@@ -20,7 +20,7 @@ import {
   RemoteReviewSchema,
   RemoteReviewContentSchema,
   RemoteReviewScopeSchema,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { AppError } from "../../app-error.js";
@@ -343,7 +343,7 @@ export function registerRemoteRoutes(
             throw new AppError("NOT_FOUND", 404, "项目不可用");
           cwd = (await options.projectRegistry.resolveExecutionContext(command.projectId)).cwd;
         } else {
-          const root = config.LARK_CODEX_TEMPORARY_PROJECT_ROOT;
+          const root = config.CODEXBOARD_TEMPORARY_PROJECT_ROOT;
           if (!root || !isAbsolute(root))
             throw new AppError("INVALID_REQUEST", 409, "临时工作目录尚未配置");
           cwd = join(root, new Date().toISOString().slice(0, 10), `task-${randomUUID()}`);

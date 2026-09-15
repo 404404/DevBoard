@@ -1,4 +1,4 @@
-import { REMOTE_UPLOAD_MAX_BASE64_LENGTH } from "@lark-codex/contracts";
+import { REMOTE_UPLOAD_MAX_BASE64_LENGTH } from "@codexboard/contracts";
 import { readTaskProgress } from "./codex-task-progress.mjs";
 import { readRemoteImage } from "./codex-remote-image.mjs";
 import { storeRemoteUpload, readRemoteUploadImage } from "./codex-remote-upload.mjs";

@@ -1,4 +1,4 @@
-import { identityKey } from "@lark-codex/contracts";
+import { identityKey } from "@codexboard/contracts";
 import { createHash, randomUUID } from "node:crypto";
 
 import {
@@ -11,7 +11,7 @@ import {
   type GlobalLabelView,
   type ReorderGlobalLabelsCommand,
   type UpdateGlobalLabelCommand,
-} from "@lark-codex/contracts";
+} from "@codexboard/contracts";
 import { z } from "zod";
 
 import { AppError } from "../../app-error.js";

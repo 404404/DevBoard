@@ -31,7 +31,7 @@ test.describe("mobile Remote", () => {
             {
               id: projectId,
               projectKey: "TASK",
-              name: "lark-codex",
+              name: "codexboard",
               description: "",
               kind: "codex",
               rootPaths: ["/projects/taskboard"],
@@ -207,7 +207,7 @@ test.describe("mobile Remote", () => {
       }),
     );
     await page.goto("/?remote=1");
-    await expect(page.getByRole("button", { name: "lark-codex", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "codexboard", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "最近", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: titles[0] })).toHaveCount(0);
     await expect(page.getByLabel("搜索 Codex 任务")).toBeInViewport();
@@ -229,10 +229,10 @@ test.describe("mobile Remote", () => {
     await page.getByRole("button", { name: "任务列表选项", exact: true }).click();
     await page.getByRole("button", { name: "按项目", exact: true }).click();
 
-    await page.getByRole("button", { name: "在lark-codex中新建任务" }).click();
+    await page.getByRole("button", { name: "在codexboard中新建任务" }).click();
     await expect(page.getByLabel("工作位置")).toHaveValue(projectId);
     await page.getByRole("button", { name: "取消新建任务" }).click();
-    await page.getByRole("button", { name: "lark-codex", exact: true }).click();
+    await page.getByRole("button", { name: "codexboard", exact: true }).click();
     await expect(page.getByRole("button", { name: titles[0] })).toBeVisible();
     await page.getByLabel("搜索 Codex 任务").fill("导航");
     await expect(page.locator(".remote-thread-list li")).toHaveCount(1);

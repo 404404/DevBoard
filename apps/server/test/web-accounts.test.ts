@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CreateTaskCommandSchema, identityKey, TEMPORARY_PROJECT_ID } from "@lark-codex/contracts";
+import { CreateTaskCommandSchema, identityKey, TEMPORARY_PROJECT_ID } from "@codexboard/contracts";
 import { afterEach, expect, it } from "vitest";
 import { appControl, createApp } from "../src/app.js";
 import { loadConfig } from "../src/config.js";
@@ -18,15 +18,15 @@ function setup(protocol = "https", mode: "feishu" | "web" = "feishu") {
   const root = mkdtempSync(join(tmpdir(), "web-account-test-"));
   const database = initializeDatabase(":memory:");
   const config = loadConfig({
-    LARK_CODEX_ENV: "test",
-    LARK_CODEX_AUTH_MODE: mode,
-    LARK_CODEX_ORIGIN: `${protocol}://tasks.example.com`,
-    LARK_CODEX_ALLOWED_HOSTS: "tasks.example.com",
-    LARK_CODEX_FEISHU_APP_ID: mode === "feishu" ? "cli_test" : undefined,
-    LARK_CODEX_FEISHU_APP_SECRET: mode === "feishu" ? "test-secret" : undefined,
-    LARK_CODEX_DATA_DIR: root,
-    LARK_CODEX_WORKSPACE_ROOTS: root,
-    LARK_CODEX_TEMPORARY_PROJECT_ROOT: root,
+    CODEXBOARD_ENV: "test",
+    CODEXBOARD_AUTH_MODE: mode,
+    CODEXBOARD_ORIGIN: `${protocol}://tasks.example.com`,
+    CODEXBOARD_ALLOWED_HOSTS: "tasks.example.com",
+    CODEXBOARD_FEISHU_APP_ID: mode === "feishu" ? "cli_test" : undefined,
+    CODEXBOARD_FEISHU_APP_SECRET: mode === "feishu" ? "test-secret" : undefined,
+    CODEXBOARD_DATA_DIR: root,
+    CODEXBOARD_WORKSPACE_ROOTS: root,
+    CODEXBOARD_TEMPORARY_PROJECT_ROOT: root,
   });
   const app = createApp({
     config,
@@ -56,7 +56,7 @@ function setup(protocol = "https", mode: "feishu" | "web" = "feishu") {
     database.close();
     rmSync(root, { recursive: true, force: true });
   });
-  const headers = { host: "tasks.example.com", origin: config.LARK_CODEX_ORIGIN };
+  const headers = { host: "tasks.example.com", origin: config.CODEXBOARD_ORIGIN };
   const localHeaders = { host: "127.0.0.1:47824", authorization: `Bearer ${"x".repeat(43)}` };
   const accounts = new WebAccountService(database);
   const login = () =>
@@ -292,6 +292,6 @@ it("Web-only mode has no development or Feishu login and advertises account logi
     ).toBe(404);
   }
   expect(() =>
-    loadConfig({ LARK_CODEX_AUTH_MODE: "web", LARK_CODEX_ORIGIN: "http://tasks.example.com" }),
+    loadConfig({ CODEXBOARD_AUTH_MODE: "web", CODEXBOARD_ORIGIN: "http://tasks.example.com" }),
   ).toThrow();
 });

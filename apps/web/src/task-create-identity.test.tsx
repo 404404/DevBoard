@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ProjectTaskCreationOptionsViewSchema, ProjectViewSchema } from "@lark-codex/contracts";
+import { ProjectTaskCreationOptionsViewSchema, ProjectViewSchema } from "@codexboard/contracts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { TaskCreateDialog } from "./task-create-dialog";

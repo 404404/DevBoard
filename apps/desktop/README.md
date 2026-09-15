@@ -1,14 +1,14 @@
-# Lark-Codex macOS 应用（HTTP / HTTPS）
+# CodexBoard macOS 应用（HTTP / HTTPS）
 
 当前支持 Apple Silicon、macOS 13 或更新版本。内置 Node 运行时。
 
-应用打开时启动三个服务：Lark-Codex 后端（内嵌 Codex 桥接）、Caddy 和 frpc。关闭主窗口时隐藏窗口和 Dock 图标，仅保留菜单栏图标，服务继续运行；通过菜单栏「显示主窗口」恢复窗口和 Dock 图标。选择菜单栏「退出 Lark-Codex」、按 Command-Q 或使用系统应用菜单退出时，应用停止自己启动的后台进程。界面的「停止服务」仍可手动停止服务。Codex Desktop 和它已经执行的任务不会被应用关闭。
+应用打开时启动三个服务：CodexBoard 后端（内嵌 Codex 桥接）、Caddy 和 frpc。关闭主窗口时隐藏窗口和 Dock 图标，仅保留菜单栏图标，服务继续运行；通过菜单栏「显示主窗口」恢复窗口和 Dock 图标。选择菜单栏「退出 CodexBoard」、按 Command-Q 或使用系统应用菜单退出时，应用停止自己启动的后台进程。界面的「停止服务」仍可手动停止服务。Codex Desktop 和它已经执行的任务不会被应用关闭。
 
 「打开看板」先检查本机部署配置、后台服务和公网入口，再唤起飞书客户端中配置的应用，不会回退到浏览器。缺少配置、服务未就绪或公网入口不可用时显示「未部署完成」。当前应用没有飞书发布状态查询权限，这些检查不包含开放平台版本发布状态；尚未发布或无可见权限的应用仍由飞书客户端处理。此版本是本机服务管理应用，尚未将完整看板嵌入桌面窗口。
 
 ## 本机配置
 
-首次启动自动创建 `~/Library/Application Support/Lark-Codex/` 下的数据、证书与配置目录。路径由当前用户目录推导，不读取 desktop.env 或 production.env，不保存自定义目录或 Codex 路径。正式部署沿用现有配置目录及看板数据。
+首次启动自动创建 `~/Library/Application Support/CodexBoard/` 下的数据、证书与配置目录。路径由当前用户目录推导，不读取 desktop.env 或 production.env，不保存自定义目录或 Codex 路径。正式部署沿用现有配置目录及看板数据。
 
 应用自动查找 Codex Desktop / ChatGPT 内置程序及常见 CLI 路径，使用本机登录状态；新安装 Codex 后无需重启管理应用即可重新检测。工作区允许目录在服务启动时读取 Codex Desktop 项目列表。macOS 临时任务根目录由当前用户主目录动态推导为 `~/Documents/Codex`，创建临时任务时自动递归创建目录，不提供路径编辑入口。
 
@@ -60,7 +60,7 @@ npm ci
 npm run build:desktop
 ```
 
-产物：`apps/desktop/dist/Lark-Codex.app`。
+产物：`apps/desktop/dist/CodexBoard.app`。
 
 构建脚本下载并校验固定 SHA256 的 Node 22.23.2、Caddy 2.11.4 和 frp 0.70.0 macOS arm64 包，编译前后端及 Tauri，复制锁定的生产依赖，并完成 ad-hoc 签名及 SQLite 冒烟测试。运行时没有 Homebrew Node 动态库依赖。
 
@@ -78,17 +78,17 @@ CARGO_ENCODED_RUSTFLAGS="--remap-path-prefix=$HOME=/build" npm run build:desktop
 
 接收方需要 Apple Silicon Mac、macOS 13 或更新版本，并安装和登录 Codex、飞书客户端。应用已包含 Node、后端、内嵌桥接、SQLite 组件、Caddy 与 frpc，无需另外安装 Node、Docker 或开发工具；公网 frp 服务端不在安装包中。
 
-1. 将 `Lark-Codex.app` 复制到「应用程序」目录；升级前先正常退出已有的 Lark-Codex。
+1. 将 `CodexBoard.app` 复制到「应用程序」目录；升级前先正常退出已有的 CodexBoard。
 2. 打开应用，按照「使用引导」配置自己的飞书应用与完整 frpc.toml；使用域名时完成对应 DNS 配置。
 3. 检查连接和服务状态，在飞书中打开看板并验证登录。
 
-应用更新通过替换整个 `.app` 完成。用户数据和配置位于 `~/Library/Application Support/Lark-Codex/`，不会因正常替换应用而被覆盖。分发时只发送应用产物，保留自己电脑上的该目录；不要把其中的 `secrets/`、数据库、附件、日志或运行时描述复制给接收方。
+应用更新通过替换整个 `.app` 完成。用户数据和配置位于 `~/Library/Application Support/CodexBoard/`，不会因正常替换应用而被覆盖。分发时只发送应用产物，保留自己电脑上的该目录；不要把其中的 `secrets/`、数据库、附件、日志或运行时描述复制给接收方。
 
-旧版使用 `~/Library/Application Support/Lark Codex Taskboard/`。升级首次启动会等待旧应用释放实例锁，并在新目录不存在时原子移动完整旧目录，保留数据库、附件、配置及权限。两个目录同时存在、路径含链接或旧实例仍占用时会显示错误并保留内容，不合并、不覆盖、不自动备份。
+旧版使用 `~/Library/Application Support/Lark-Codex/` 或更早的 `~/Library/Application Support/Lark Codex Taskboard/`。升级首次启动会等待旧应用释放实例锁，并在新目录不存在时原子移动完整旧目录，保留数据库、附件、配置及权限。两个目录同时存在、路径含链接或旧实例仍占用时会显示错误并保留内容，不合并、不覆盖、不自动备份。
 
-主程序和 bundle identifier 已统一为 `lark-codex-desktop`、`cn.rocyan.larkcodex.desktop`。更新包保留旧名 `Contents/MacOS/taskboard-desktop` 的小型转发启动器，仅用于兼容 v0.1.0 的结构校验与更新后重启；更新公钥保持不变。
+主程序和 bundle identifier 已统一为 `codexboard-desktop`、`cn.rocyan.codexboard.desktop`。更新包保留旧名 `Contents/MacOS/lark-codex-desktop` 和 `Contents/MacOS/taskboard-desktop` 的小型转发启动器，仅用于兼容已发布版本的结构校验与更新后重启；更新公钥保持不变。
 
-随包 Skill 使用 `manage-lark-codex`。检测到旧 `manage-lark-taskboard` 目录时会提示交由原管理工具处理，不自动改名或覆盖；新目录内的旧安装凭据也需要按已修改内容重新确认。
+随包 Skill 使用 `manage-codexboard`。检测到旧 `manage-lark-codex` 或 `manage-lark-taskboard` 目录时会提示交由原管理工具处理，不自动改名或覆盖；新目录内的旧安装凭据也需要按已修改内容重新确认。
 
 桌面 `.cache/`、`staging/`、`src-tauri/target/` 和过时的 `dist/` 是可重建产物，不属于运行数据。删除这些目录会使下次构建重新下载或编译；应先保留计划分发的已验证应用。
 
@@ -97,14 +97,14 @@ CARGO_ENCODED_RUSTFLAGS="--remap-path-prefix=$HOME=/build" npm run build:desktop
 ```sh
 node --test apps/desktop/scripts/*.test.mjs
 npx eslint apps/desktop/scripts/*.mjs apps/desktop/ui/app.js --max-warnings=0
-codesign --verify --deep --strict "apps/desktop/dist/Lark-Codex.app"
+codesign --verify --deep --strict "apps/desktop/dist/CodexBoard.app"
 ```
 
 实际验收应覆盖端口冲突、修改 Caddy 端口后隧道同步、配置保存后选择立即重启或稍后、三个服务启动、公网健康检查、Codex 鉴权初始化、停止/重启、关闭窗口后继续运行、菜单栏恢复窗口及彻底退出后的进程释放。不要在运行数据库的同时启动第二套服务。
 
 ## 内嵌 Codex 桥接
 
-桌面版使用 `LARK_CODEX_CODEX_TRANSPORT=embedded`，直接在后端进程中加载桥接模块与项目快照监听。业务 API、本机管理 API 和受 token 保护的桥接接口由同一进程按已配置端口提供；保留本机 WebSocket 接口兼容现有调用，不再运行独立的桥接 Node 服务。退出或启动失败时，后端统一释放监听器。
+桌面版使用 `CODEXBOARD_CODEX_TRANSPORT=embedded`，直接在后端进程中加载桥接模块与项目快照监听。业务 API、本机管理 API 和受 token 保护的桥接接口由同一进程按已配置端口提供；保留本机 WebSocket 接口兼容现有调用，不再运行独立的桥接 Node 服务。退出或启动失败时，后端统一释放监听器。
 
 ## 连接配置页面
 

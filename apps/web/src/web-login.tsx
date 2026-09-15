@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { SessionView } from "@lark-codex/contracts";
+import type { SessionView } from "@codexboard/contracts";
 import { loginWeb, logout } from "./api";
 
 export function WebLoginForm({ enabled }: { readonly enabled: boolean }) {
@@ -28,7 +28,8 @@ export function WebLoginForm({ enabled }: { readonly enabled: boolean }) {
   }
   return (
     <main className="session-state web-login">
-      <h1>登录任务看板</h1>
+      <img src="/codexboard.png" width="72" height="72" alt="CodexBoard" />
+      <h1>登录 CodexBoard</h1>
       <p>使用本机应用管理员为你创建的 Web 账号。</p>
       {enabled ? (
         <form onSubmit={(event) => void submit(event)}>
@@ -62,7 +63,7 @@ export function WebLoginForm({ enabled }: { readonly enabled: boolean }) {
         </form>
       ) : (
         <p>
-          Web 登录尚未启用。请在本机 Lark-Codex 的“应用设置 → Web 账号”中创建账号，并配置 HTTPS
+          Web 登录尚未启用。请在本机 CodexBoard 的“应用设置 → Web 账号”中创建账号，并配置 HTTPS
           公网地址。
         </p>
       )}

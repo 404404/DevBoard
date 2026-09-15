@@ -5,8 +5,10 @@ import { fileURLToPath } from "node:url";
 
 // v0.1.0 requires this regular executable archive entry and restarts its old
 // executable path after replacement. Keep it only as a forwarding entry point.
-export function writeLegacyUpdateLauncher(contents) {
-  const launcher = join(contents, "MacOS/taskboard-desktop");
+export function writeLegacyUpdateLauncher(contents, name = "taskboard-desktop") {
+  if (!["taskboard-desktop", "lark-codex-desktop"].includes(name))
+    throw new Error("未知旧版更新入口");
+  const launcher = join(contents, "MacOS", name);
   try {
     lstatSync(launcher);
     throw new Error("旧版更新兼容入口已存在，未覆盖");

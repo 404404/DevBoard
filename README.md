@@ -1,4 +1,6 @@
-# Lark-Codex
+# CodexBoard
+
+<img src="assets/brand/codexboard.png" alt="CodexBoard" width="112" />
 
 **简体中文** · [English](README.en.md)
 
@@ -6,9 +8,9 @@
 
 **用户指南** · [给 Agent 的操作指南](AGENTS.md)
 
-Lark-Codex 将 Web / 飞书任务看板与本机 Codex 连接起来。你可以整理项目和任务、提交需求、查看执行进度，并在需要时处理审批或补充信息。Mac 应用负责启动和管理本机服务，看板可通过 HTTPS 浏览器账号登录，也可在飞书中使用；两种方式可以同时配置。
+CodexBoard 将 Web / 飞书任务看板与本机 Codex 连接起来。你可以整理项目和任务、提交需求、查看执行进度，并在需要时处理审批或补充信息。Mac 应用负责启动和管理本机服务，看板可通过 HTTPS 浏览器账号登录，也可在飞书中使用；两种方式可以同时配置。
 
-当前为 **0.1.2 预览版**，支持 **Apple Silicon Mac · macOS 13 或更新版本**。
+当前为 **0.1.3 预览版**，支持 **Apple Silicon Mac · macOS 13 或更新版本**。
 
 ## 访问方式
 
@@ -75,15 +77,15 @@ Lark-Codex 将 Web / 飞书任务看板与本机 Codex 连接起来。你可以�
 
 ## 下载与安装
 
-1. 打开本仓库的 [Releases 页面](https://github.com/RocYan98/Lark-Codex/releases)，在所选版本的 **Assets** 中下载 `Lark-Codex-版本号-macos-arm64.dmg`。`Source code` 压缩包不是安装包。
-2. 如果已安装旧版，先结束或妥善处理正在执行的看板任务，再从菜单栏正常退出 Lark-Codex。
-3. 打开 DMG，将 `Lark-Codex.app` 拖入 **Applications（应用程序）**。
-4. 从“应用程序”打开 Lark-Codex，随后推出安装磁盘。
+1. 打开本仓库的 [Releases 页面](https://github.com/RocYan98/CodexBoard/releases)，在所选版本的 **Assets** 中下载 `CodexBoard-版本号-macos-arm64.dmg`。`Source code` 压缩包不是安装包。
+2. 如果已安装旧版，先结束或妥善处理正在执行的看板任务，再从菜单栏正常退出 CodexBoard。
+3. 打开 DMG，将 `CodexBoard.app` 拖入 **Applications（应用程序）**。
+4. 从“应用程序”打开 CodexBoard，随后推出安装磁盘。
 
-如需校验下载完整性，同时下载对应的 `.dmg.sha256` 文件，在两个文件所在目录执行。以 0.1.2 为例：
+如需校验下载完整性，同时下载对应的 `.dmg.sha256` 文件，在两个文件所在目录执行。以 0.1.3 为例：
 
 ```sh
-shasum -a 256 -c Lark-Codex-0.1.2-macos-arm64.dmg.sha256
+shasum -a 256 -c CodexBoard-0.1.3-macos-arm64.dmg.sha256
 ```
 
 显示 `OK` 表示文件与发布者提供的校验值一致。
@@ -138,23 +140,23 @@ Web 账号是可执行任务的受信任用户，不是只读访客。各账号�
 
 在 Codex Desktop 中管理项目，在看板选择同步出的项目，创建任务并描述需求。发起 Codex 执行后，可以在任务详情查看进度、结果、审批和待补充输入；执行结束后再检查结果并验收。
 
-- **关闭 Lark-Codex 窗口**：应用保留在菜单栏，服务继续运行。
-- **退出 Lark-Codex 或点击停止服务**：本机服务停止，浏览器和飞书中的看板暂时无法访问。
+- **关闭 CodexBoard 窗口**：应用保留在菜单栏，服务继续运行。
+- **退出 CodexBoard 或点击停止服务**：本机服务停止，浏览器和飞书中的看板暂时无法访问。
 - **Mac 关机、休眠或断网**：公网访问可能中断；使用远程功能时需要保持 Mac 在线。
 
-退出 Lark-Codex 不会关闭 Codex Desktop，但应在更新或停止服务前处理好看板中的执行任务。
+退出 CodexBoard 不会关闭 Codex Desktop，但应在更新或停止服务前处理好看板中的执行任务。
 
 ## 安装与使用 Codex Skill
 
-配套 Skill 让 Codex 通过应用内置命令行查询、修改任务和协助执行，无需克隆源码或安装 Node.js。目前支持安装到 Codex，技能名称为 `manage-lark-codex`。
+配套 Skill 让 Codex 通过应用内置命令行查询、修改任务和协助执行，无需克隆源码或安装 Node.js。目前支持安装到 Codex，技能名称为 `manage-codexboard`。
 
-首次启动且尚未安装配套技能时，应用会显示 **让 Codex 使用 Lark-Codex** 提示，可以选择 **安装到 Codex**，也可以稍后从 **应用设置 → Agent Skill** 安装。安装位置为 `~/.agents/skills/manage-lark-codex`。
+首次启动且尚未安装配套技能时，应用会显示 **让 Codex 使用 CodexBoard** 提示，可以选择 **安装到 Codex**，也可以稍后从 **应用设置 → Agent Skill** 安装。安装位置为 `~/.agents/skills/manage-codexboard`。
 
 卡片会显示文件安装状态，可用“重新检查”刷新。应用升级后会提示有新版技能，点击更新后才替换；已有用户修改时，须明确选择“使用随包版本”。符号链接、由其他工具管理的目录、旧版名称的技能或旧技能目录中的同名技能，会提示回到原位置或管理器处理，避免重复安装。
 
 “文件已安装”不表示当前 Codex 任务已加载技能。请在 Codex 的技能列表中确认；未识别时可强制重新加载技能，或在方便时重新打开 Codex，再在新任务中使用：
 
-> 请使用 $manage-lark-codex，先查看我的项目和任务，再帮我处理指定任务。
+> 请使用 $manage-codexboard，先查看我的项目和任务，再帮我处理指定任务。
 
 技能安装或 Web 登录不等于 CLI 写入授权。CLI 当前仍需要真实飞书用户配对；仅配置 Web 账号不能代替该步骤。Agent 首次代操作时，仍需你在飞书中完成配对确认。
 
@@ -162,7 +164,7 @@ Web 账号是可执行任务的受信任用户，不是只读访客。各账号�
 
 需要 Agent 帮你安装应用、完成配置或排查问题时，把本仓库的 [AGENTS.md](AGENTS.md)交给它，并说明你要完成的事情，例如：
 
-> 请阅读 AGENTS.md，检查我的 Mac 是否满足要求，帮我安装并配置 Lark-Codex。需要我登录或在飞书后台确认的步骤，请明确告诉我。
+> 请阅读 AGENTS.md，检查我的 Mac 是否满足要求，帮我安装并配置 CodexBoard。需要我登录或在飞书后台确认的步骤，请明确告诉我。
 
 Agent 指南提供内置 `taskctl` 的入口、身份配对、只读检查和常用操作流程，无需为此克隆源码或安装开发依赖。不同 Agent 对指令文件的自动读取方式不同；不能自动读取时，直接提供文件内容或链接。
 
@@ -170,10 +172,10 @@ Agent 指南提供内置 `taskctl` 的入口、身份配对、只读检查和常
 
 在 **应用设置 → 应用更新** 中检查新版本，也可以从菜单栏手动检查。应用每天自动检查一次，发现新版本后显示提醒和更新说明。下载并验证完成后，点击“安装并重启”，按提示处理正在执行的任务，再确认安装。检查和下载期间服务继续运行；安装时本机服务会暂时停止。
 
-更新包使用独立签名校验。无法自动更新时，可正常退出旧版，再用新版 DMG 替换“应用程序”中的 `Lark-Codex.app`。配置、数据库和附件保存在：
+更新包使用独立签名校验。无法自动更新时，可正常退出旧版，再用新版 DMG 替换“应用程序”中的 `CodexBoard.app`。配置、数据库和附件保存在：
 
 ```text
-~/Library/Application Support/Lark-Codex/
+~/Library/Application Support/CodexBoard/
 ```
 
 升级首次启动时，若新目录尚不存在，应用会在旧版退出后自动迁移已有数据；遇到目录冲突时会保留原数据并提示处理。正常替换应用会保留数据。删除数据目录会影响配置和任务数据，不要把它当成安装缓存清理，也不要随安装包发送给别人。

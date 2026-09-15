@@ -1,6 +1,6 @@
 import { userErrorMessage } from "./user-error";
 import { Notice } from "./notification-center";
-import type { TaskView } from "@lark-codex/contracts";
+import type { TaskView } from "@codexboard/contracts";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { restoreTask } from "./api";
 import { applyTaskUpdate } from "./task-move-cache";

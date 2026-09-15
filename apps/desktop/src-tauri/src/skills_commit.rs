@@ -8,8 +8,8 @@ use std::{
     path::{Component, Path},
 };
 
-const TARGET: &str = "manage-lark-codex";
-const STAGING_PREFIX: &str = ".manage-lark-codex.install-";
+const TARGET: &str = "manage-codexboard";
+const STAGING_PREFIX: &str = ".manage-codexboard.install-";
 
 fn open_directory(parent: RawFd, name: &OsStr) -> Result<OwnedFd, String> {
     let name = CString::new(name.as_bytes()).map_err(|_| "Skill 目录名称无效")?;
@@ -141,7 +141,7 @@ mod tests {
         time::{SystemTime, UNIX_EPOCH},
     };
 
-    const STAGE: &str = ".manage-lark-codex.install-test";
+    const STAGE: &str = ".manage-codexboard.install-test";
 
     struct Fixture {
         root: PathBuf,
@@ -153,7 +153,7 @@ mod tests {
         fn new() -> Self {
             static NEXT: AtomicU64 = AtomicU64::new(0);
             let root = std::env::temp_dir().join(format!(
-                "lark-skills-commit-{}-{}-{}",
+                "codexboard-skills-commit-{}-{}-{}",
                 std::process::id(),
                 SystemTime::now()
                     .duration_since(UNIX_EPOCH)
@@ -277,13 +277,13 @@ mod tests {
             TARGET,
             STAGING_PREFIX,
             "../escape",
-            ".manage-lark-codex.install-a/b",
-            ".manage-lark-codex.install-a\\b",
-            ".manage-lark-codex.install-a\0b",
+            ".manage-codexboard.install-a/b",
+            ".manage-codexboard.install-a\\b",
+            ".manage-codexboard.install-a\0b",
         ] {
             assert!(atomic_install(&fixture.home, name, None).is_err());
         }
-        assert!(atomic_install(&fixture.home, ".manage-lark-codex.install-missing", None).is_err());
+        assert!(atomic_install(&fixture.home, ".manage-codexboard.install-missing", None).is_err());
         assert_eq!(fixture.text(STAGE), "new");
         assert!(!fixture.skills.join(TARGET).exists());
     }

@@ -13,7 +13,7 @@ import {
 import { dirname, join, resolve, sep } from "node:path";
 import { TextDecoder } from "node:util";
 
-import { AttachmentContentTypeSchema, AttachmentFilenameSchema } from "@lark-codex/contracts";
+import { AttachmentContentTypeSchema, AttachmentFilenameSchema } from "@codexboard/contracts";
 
 import { AppError } from "../../app-error.js";
 

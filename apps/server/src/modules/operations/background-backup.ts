@@ -1,6 +1,6 @@
 import { Worker } from "node:worker_threads";
 
-import { BackupManifestSchema, type BackupManifest } from "@lark-codex/contracts";
+import { BackupManifestSchema, type BackupManifest } from "@codexboard/contracts";
 import { z } from "zod";
 
 const BackupIdentifierSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$/);

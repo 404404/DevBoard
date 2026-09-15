@@ -1,4 +1,4 @@
-import { ALL_PROJECT_ID, type BoardView, type TaskView } from "@lark-codex/contracts";
+import { ALL_PROJECT_ID, type BoardView, type TaskView } from "@codexboard/contracts";
 import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 
