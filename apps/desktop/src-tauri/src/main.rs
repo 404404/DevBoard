@@ -170,7 +170,7 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let update = MenuItem::with_id(app, "check-updates", "检查更新…", true, None::<&str>)?;
     let exit = MenuItem::with_id(app, "quit-app", "退出 CodexBoard", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &update, &exit])?;
-    let mut tray = TrayIconBuilder::with_id("codexboard")
+    let tray = TrayIconBuilder::with_id("codexboard")
         .tooltip("CodexBoard")
         .menu(&menu)
         .on_menu_event(|app, event| match event.id.as_ref() {
@@ -182,10 +182,8 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
             "quit-app" => quit(app.clone()),
             _ => {}
         });
-    if let Some(icon) = app.default_window_icon() {
-        tray = tray.icon(tray_icon::menu_icon(icon)).icon_as_template(false);
-    }
-    tray.build(app)?;
+    let tray = tray.build(app)?;
+    tray_icon::install(&tray)?;
     Ok(())
 }
 fn main() {

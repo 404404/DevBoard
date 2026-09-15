@@ -14,4 +14,6 @@
 
 > Produce a square application icon extracted from this approved image. ONLY the exact dark knot and three bottom task cards artwork, centered on SOLID PURE WHITE (#FFFFFF) background filling the ENTIRE canvas. NO text, NO wordmark, NO label, NO shadow, NO rounded outer tile border, NO checkerboard, NO transparency simulation, NO texture. Preserve the exact knot geometry and original relative size/positions/overlap of the three cards, mint green center card with dark checkmark and line, two white cards with dark graphite outlines and inner lines. Artwork occupies 76% of square canvas height, centered with equal white padding. This is an extraction and color-preserving cleanup, NOT a new design. Deliver square high quality PNG.
 
-圆角遮罩由 `apps/desktop/scripts/icon-mask.swift` 使用系统 Core Animation 绘制。菜单栏通过 `tray_icon.rs` 生成保留薄荷绿与深色线条的透明背景彩色图标；关闭 macOS 模板着色，避免绿色被转换为单色。
+圆角遮罩由 `apps/desktop/scripts/icon-mask.swift` 使用系统 Core Animation 绘制。菜单栏通过 `tray_icon.rs` 接入原生菜单栏专用矢量图标，轮廓跟随系统着色，薄荷绿独立保留。
+
+菜单栏专用适配：`apps/desktop/native/menu-bar-icon.m` 以 22pt 矢量布局绘制。结形与侧卡片交由 NSStatusBarButton 的模板图标着色，绿色中心卡片为不拦截点击的独立透明叠层。`knot-path.inc` 的结形路径来自已批准源 PNG 内嵌的 OpenAI 矢量标记；任务卡片按菜单栏尺寸重绘。
