@@ -4,11 +4,11 @@
 
 [简体中文](README.md) · **English**
 
-Manage tasks in a browser or Lark and let Codex on your Mac help execute them.
+Connect your projects to Codex and turn ideas into progress.
 
 **User guide** · [Agent operating guide (Chinese)](AGENTS.md)
 
-CodexBoard connects a Lark task board to Codex running on your Mac. Organize projects and tasks, submit requests, track execution, and handle approvals or requests for more information. The Mac app starts and manages local services; you access the board through HTTPS with a locally created Web account, through Lark, or both.
+CodexBoard connects your project task board to Codex running on your Mac. Organize projects and tasks, submit requests, track execution, and handle approvals or requests for more information. The Mac app starts and manages local services; you access the board through HTTPS with a locally created Web account, through Lark, or both.
 
 Current release: **0.1.3 preview**, for **Apple Silicon Macs running macOS 13 or later**.
 
@@ -52,7 +52,7 @@ Manage tasks in the Lark custom app. Mobile Remote supports Codex conversations,
 
 ### Web · Desktop and mobile browsers
 
-Sign in over HTTPS with a locally created Web account, without Lark. Click a thumbnail to view the full image.
+Sign in over HTTPS with a locally created Web account. Click a thumbnail to view the full image.
 
 <table>
   <tr><th>Desktop browser</th><th>Mobile browser</th></tr>

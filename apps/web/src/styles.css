@@ -4140,6 +4140,10 @@ body.is-resizing-task-dialog {
   border-color: var(--remote-border, var(--border));
 }
 
+.web-login > img {
+  border-radius: 22%;
+}
+
 .web-login form {
   width: min(100%, 340px);
   display: grid;

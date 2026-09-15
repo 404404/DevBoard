@@ -295,7 +295,7 @@ function renderSetup() {
   setText(
     $("setup-mode-help"),
     web
-      ? "Web 引导：配置 HTTPS 并在本机创建账号。可与飞书应用同时使用。"
+      ? "Web 引导：配置 HTTPS 并在本机创建账号。"
       : "飞书引导：配置应用凭据并发布。已有 Web 账号仍可从浏览器登录。",
   );
   setText($("setup-finish-title"), web ? "保存配置，再到浏览器验证" : "保存配置，再到飞书验证");
