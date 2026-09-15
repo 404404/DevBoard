@@ -14,4 +14,4 @@
 
 > Produce a square application icon extracted from this approved image. ONLY the exact dark knot and three bottom task cards artwork, centered on SOLID PURE WHITE (#FFFFFF) background filling the ENTIRE canvas. NO text, NO wordmark, NO label, NO shadow, NO rounded outer tile border, NO checkerboard, NO transparency simulation, NO texture. Preserve the exact knot geometry and original relative size/positions/overlap of the three cards, mint green center card with dark checkmark and line, two white cards with dark graphite outlines and inner lines. Artwork occupies 76% of square canvas height, centered with equal white padding. This is an extraction and color-preserving cleanup, NOT a new design. Deliver square high quality PNG.
 
-圆角遮罩由 `apps/desktop/scripts/icon-mask.swift` 使用系统 Core Animation 绘制。菜单栏通过 `tray_icon.rs` 生成黑色与透明像素组成的模板图标，由 macOS 适配外观。
+圆角遮罩由 `apps/desktop/scripts/icon-mask.swift` 使用系统 Core Animation 绘制。菜单栏通过 `tray_icon.rs` 生成保留薄荷绿与深色线条的透明背景彩色图标；关闭 macOS 模板着色，避免绿色被转换为单色。

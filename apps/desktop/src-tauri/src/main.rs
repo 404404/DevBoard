@@ -183,7 +183,7 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
             _ => {}
         });
     if let Some(icon) = app.default_window_icon() {
-        tray = tray.icon(tray_icon::template(icon)).icon_as_template(true);
+        tray = tray.icon(tray_icon::menu_icon(icon)).icon_as_template(false);
     }
     tray.build(app)?;
     Ok(())
