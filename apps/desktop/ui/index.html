@@ -101,7 +101,7 @@
         <p id="setup-notice" class="setup-notice" role="status" aria-live="polite"></p>
         <p id="setup-error" class="setup-error" role="alert" hidden></p>
         <div class="setup-steps">
-          <details class="setup-step" id="setup-step-tunnel" open>
+          <details class="setup-step" id="setup-step-tunnel">
             <summary>
               <span class="setup-number">1</span
               ><span class="setup-step-title"
@@ -245,47 +245,54 @@
         <div class="eyebrow">工作空间连接</div>
         <h1>连接配置</h1>
         <p class="intro">保存到本机后，选择立即重启服务或稍后手动重启。</p>
-        <form id="connections-form" autocomplete="off">
-          <p class="hint">
-            飞书应用与 Web 账号可同时使用，共用下方公网隧道。仅使用 Web 时，飞书凭据可留空。
-          </p>
-          <div id="feishu-connection-fields" class="connection-fields">
-            <div>
-              <label for="app-id">App ID</label>
-              <input id="app-id" spellcheck="false" placeholder="cli_…" />
-              <p id="app-id-path" class="hint"></p>
-            </div>
-            <div>
-              <label for="app-secret">App Secret</label>
-              <div class="secret-input">
-                <input
-                  id="app-secret"
-                  type="password"
-                  autocomplete="new-password"
-                  spellcheck="false"
-                  placeholder="填写飞书应用密钥"
-                />
-                <button id="show-secret" type="button">显示密钥</button>
+        <details
+          id="connections-card"
+          class="update-card collapsible-card"
+          aria-labelledby="connections-title"
+        >
+          <summary><h2 id="connections-title">飞书应用与公网隧道</h2></summary>
+          <form id="connections-form" autocomplete="off">
+            <p class="hint">
+              飞书应用与 Web 账号可同时使用，共用下方公网隧道。仅使用 Web 时，飞书凭据可留空。
+            </p>
+            <div id="feishu-connection-fields" class="connection-fields">
+              <div>
+                <label for="app-id">App ID</label>
+                <input id="app-id" spellcheck="false" placeholder="cli_…" />
+                <p id="app-id-path" class="hint"></p>
               </div>
-              <p id="secret-hint" class="hint"></p>
+              <div>
+                <label for="app-secret">App Secret</label>
+                <div class="secret-input">
+                  <input
+                    id="app-secret"
+                    type="password"
+                    autocomplete="new-password"
+                    spellcheck="false"
+                    placeholder="填写飞书应用密钥"
+                  />
+                  <button id="show-secret" type="button">显示密钥</button>
+                </div>
+                <p id="secret-hint" class="hint"></p>
+              </div>
             </div>
-          </div>
-          <label for="frpc-content">frpc.toml</label>
-          <textarea
-            required
-            id="frpc-content"
-            rows="9"
-            spellcheck="false"
-            placeholder="粘贴完整的 frpc.toml 内容"
-          ></textarea>
-          <p id="frpc-hint" class="hint"></p>
-          <div class="connection-account-actions">
-            <button id="connections-web-accounts" type="button">管理 Web 账号</button
-            ><span class="hint">HTTPS 入口和有效账号就绪后，可从浏览器登录。</span>
-          </div>
-          <button id="save-connections" class="primary" type="submit">保存配置</button>
-          <p id="connections-result" role="status" aria-live="polite"></p>
-        </form>
+            <label for="frpc-content">frpc.toml</label>
+            <textarea
+              required
+              id="frpc-content"
+              rows="9"
+              spellcheck="false"
+              placeholder="粘贴完整的 frpc.toml 内容"
+            ></textarea>
+            <p id="frpc-hint" class="hint"></p>
+            <div class="connection-account-actions">
+              <button id="connections-web-accounts" type="button">管理 Web 账号</button
+              ><span class="hint">HTTPS 入口和有效账号就绪后，可从浏览器登录。</span>
+            </div>
+            <button id="save-connections" class="primary" type="submit">保存配置</button>
+            <p id="connections-result" role="status" aria-live="polite"></p>
+          </form>
+        </details>
         <details id="ports" class="update-card collapsible-card">
           <summary><h2>端口设置</h2></summary>
           <p class="update-help">修改后保存，重启服务后生效。</p>
@@ -431,11 +438,15 @@
             Skill 不会授权它操作任务。
           </p>
         </details>
-        <div id="update-card" class="update-card" aria-labelledby="update-title">
-          <div class="update-heading">
+        <details
+          id="update-card"
+          class="update-card collapsible-card"
+          aria-labelledby="update-title"
+        >
+          <summary>
             <h2 id="update-title">应用更新</h2>
             <span id="update-current-version">正在读取版本…</span>
-          </div>
+          </summary>
           <p id="update-status" role="status" aria-live="polite">正在读取更新状态…</p>
           <p id="update-last-checked" class="update-help">尚未检查更新。</p>
           <div id="update-download-progress" hidden>
@@ -447,6 +458,19 @@
             <p id="update-notes"></p>
           </details>
           <p id="update-error" class="update-error" role="alert" hidden></p>
+          <label for="update-proxy">更新下载代理（可选）</label>
+          <input
+            id="update-proxy"
+            type="text"
+            placeholder="自动使用系统或环境代理"
+            autocomplete="off"
+            spellcheck="false"
+            aria-describedby="update-proxy-help"
+          />
+          <p id="update-proxy-help" class="update-help">
+            留空自动选择；手动填写如 http://127.0.0.1:7890，也支持
+            HTTPS、SOCKS5。仅本次打开应用有效，不支持账号密码。下次检查或下载时生效。
+          </p>
           <div class="update-actions">
             <button id="update-check" type="button">检查更新</button>
             <button id="update-release-link" type="button">前往 Release 手动下载 ↗</button>
@@ -456,7 +480,7 @@
           <p id="update-install-hint" class="update-help" hidden>
             安装时将停止本机服务，重启后恢复。请先结束正在执行的任务并保存配置。
           </p>
-        </div>
+        </details>
         <p class="intro">目录由应用自动管理，Codex 程序自动识别。</p>
         <label for="directory">部署配置目录</label>
         <input id="directory" readonly />

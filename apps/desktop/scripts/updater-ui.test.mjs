@@ -123,14 +123,17 @@ test("daily automatic checks respect persisted lastChecked and manual checks byp
   const ui = await updater({ lastChecked: null });
   assert.deepEqual(
     ui.calls.filter((call) => call.command === "check_updates"),
-    [{ command: "check_updates", args: { automatic: true } }],
+    [{ command: "check_updates", args: { automatic: true, proxy: null } }],
   );
   await ui.poll({}, day - 1);
   assert.equal(ui.calls.filter((call) => call.command === "check_updates").length, 1);
   await ui.poll({}, 1);
   assert.equal(ui.calls.filter((call) => call.command === "check_updates").length, 2);
   await ui.get("update-check").onclick();
-  assert.deepEqual(ui.calls.at(-1), { command: "check_updates", args: { automatic: false } });
+  assert.deepEqual(ui.calls.at(-1), {
+    command: "check_updates",
+    args: { automatic: false, proxy: null },
+  });
   const recentlyChecked = await updater({ status: "upToDate" });
   assert.equal(recentlyChecked.calls.length, 1);
   assert.match(recentlyChecked.get("update-current-version").textContent, /0\.1\.0/);
@@ -172,7 +175,7 @@ test("an ignored available version is checked again daily without interrupting a
   await ui.poll({}, 1);
   assert.deepEqual(
     ui.calls.filter((call) => call.command === "check_updates"),
-    [{ command: "check_updates", args: { automatic: true } }],
+    [{ command: "check_updates", args: { automatic: true, proxy: null } }],
   );
   assert.match(ui.get("update-notice-text").textContent, /0\.3\.0/);
   assert.equal(ui.get("update-notice").hidden, false);
@@ -310,4 +313,25 @@ test("manual release download remains available during downloads and reports bro
   );
   await failed.get("update-release-link").onclick({ preventDefault() {} });
   assert.match(failed.get("update-error").textContent, /复制 Release 链接/);
+});
+
+test("proxy override applies to checks and downloads, and clearing restores automatic mode", async () => {
+  const ui = await updater({ status: "available", version: "0.1.8" });
+  ui.get("update-proxy").value = "  http://127.0.0.1:7890  ";
+  await ui.get("update-check").onclick();
+  assert.deepEqual(ui.calls.at(-1).args, { automatic: false, proxy: "http://127.0.0.1:7890" });
+  ui.get("update-proxy").value = "";
+  await ui.get("update-download").onclick();
+  assert.deepEqual(ui.calls.at(-1).args, { proxy: null });
+  assert.equal(ui.get("update-proxy").disabled, true);
+});
+
+test("manual proxy is sent when downloading an already discovered update", async () => {
+  const ui = await updater({ status: "available", version: "0.1.8" });
+  ui.get("update-proxy").value = "socks5h://127.0.0.1:1080";
+  await ui.get("update-download").onclick();
+  assert.deepEqual(ui.calls.at(-1), {
+    command: "download_update",
+    args: { proxy: "socks5h://127.0.0.1:1080" },
+  });
 });

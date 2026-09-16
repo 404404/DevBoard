@@ -1,3 +1,4 @@
+/* global dirtyFields */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -51,6 +52,31 @@ for (const [name, engine] of Object.entries({ chromium, webkit }))
       });
       await page.addScriptTag({ content: readFileSync(new URL("app.js", ui), "utf8") });
       await page.addScriptTag({ content: readFileSync(new URL("updater.js", ui), "utf8") });
+      // All disclosure sections start closed; navigation alone keeps them closed.
+      assert.equal(await page.locator("details[open]").count(), 0);
+      await page.locator('[data-tab="connections"]').click();
+      assert.equal(await page.locator("#connections-form").isVisible(), false);
+      await page.locator("#connections-card > summary").click();
+      await page.locator("#app-id").fill("cli_unsaved_draft");
+      await page.locator("#connections-card > summary").click();
+      assert.equal(await page.locator("#connections-form").isVisible(), false);
+      await page.locator("#connections-card > summary").click();
+      assert.equal(await page.locator("#app-id").inputValue(), "cli_unsaved_draft");
+      // Restore the fixture so the existing install guard checks stay independent.
+      await page.evaluate(() => dirtyFields.clear());
+      await page.locator("#connections-card > summary").click();
+      await page.locator('[data-tab="guide"]').click();
+      assert.equal(await page.locator("#setup-step-tunnel").getAttribute("open"), null);
+      await page.locator("#setup-step-tunnel > summary").click();
+      await page.locator("#setup-configure-tunnel").click();
+      assert.equal(await page.locator("#connections-form").isVisible(), true);
+      assert.equal(await page.evaluate(() => document.activeElement.id), "frpc-content");
+      await page.locator('[data-tab="settings"]').click();
+      assert.equal(await page.locator("#update-check").isVisible(), false);
+      await page.locator("#update-card > summary").click();
+      assert.equal(await page.locator("#update-check").isVisible(), true);
+      await page.locator("#update-card > summary").click();
+      await page.locator('[data-tab="overview"]').click();
       await page.locator("#update-notice").waitFor({ state: "visible" });
       assert.equal(await page.locator("#update-dialog").isVisible(), false);
       assert.equal(await page.locator("#settings").isVisible(), false);

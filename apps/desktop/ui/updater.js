@@ -50,6 +50,7 @@
     const installing = state.status === "installing" || requestPending === "install_update";
     window.codexBoardAppUpdateInstalling = installing;
     const busy = Boolean(requestPending) || activeStates.has(state.status);
+    element("update-proxy").disabled = !invokeUpdate || busy;
     const version = state.version ? ` ${state.version}` : "";
     const statuses = {
       idle: "",
@@ -150,7 +151,10 @@
     transportError = "";
     renderUpdate();
     try {
-      const result = await invokeUpdate(command, args);
+      const requestArgs = ["check_updates", "download_update"].includes(command)
+        ? { ...args, proxy: String(element("update-proxy").value ?? "").trim() || null }
+        : args;
+      const result = await invokeUpdate(command, requestArgs);
       if (generation === requestGeneration) acceptStatus(result);
     } catch (error) {
       transportError = String(error);
@@ -246,6 +250,7 @@
   };
   element("update-notice-open").onclick = () => {
     document.querySelector('[data-tab="settings"]').click();
+    element("update-card").open = true;
     element("update-card").scrollIntoView({ block: "nearest" });
     element("update-check").focus();
   };

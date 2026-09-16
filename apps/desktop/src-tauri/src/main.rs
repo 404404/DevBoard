@@ -189,7 +189,7 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
             "show-main" => show_main_window(app),
             "check-updates" => {
                 show_main_window(app);
-                let _ = updater::check_updates(app.clone(), Some(false));
+                let _ = updater::check_updates(app.clone(), Some(false), None);
             }
             "quit-app" => quit(app.clone()),
             _ => {}

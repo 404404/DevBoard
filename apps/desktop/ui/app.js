@@ -183,7 +183,10 @@ function showPage(tab, focusId, automatic = false) {
     button.classList.toggle("selected", button.dataset.tab === tab);
   for (const page of document.querySelectorAll(".page")) page.hidden = page.id !== tab;
   $("breadcrumb").textContent = pageNames[tab];
-  if (focusId) $(focusId).focus();
+  if (focusId) {
+    if (tab === "connections") $("connections-card").open = true;
+    $(focusId).focus();
+  }
 }
 $("overview-guide").onclick = () => showPage("guide");
 for (const [id, field] of [

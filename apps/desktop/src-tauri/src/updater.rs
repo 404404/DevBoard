@@ -102,6 +102,29 @@ fn checked_recently(last: Option<u64>, now: u64) -> bool {
     last.is_some_and(|last| now >= last && now - last < DAY_MS)
 }
 
+// Manual overrides are session-only and never written to logs or settings.
+fn parse_proxy(value: Option<&str>) -> Result<Option<reqwest::Url>, String> {
+    let value = value.unwrap_or_default().trim();
+    if value.is_empty() {
+        return Ok(None);
+    }
+    let invalid = || {
+        "代理地址无效，请填写 http://、https://、socks5:// 或 socks5h://主机:端口；不支持账号密码、路径或查询参数。".to_string()
+    };
+    let url = reqwest::Url::parse(value).map_err(|_| invalid())?;
+    if !matches!(url.scheme(), "http" | "https" | "socks5" | "socks5h")
+        || url.host_str().is_none()
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || !matches!(url.path(), "" | "/")
+        || url.query().is_some()
+        || url.fragment().is_some()
+    {
+        return Err(invalid());
+    }
+    Ok(Some(url))
+}
+
 #[tauri::command]
 pub fn update_status(app: tauri::AppHandle) -> UpdateStatus {
     app.state::<Updates>().status()
@@ -111,10 +134,12 @@ pub fn update_status(app: tauri::AppHandle) -> UpdateStatus {
 pub fn check_updates(
     app: tauri::AppHandle,
     automatic: Option<bool>,
+    proxy: Option<String>,
 ) -> Result<UpdateStatus, String> {
     if app.state::<Controller>().quitting.load(Ordering::SeqCst) {
         return Err("应用正在退出".into());
     }
+    let proxy = parse_proxy(proxy.as_deref())?;
     let state = app.state::<Updates>();
     let mut pending = state.pending.lock().unwrap();
     let now = now_ms();
@@ -147,10 +172,11 @@ pub fn check_updates(
     drop(pending);
     tauri::async_runtime::spawn(async move {
         let result = async {
-            let updater = app
-                .updater_builder()
-                .timeout(Duration::from_secs(30))
-                .build()?;
+            let mut builder = app.updater_builder().timeout(Duration::from_secs(30));
+            if let Some(proxy) = proxy {
+                builder = builder.proxy(proxy);
+            }
+            let updater = builder.build()?;
             // The official comparator only accepts newer versions; no downgrade override.
             updater.check().await
         }
@@ -177,7 +203,11 @@ pub fn check_updates(
 }
 
 #[tauri::command]
-pub fn download_update(app: tauri::AppHandle) -> Result<UpdateStatus, String> {
+pub fn download_update(
+    app: tauri::AppHandle,
+    proxy: Option<String>,
+) -> Result<UpdateStatus, String> {
+    let proxy = parse_proxy(proxy.as_deref())?;
     if app.state::<Controller>().quitting.load(Ordering::SeqCst) {
         return Err("应用正在退出".into());
     }
@@ -186,7 +216,8 @@ pub fn download_update(app: tauri::AppHandle) -> Result<UpdateStatus, String> {
     if pending.status.busy() || pending.status.can_install {
         return Ok(pending.status.clone());
     }
-    let update = pending.update.clone().ok_or("请先检查更新")?;
+    let mut update = pending.update.clone().ok_or("请先检查更新")?;
+    update.proxy = proxy;
     pending.status.status = "downloading".into();
     pending.status.error = None;
     pending.status.downloaded_bytes = 0;
@@ -493,5 +524,40 @@ mod tests {
             validate_archive(&bytes).is_ok(),
             "release archive was rejected by the native installer"
         );
+    }
+}
+
+#[cfg(test)]
+mod proxy_tests {
+    use super::parse_proxy;
+
+    #[test]
+    fn accepts_automatic_and_supported_proxies() {
+        assert!(parse_proxy(None).unwrap().is_none());
+        assert!(parse_proxy(Some("  ")).unwrap().is_none());
+        for value in [
+            "http://127.0.0.1:7890",
+            "https://proxy.example:443",
+            "socks5://localhost:1080",
+            "socks5h://[::1]:1080",
+        ] {
+            assert!(parse_proxy(Some(value)).unwrap().is_some());
+        }
+    }
+
+    #[test]
+    fn rejects_unsupported_or_sensitive_values_without_echoing_them() {
+        for value in [
+            "localhost:7890",
+            "file:///tmp/proxy",
+            "http://user:secret@localhost:7890",
+            "http://localhost/path",
+            "http://localhost?token=secret",
+            "http://localhost#secret",
+        ] {
+            let error = parse_proxy(Some(value)).unwrap_err();
+            assert!(!error.contains(value));
+            assert!(!error.contains("secret"));
+        }
     }
 }

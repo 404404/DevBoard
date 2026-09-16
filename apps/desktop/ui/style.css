@@ -1057,7 +1057,8 @@ select:focus-visible {
   margin: 0;
   font-size: 17px;
 }
-.collapsible-card > summary .skill-target-label {
+.collapsible-card > summary .skill-target-label,
+.collapsible-card > summary #update-current-version {
   margin-left: auto;
 }
 .collapsible-card > summary:focus-visible {

@@ -1,12 +1,13 @@
 [package]
 name = "codexboard-desktop"
-version = "0.1.8"
+version = "0.1.9"
 edition = "2021"
 [build-dependencies]
 tauri-build = { version = "=2.6.3", features = [] }
 [dependencies]
 tauri = { version = "=2.11.5", features = ["tray-icon"] }
 tauri-plugin-updater = "=2.10.1"
+reqwest = { version = "=0.13.4", default-features = false, features = ["system-proxy", "socks"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 libc = "0.2"
