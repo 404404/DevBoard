@@ -57,10 +57,16 @@ for (const [name, engine] of Object.entries({ chromium, webkit }))
       await page.locator("#update-notice-open").click();
       assert.equal(await page.locator("#settings").isVisible(), true);
       const release = page.locator("#update-release-link");
-      assert.equal(
-        await release.getAttribute("href"),
-        "https://github.com/RocYan98/CodexBoard/releases/latest",
-      );
+      assert.equal(await release.evaluate((element) => element.tagName), "BUTTON");
+      const buttonStyles = await page
+        .locator("#update-check, #update-release-link")
+        .evaluateAll((buttons) =>
+          buttons.map((button) => {
+            const style = getComputedStyle(button);
+            return [style.fontSize, style.fontFamily, style.padding, style.borderRadius];
+          }),
+        );
+      assert.deepEqual(buttonStyles[0], buttonStyles[1]);
       await release.click();
       assert.equal((await page.evaluate(() => window.updateCalls)).at(-1), "open_release_page");
       await page.evaluate(() => {
