@@ -2,6 +2,7 @@
   "codexVersion": "0.154.0",
   "clientMethods": [
     "initialize",
+    "config/read",
     "fs/createDirectory",
     "thread/start",
     "thread/name/set",

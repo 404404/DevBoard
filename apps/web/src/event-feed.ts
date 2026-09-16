@@ -35,10 +35,13 @@ const EXECUTION_EVENT_TYPES = [
   "job.succeeded",
   "job.failed",
   "job.failed_recoverable",
+  "job.outcome_unknown",
+  "job.result_corrected",
   "job.capacity_waiting",
   "job.canceling",
   "job.canceled",
   "codex.agent_message",
+  "codex.history_synced",
   "codex.thread_created",
   "codex.thread_bound",
   "codex.turn_started",
@@ -103,6 +106,14 @@ function isEventType(eventType: string, candidates: readonly string[]): boolean 
 }
 
 export function eventInvalidationKeys(projectId: string, event: BoardEvent): QueryKey[] {
+  if (event.eventType === "task.workspace_synced") {
+    const taskId = event.aggregateId;
+    return [
+      ...taskMutationInvalidationKeys(projectId, taskId ? [taskId] : []),
+      ["task-creation-options", projectId],
+      ["git-management", projectId],
+    ];
+  }
   if (isEventType(event.eventType, LABEL_EVENT_TYPES)) {
     return [["labels"], ["task-creation-options"], ["board", projectId], ["task"], ["workspace"]];
   }

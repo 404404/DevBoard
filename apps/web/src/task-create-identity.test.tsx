@@ -51,6 +51,7 @@ describe("task creation current identity display", () => {
     const html = renderToStaticMarkup(
       <QueryClientProvider client={client}>
         <TaskCreateDialog
+          open
           project={project}
           projects={[project]}
           csrfToken={"x".repeat(32)}

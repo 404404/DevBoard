@@ -1,3 +1,5 @@
+import type { CodexRecoveredOutcome, CodexThreadHistory } from "./codex-executor.js";
+import { TaskModelOptionsSchema, type TaskModelOptions } from "@codexboard/contracts";
 import { identityKey, identityFromKey, IdentityKeySchema } from "@codexboard/contracts";
 import { createHash, randomUUID } from "node:crypto";
 import { resolve } from "node:path";
@@ -139,6 +141,7 @@ export interface TaskThreadBinding {
   readonly taskId: string;
   readonly threadId: string;
   readonly cwd: string;
+  readonly modelOptions?: TaskModelOptions;
   readonly lastTurnId: string | null;
   readonly lastEventCursor: string | null;
   readonly status: "active" | "idle" | "completed" | "failed" | "archived";
@@ -381,16 +384,28 @@ export class ExecutionQueue {
     const row = this.#database
       .prepare(
         `SELECT id, task_id AS taskId, thread_id AS threadId, cwd,
-          last_turn_id AS lastTurnId, last_event_cursor AS lastEventCursor, status
+          last_turn_id AS lastTurnId, last_event_cursor AS lastEventCursor, status, model_options_json AS modelOptionsJson
         FROM task_threads WHERE task_id = ? AND is_primary = 1`,
       )
-      .get(taskId) as TaskThreadBinding | undefined;
-    return row ?? null;
+      .get(taskId) as (TaskThreadBinding & { modelOptionsJson: string | null }) | undefined;
+    if (!row) return null;
+    const { modelOptionsJson, ...binding } = row;
+    return {
+      ...binding,
+      ...(modelOptionsJson
+        ? { modelOptions: TaskModelOptionsSchema.parse(JSON.parse(modelOptionsJson)) }
+        : {}),
+    };
   }
 
   bindDraftThread(
     taskId: string,
-    binding: { readonly threadId: string; readonly cwd: string; readonly codexVersion?: string },
+    binding: {
+      readonly threadId: string;
+      readonly cwd: string;
+      readonly codexVersion?: string;
+      readonly modelOptions?: TaskModelOptions;
+    },
   ): { readonly thread: TaskThreadBinding; readonly revision: number | null } {
     const timestamp = this.#now().toISOString();
     const mutation = withTransaction(this.#database, () => {
@@ -414,8 +429,8 @@ export class ExecutionQueue {
       this.#database
         .prepare(
           `INSERT INTO task_threads (
-            id, task_id, thread_id, cwd, codex_version, is_primary, status, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, 1, 'idle', ?, ?)`,
+            id, task_id, thread_id, cwd, codex_version, model_options_json, is_primary, status, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, 1, 'idle', ?, ?)`,
         )
         .run(
           randomUUID(),
@@ -423,6 +438,9 @@ export class ExecutionQueue {
           binding.threadId,
           binding.cwd,
           binding.codexVersion ?? null,
+          binding.modelOptions
+            ? JSON.stringify(TaskModelOptionsSchema.parse(binding.modelOptions))
+            : null,
           timestamp,
           timestamp,
         );
@@ -903,8 +921,10 @@ export class ExecutionQueue {
       .array(z.object({ id: z.uuid(), version: z.number().int().positive() }))
       .parse(superseded?.workContext.commentSnapshot ?? []);
     {
+      const modelOptions = this.primaryThread(taskId)?.modelOptions;
       const workContext = {
         ...baseContext,
+        ...(modelOptions ? { modelOptions } : {}),
         commentSnapshot: comments.map(({ id, version }) => ({ id, version })),
         commentBodySnapshot: comments,
         attachmentSnapshot,
@@ -1337,6 +1357,370 @@ export class ExecutionQueue {
     return mutation.result;
   }
 
+  observedJobs(): readonly JobView[] {
+    const ids = this.#database
+      .prepare(
+        `SELECT jobs.id FROM jobs
+      JOIN tasks ON tasks.id = jobs.task_id
+      JOIN task_threads ON task_threads.id = jobs.task_thread_id AND task_threads.is_primary = 1
+      WHERE tasks.archived_at IS NULL AND tasks.status NOT IN ('done', 'canceled')
+      AND jobs.kind != 'cancel' AND jobs.rowid = (
+        SELECT MAX(latest.rowid) FROM jobs latest WHERE latest.task_id = jobs.task_id AND latest.kind != 'cancel'
+      ) ORDER BY jobs.rowid`,
+      )
+      .pluck()
+      .all() as string[];
+    return ids.map((id) => this.readJob(id));
+  }
+
+  syncThreadHistory(jobId: string, history: CodexThreadHistory): number {
+    const mutation = withTransaction(this.#database, () => {
+      const job = this.readJob(jobId);
+      const thread = this.primaryThread(job.taskId);
+      const task = this.#taskForJob(jobId);
+      if (
+        !thread ||
+        thread.id !== job.taskThreadId ||
+        thread.threadId !== history.threadId ||
+        job.status === "canceled" ||
+        hasTaskLifecycleIntent(this.#database, job.taskId) ||
+        !this.observedJobs().some((candidate) => candidate.id === jobId)
+      )
+        return { count: 0, revision: null };
+      const taskJobs = this.listTaskJobs(job.taskId);
+      const boardClientIds = new Set(taskJobs.map((candidate) => candidate.id));
+      const activeBoardJob = taskJobs.some((candidate) =>
+        ["queued", "running", "waiting_input", "waiting_approval", "canceling"].includes(
+          candidate.status,
+        ),
+      );
+      const anchors = new Map(
+        taskJobs
+          .filter(
+            (candidate) => candidate.kind !== "cancel" && candidate.taskThreadId === thread.id,
+          )
+          .map((candidate) => [candidate.recoveryCheckpoint?.turnId, candidate]),
+      );
+      if (!history.turns.some((turn) => anchors.has(turn.id))) return { count: 0, revision: null };
+      const timestamp = this.#now().toISOString();
+      const anchorIndex = history.turns.findIndex((turn) => anchors.has(turn.id));
+      const desktopActive = history.turns
+        .slice(anchorIndex)
+        .some((turn) => !anchors.has(turn.id) && turn.status === "inProgress");
+      // Only the latest turn can drive the task status; an older Desktop reply
+      // must not override a later board-dispatched turn.
+      const latestTurn = history.turns.at(-1);
+      const desktopTurn = latestTurn && !anchors.has(latestTurn.id) ? latestTurn : undefined;
+      const hasCurrentAnchor = history.turns.some(
+        (turn) => turn.id === job.recoveryCheckpoint?.turnId,
+      );
+      const previousState = this.#database
+        .prepare(
+          `SELECT json_extract(job_events.safe_payload_json, '$.active') AS active,
+          json_extract(job_events.safe_payload_json, '$.turnId') AS turnId,
+          json_extract(job_events.safe_payload_json, '$.turnStatus') AS turnStatus
+        FROM job_events JOIN jobs ON jobs.id = job_events.job_id WHERE jobs.task_thread_id = ? AND job_events.kind = 'codex.desktop_state'
+        ORDER BY job_events.rowid DESC LIMIT 1`,
+        )
+        .get(thread.id) as
+        { active: number; turnId: string | null; turnStatus: string | null } | undefined;
+      const stateChanged =
+        Boolean(previousState?.active) !== desktopActive ||
+        (desktopTurn !== undefined &&
+          (previousState?.turnId !== desktopTurn.id ||
+            previousState?.turnStatus !== desktopTurn.status));
+      if (stateChanged)
+        this.#appendEvent(
+          jobId,
+          "codex.desktop_state",
+          desktopActive ? "Desktop 对话正在执行" : "Desktop 对话执行已结束",
+          {
+            active: desktopActive,
+            turnId: desktopTurn?.id ?? null,
+            turnStatus: desktopTurn?.status ?? null,
+          },
+          timestamp,
+        );
+      const desktopFinished =
+        desktopTurn && ["completed", "failed", "interrupted"].includes(desktopTurn.status);
+      let taskStatusChanged = false;
+      if (
+        !activeBoardJob &&
+        hasCurrentAnchor &&
+        desktopTurn &&
+        (desktopActive || (stateChanged && desktopFinished))
+      ) {
+        const currentTask = this.#readTask(job.taskId);
+        const nextStatus = desktopActive ? "in_progress" : "in_review";
+        if (currentTask.status !== nextStatus) {
+          this.#database
+            .prepare(
+              `UPDATE tasks SET status = ?, blocked_from_status = NULL,
+              version = version + 1, updated_at = ? WHERE id = ?`,
+            )
+            .run(nextStatus, timestamp, job.taskId);
+          const kind = desktopActive ? "task.execution_started" : "task.execution_completed";
+          this.#database
+            .prepare(
+              `INSERT INTO activities (id, task_id, identity_key, kind, changes_json, created_at)
+              VALUES (?, ?, NULL, ?, ?, ?)`,
+            )
+            .run(
+              randomUUID(),
+              job.taskId,
+              kind,
+              JSON.stringify({
+                status: { from: currentTask.status, to: nextStatus },
+                jobId,
+                source: "desktop",
+                turnId: desktopTurn?.id,
+              }),
+              timestamp,
+            );
+          this.#recordChange(
+            "task",
+            job.taskId,
+            kind,
+            { projectId: task.projectId, taskId: job.taskId, status: nextStatus },
+            timestamp,
+          );
+          taskStatusChanged = true;
+        }
+      }
+      let count = 0;
+      let source: JobView | undefined;
+      for (const turn of history.turns) {
+        source = anchors.get(turn.id) ?? source;
+        if (!source) continue;
+        for (const event of turn.events) {
+          const user = event.kind === "codex.user_message";
+          if (user) {
+            const clientId = event.safePayload?.clientId;
+            // Board-dispatched prompts already exist as task descriptions/comments.
+            if (typeof clientId === "string" && boardClientIds.has(clientId)) continue;
+            if (
+              anchors.has(turn.id) &&
+              !clientId &&
+              event.safePayload?.itemType !== "steeringUserMessage"
+            )
+              continue;
+          } else if (
+            event.kind !== "codex.agent_message" ||
+            event.safePayload?.phase !== "final_answer" ||
+            !["completed", "failed", "interrupted"].includes(turn.status) ||
+            !["succeeded", "failed", "failed_recoverable"].includes(source.status) ||
+            activeBoardJob
+          )
+            continue;
+          const exists = this.#database
+            .prepare(
+              `SELECT 1 FROM job_events JOIN jobs ON jobs.id = job_events.job_id
+            WHERE jobs.task_thread_id = ? AND (
+              json_extract(job_events.safe_payload_json, '$.eventCursor') = ? OR
+              (? = 1 AND job_events.kind = 'codex.user_message' AND EXISTS (
+                SELECT 1 FROM json_each(job_events.safe_payload_json, '$.messageIds') existing
+                JOIN json_each(?) incoming ON incoming.value = existing.value
+              ))
+            )`,
+            )
+            .get(
+              thread.id,
+              event.cursor,
+              user ? 1 : 0,
+              JSON.stringify(event.safePayload?.messageIds ?? []),
+            );
+          if (exists) continue;
+          this.#appendEvent(
+            source.id,
+            event.kind,
+            event.summary,
+            { ...event.safePayload, eventCursor: event.cursor },
+            timestamp,
+          );
+          count++;
+        }
+      }
+      const revision =
+        count || stateChanged || taskStatusChanged
+          ? this.#recordChange(
+              "job",
+              jobId,
+              "codex.history_synced",
+              { projectId: task.projectId, taskId: job.taskId, status: job.status },
+              timestamp,
+            )
+          : null;
+      return { count, revision };
+    });
+    this.#notify(mutation.revision);
+    return mutation.count;
+  }
+
+  syncWorkspace(jobId: string, expectedCwd: string, context: { id: string; cwd: string }): boolean {
+    const mutation = withTransaction(this.#database, () => {
+      const job = this.readJob(jobId);
+      const thread = this.primaryThread(job.taskId);
+      const task = this.#taskForJob(jobId);
+      if (
+        !thread ||
+        thread.id !== job.taskThreadId ||
+        thread.cwd !== expectedCwd ||
+        ["canceled", "canceling"].includes(job.status) ||
+        hasTaskLifecycleIntent(this.#database, job.taskId) ||
+        !this.observedJobs().some((candidate) => candidate.id === jobId)
+      )
+        return { result: false, revision: null };
+      assertWorkspaceLifecycleAvailable(this.#database, context.cwd);
+      const timestamp = this.#now().toISOString();
+      this.#database
+        .prepare("UPDATE task_threads SET cwd = ?, updated_at = ? WHERE id = ?")
+        .run(context.cwd, timestamp, thread.id);
+      this.#database
+        .prepare(
+          "UPDATE tasks SET development_context_json = ?, version = version + 1, updated_at = ? WHERE id = ?",
+        )
+        .run(JSON.stringify({ id: context.id }), timestamp, job.taskId);
+      const revision = this.#recordChange(
+        "task",
+        job.taskId,
+        "task.workspace_synced",
+        { projectId: task.projectId, taskId: job.taskId, workingDirectory: context.cwd },
+        timestamp,
+      );
+      return { result: true, revision };
+    });
+    this.#notify(mutation.revision);
+    return mutation.result;
+  }
+
+  uncertainJobs(): readonly JobView[] {
+    const ids = this.#database
+      .prepare(
+        `SELECT id FROM jobs WHERE kind != 'cancel' AND status = 'canceling'
+      AND cancel_requested_at IS NULL AND error_code IN ('CODEX_OUTCOME_UNKNOWN', 'CONNECTOR_DISCONNECTED', 'RESTART_UNCERTAIN')
+      ORDER BY updated_at, rowid`,
+      )
+      .pluck()
+      .all() as string[];
+    return ids.map((id) => this.readJob(id));
+  }
+
+  recoverableResultJobs(): readonly JobView[] {
+    const ids = this.#database
+      .prepare(
+        `SELECT jobs.id FROM jobs JOIN tasks ON tasks.id = jobs.task_id
+      WHERE jobs.kind != 'cancel' AND jobs.status = 'failed' AND jobs.cancel_requested_at IS NULL
+      AND jobs.error_code IN ('TURN_INTERRUPTED', 'TURN_FAILED')
+      AND json_extract(jobs.recovery_checkpoint_json, '$.recoveredTurnId') IS NOT NULL
+      AND tasks.archived_at IS NULL AND tasks.status NOT IN ('done', 'canceled')`,
+      )
+      .pluck()
+      .all() as string[];
+    return [...this.uncertainJobs(), ...ids.map((id) => this.readJob(id))];
+  }
+
+  completeRecovered(jobId: string, owner: string, outcome: CodexRecoveredOutcome): JobView | null {
+    return withTransaction(this.#database, () => {
+      const current = this.readJob(jobId);
+      const thread = this.primaryThread(current.taskId);
+      if (
+        !this.recoverableResultJobs().some((job) => job.id === jobId) ||
+        !thread ||
+        current.taskThreadId !== thread.id ||
+        thread.threadId !== outcome.threadId ||
+        (typeof current.recoveryCheckpoint?.turnId === "string" &&
+          current.recoveryCheckpoint.turnId !== outcome.turnId) ||
+        hasTaskLifecycleIntent(this.#database, current.taskId)
+      )
+        return null;
+      if (current.status === "failed" && outcome.status !== "completed") return null;
+      const timestamp = this.#now().toISOString();
+      // Correct a historical recovery error without consuming a newer job's
+      // comments, changing its lease, or moving the task underneath it.
+      if (
+        current.status === "failed" &&
+        this.listTaskJobs(current.taskId).find((job) => job.kind !== "cancel")?.id !== jobId
+      ) {
+        this.#database
+          .prepare(
+            `UPDATE jobs SET status = 'succeeded', error_code = NULL,
+          error_summary = NULL, recovery_checkpoint_json = ?, updated_at = ? WHERE id = ?`,
+          )
+          .run(
+            JSON.stringify({ ...current.recoveryCheckpoint, correctedTurnId: outcome.turnId }),
+            timestamp,
+            jobId,
+          );
+        for (const event of outcome.events) {
+          if (
+            this.#database
+              .prepare(
+                `SELECT 1 FROM job_events WHERE job_id = ? AND json_extract(safe_payload_json, '$.eventCursor') = ?`,
+              )
+              .get(jobId, event.cursor)
+          )
+            continue;
+          this.#appendEvent(
+            jobId,
+            event.kind,
+            event.summary,
+            { ...event.safePayload, eventCursor: event.cursor },
+            timestamp,
+          );
+        }
+        this.#appendEvent(
+          jobId,
+          "job.result_corrected",
+          "Desktop 已确认原回合完成，修正先前恢复误判",
+          { turnId: outcome.turnId },
+          timestamp,
+        );
+        const task = this.#taskForJob(jobId);
+        const revision = this.#recordChange(
+          "job",
+          jobId,
+          "job.result_corrected",
+          { projectId: task.projectId, taskId: current.taskId, status: "succeeded" },
+          timestamp,
+        );
+        this.#notify(revision);
+        return this.readJob(jobId);
+      }
+      this.#database
+        .prepare(
+          `UPDATE jobs SET status = 'running', lease_owner = ?, error_code = NULL, error_summary = NULL,
+        recovery_checkpoint_json = ?, updated_at = ? WHERE id = ? AND status IN ('canceling', 'failed') AND cancel_requested_at IS NULL`,
+        )
+        .run(
+          owner,
+          JSON.stringify({
+            ...current.recoveryCheckpoint,
+            turnId: outcome.turnId,
+            recoveredTurnId: outcome.turnId,
+            ...(current.status === "failed" ? { correctedTurnId: outcome.turnId } : {}),
+          }),
+          timestamp,
+          jobId,
+        );
+      this.#appendEvent(
+        jobId,
+        "job.result_recovered",
+        "已从原 Codex 回合恢复执行结果",
+        { turnId: outcome.turnId },
+        timestamp,
+      );
+      for (const event of outcome.events) this.appendExecutionEvent(jobId, owner, event);
+      if (outcome.status === "completed")
+        return this.succeedAndRequestReview(jobId, owner, { turnId: outcome.turnId });
+      return this.fail(
+        jobId,
+        owner,
+        outcome.status === "interrupted" ? "TURN_INTERRUPTED" : "TURN_FAILED",
+        outcome.status === "interrupted" ? "Codex Turn 已中断" : "Codex Turn 执行失败",
+      );
+    });
+  }
+
   recoverAfterRestart(): readonly JobView[] {
     const candidates = this.#database
       .prepare(
@@ -1351,6 +1735,8 @@ export class ExecutionQueue {
     for (const jobId of candidates) {
       const timestamp = this.#now().toISOString();
       const mutation = withTransaction(this.#database, () => {
+        const isCancellation = this.readJob(jobId).kind === "cancel";
+        const eventKind = isCancellation ? "job.failed_recoverable" : "job.outcome_unknown";
         this.#database
           .prepare(
             `UPDATE jobs SET status = CASE WHEN kind = 'cancel' THEN 'failed_recoverable' ELSE 'canceling' END, error_code = 'RESTART_UNCERTAIN',
@@ -1360,7 +1746,7 @@ export class ExecutionQueue {
           .run(timestamp, timestamp, jobId);
         this.#appendEvent(
           jobId,
-          "job.failed_recoverable",
+          eventKind,
           "服务重启后执行状态不确定，需核对远端停止状态",
           {},
           timestamp,
@@ -1369,8 +1755,12 @@ export class ExecutionQueue {
         const revision = this.#recordChange(
           "job",
           jobId,
-          "job.failed_recoverable",
-          { projectId: task.projectId, taskId: task.taskId, status: "failed_recoverable" },
+          eventKind,
+          {
+            projectId: task.projectId,
+            taskId: task.taskId,
+            status: isCancellation ? "failed_recoverable" : "canceling",
+          },
           timestamp,
         );
         return { result: this.readJob(jobId), revision };

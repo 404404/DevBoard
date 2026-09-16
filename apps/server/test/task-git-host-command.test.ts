@@ -42,3 +42,21 @@ it("keeps failed host commands recoverable without exposing repository stderr", 
     hostWorkspaceCommand(client)("/workspace/task", ["git", "commit"], ["/workspace"]),
   ).rejects.toThrow("宿主机收尾命令失败：git");
 });
+
+it("reports a safe metadata error without disclosing stderr", async () => {
+  const client = {
+    connect: vi.fn(),
+    request: vi.fn().mockResolvedValue({
+      exitCode: 128,
+      stdout: "",
+      stderr: "fatal: cannot lock ref 'private-ref': private path",
+    }),
+  };
+  await expect(
+    hostWorkspaceCommand(client)(
+      "/workspace",
+      ["git", "-C", "/workspace", "update-ref"],
+      ["/workspace"],
+    ),
+  ).rejects.toThrow("Git 收尾无法写入仓库元数据，请检查工作区权限。");
+});

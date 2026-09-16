@@ -476,7 +476,7 @@ describe("local admin HTTP adapter", () => {
       backupId: expect.stringMatching(/^backup-/),
       manifest: {
         manifestVersion: 1,
-        schemaVersion: 23,
+        schemaVersion: 26,
         attachments: [],
       },
     });

@@ -183,6 +183,11 @@ export async function connectDesktopSession({
   function flush() {
     if (!turnId || completed || !state) return;
     const turn = desktopTurns(state).find((t) => t.turnId === turnId);
+    for (const [id] of approvals) {
+      if ((state.requests ?? []).some((request) => request.id === id)) continue;
+      approvals.delete(id);
+      onMessage({ method: "serverRequest/resolved", params: { threadId, turnId, requestId: id } });
+    }
     for (const approval of state.requests ?? []) {
       if (approval.params?.turnId !== turnId || approvals.has(approval.id)) continue;
       if (!approvalMethods[approval.method]) {
@@ -875,26 +880,34 @@ export async function connectDesktopSession({
           desktopTurns(state).some((t) => t.status === "inProgress")
         )
           throw rpcError("Codex 对话正在执行，请等待当前回合结束", -32002);
+        const collaboration =
+          state.latestThreadSettings?.collaborationMode ?? state.latestCollaborationMode;
+        const selectedCollaboration =
+          params.model && collaboration?.settings
+            ? {
+                ...collaboration,
+                settings: {
+                  ...collaboration.settings,
+                  model: params.model,
+                  ...(params.effort ? { reasoning_effort: params.effort } : {}),
+                },
+              }
+            : undefined;
         submitting = true;
         const result = await request("thread-follower-start-turn", {
           conversationId: threadId,
           turnStart: {
             request: {
               ...params,
+              ...(selectedCollaboration ? { collaborationMode: selectedCollaboration } : {}),
               // Desktop renders optimistic input before App Server can normalize
               // it. Its text renderer reads text_elements.length unconditionally.
               input: params.input.map((item) =>
                 item.type === "text" ? { ...item, text_elements: item.text_elements ?? [] } : item,
               ),
-              sandboxPolicy: {
-                type: "workspaceWrite",
-                writableRoots: [params.cwd],
-                networkAccess: false,
-                excludeTmpdirEnvVar: false,
-                excludeSlashTmp: false,
-              },
             },
-            context: { inheritThreadSettings: false },
+            // Preserve the owner's permission selection, including auto-review.
+            context: { inheritThreadSettings: true },
           },
         });
         const response = result.result?.result;
@@ -907,7 +920,9 @@ export async function connectDesktopSession({
       async write(message) {
         try {
           const approval = approvals.get(message.id);
-          if (!approval) throw rpcError("Codex 桌面审批请求不存在");
+          // Desktop/Remote may have answered while the board still awaited input.
+          // A late reply must not kill the completion subscription or resend a decision.
+          if (!approval || !(state.requests ?? []).some((item) => item.id === message.id)) return;
           if (message.error) throw rpcError("Codex 桌面审批未能送达");
           const [method, field] = approvalMethods[approval.method];
           await request(method, {

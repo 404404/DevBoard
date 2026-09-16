@@ -1,3 +1,4 @@
+import { hasActiveDesktopTurn } from "./desktop-execution-state.js";
 import { identityKey, identityFromKey, IdentityKeySchema } from "@codexboard/contracts";
 import { createHash, randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
@@ -15,12 +16,12 @@ import { z } from "zod";
 import { AppError } from "../../app-error.js";
 import type { SqliteDatabase } from "../database/index.js";
 import type { ExecutionQueue } from "../execution/index.js";
-import type { TaskGitFinalizer, TaskGitSnapshot } from "./task-git-finalizer.js";
 import {
-  assertGitManagementAvailable,
-  canonicalWorkspace,
-  workspaceResourceKeys,
-} from "./task-lifecycle-guard.js";
+  canonicalGitDirectory,
+  type TaskGitFinalizer,
+  type TaskGitSnapshot,
+} from "./task-git-finalizer.js";
+import { assertGitManagementAvailable, workspaceResourceKeys } from "./task-lifecycle-guard.js";
 import { assertTaskEditable } from "./task-readonly.js";
 import type { MutationContext, Taskboard } from "./taskboard.js";
 
@@ -45,7 +46,7 @@ interface Options {
   readonly database: SqliteDatabase;
   readonly taskboard: Taskboard;
   readonly queue: ExecutionQueue;
-  readonly gitFinalizer: Pick<TaskGitFinalizer, "inspect" | "commit" | "cleanup">;
+  readonly gitFinalizer: Pick<TaskGitFinalizer, "inspect" | "verify">;
   readonly scheduleExecution: () => void;
   readonly onRevisionCommitted?: (revision: number) => void;
   readonly cancellationTimeoutMs?: number;
@@ -160,6 +161,15 @@ export class TaskLifecycleService {
   }
 
   async resumePending(): Promise<void> {
+    // Failed operations from the former cleanup workflow must not hold Git
+    // management locks now that users perform cleanup before retrying checks.
+    this.#options.database
+      .prepare(
+        `DELETE FROM task_lifecycle_resources WHERE operation_id IN (
+      SELECT id FROM task_lifecycle_operations WHERE target_status = 'done' AND status = 'failed'
+    )`,
+      )
+      .run();
     const rows = this.#options.database
       .prepare("SELECT id FROM task_lifecycle_operations WHERE status IN ('pending', 'running')")
       .all() as { id: string }[];
@@ -198,63 +208,60 @@ export class TaskLifecycleService {
           .get(task.projectId)
       )
         throw new AppError("INVALID_REQUEST", 409, "任务或项目已归档或权限已变化，无法执行操作");
-      this.#update(id, "running", operation.phase);
+      if (operation.targetStatus === "done" && operation.snapshotJson) {
+        // Preserve branch identity across transient inspection failures, but do
+        // not reuse an old commit/cleanup checkpoint as proof of completion.
+        const previous = JSON.parse(operation.snapshotJson) as TaskGitSnapshot;
+        this.#options.database
+          .prepare("UPDATE task_lifecycle_operations SET snapshot_json = ? WHERE id = ?")
+          .run(JSON.stringify({ ...previous, commitSha: null, archiveRef: null, notes: [] }), id);
+      }
+      this.#update(id, "running", "checking");
       if (operation.targetStatus === "canceled") {
         this.#update(id, "running", "canceling");
         await this.#cancelExecutions(operation);
       } else {
         this.#assertReadyToComplete(operation.taskId);
-        let snapshot = operation.snapshotJson
-          ? (JSON.parse(operation.snapshotJson) as TaskGitSnapshot)
-          : null;
-        if (!snapshot) {
-          const directory = this.#taskDirectory(operation.taskId);
-          if (directory) {
-            snapshot = await this.#options.gitFinalizer.inspect(
-              directory,
-              operation.taskId,
-              operation.id,
-            );
-            if (snapshot) {
-              const evidence = this.#options.database
-                .prepare(
-                  `SELECT evidence.after_fingerprint AS fingerprint FROM job_workspace_evidence evidence JOIN jobs ON jobs.id = evidence.job_id WHERE jobs.task_id = ? AND evidence.cwd = ? AND evidence.trusted = 1 AND evidence.after_fingerprint IS NOT NULL ORDER BY jobs.queued_at DESC, jobs.rowid DESC LIMIT 1`,
-                )
-                .get(operation.taskId, snapshot.cwd) as { fingerprint: string } | undefined;
-              snapshot = { ...snapshot, verifiedFingerprint: evidence?.fingerprint ?? null };
-              this.#lockResources(operation, snapshot);
-              this.#update(id, "running", "committing", snapshot);
-            }
-          }
-        } else {
-          this.#lockResources(operation, snapshot);
-        }
-        if (snapshot) {
-          if (!snapshot.commitSha) {
-            snapshot = await this.#options.gitFinalizer.commit(
-              snapshot,
-              this.#taskIdentifier(operation.taskId),
-              this.#shared(operation.taskId, snapshot),
-            );
-            this.#update(id, "running", "cleaning", snapshot);
-          }
-          snapshot = await this.#options.gitFinalizer.cleanup(
-            snapshot,
-            this.#shared(operation.taskId, snapshot),
+        // Reinspect on every retry, including operations persisted by the old
+        // automatic commit/cleanup flow. Historical delivery refs are irrelevant.
+        const directory = this.#taskDirectory(operation.taskId);
+        if (directory) {
+          const project = this.#options.database
+            .prepare("SELECT workspace_realpath AS cwd FROM projects WHERE id = ?")
+            .get(task.projectId) as { cwd: string | null };
+          let snapshot = await this.#options.gitFinalizer.inspect(
+            directory,
+            operation.taskId,
+            operation.id,
+            project.cwd,
+            this.#taskBranch(operation.taskId, directory, operation.snapshotJson),
           );
-          this.#update(id, "running", "cleaning", snapshot);
+          if (snapshot) {
+            this.#lockResources(operation, snapshot);
+            this.#update(id, "running", "checking", snapshot);
+            snapshot = await this.#options.gitFinalizer.verify(snapshot);
+            this.#update(id, "running", "checking", snapshot);
+          }
         }
       }
       operation = this.#operation(id);
       return this.#finish(operation);
     } catch (cause) {
       const message =
-        cause instanceof AppError ? cause.message : "任务收尾失败，请检查工作目录后重试";
+        cause instanceof AppError
+          ? cause.message.startsWith("任务未完成")
+            ? cause.message
+            : `任务未完成：${cause.message}`
+          : "任务未完成：收尾失败，请检查工作目录后重试";
       this.#options.database
         .prepare(
           "UPDATE task_lifecycle_operations SET status = 'failed', error_summary = ?, updated_at = ? WHERE id = ? AND status <> 'succeeded'",
         )
         .run(message, new Date().toISOString(), id);
+      // A failed read-only check must not prevent the user from cleaning up Git resources.
+      this.#options.database
+        .prepare("DELETE FROM task_lifecycle_resources WHERE operation_id = ?")
+        .run(id);
       this.#notify(id);
       throw cause instanceof AppError
         ? cause
@@ -297,6 +304,12 @@ export class TaskLifecycleService {
 
   #assertReadyToComplete(taskId: string): void {
     const db = this.#options.database;
+    if (hasActiveDesktopTurn(db, taskId))
+      throw new AppError(
+        "INVALID_REQUEST",
+        409,
+        "任务未完成：Desktop 对话仍在执行，请等待结束后重试。",
+      );
     if (!db.prepare("SELECT 1 FROM tasks WHERE id = ? AND status = 'in_review'").get(taskId))
       throw new AppError("INVALID_REQUEST", 409, "只有待验收状态的任务才能完成");
     if (
@@ -317,6 +330,7 @@ export class TaskLifecycleService {
 
   #lockResources(operation: Operation, snapshot: TaskGitSnapshot): void {
     assertGitManagementAvailable(this.#options.database, snapshot.cwd);
+    assertGitManagementAvailable(this.#options.database, snapshot.mainCwd);
     const db = this.#options.database;
     const keys = [`cwd:${snapshot.cwd}`, `repo:${snapshot.commonDirectory}`];
     db.transaction(() => {
@@ -346,25 +360,36 @@ export class TaskLifecycleService {
     }).immediate();
   }
 
-  #shared(taskId: string, snapshot: TaskGitSnapshot): boolean {
-    const rows = this.#options.database
+  #taskBranch(taskId: string, directory: string, previousSnapshot: string | null): string | null {
+    const row = this.#options.database
       .prepare(
-        `SELECT tasks.id, contexts.branch,
-      references_table.cwd FROM tasks
-      JOIN (SELECT task_id, cwd FROM task_threads
-        UNION SELECT tasks.id, contexts.worktree_realpath FROM tasks JOIN project_development_contexts contexts ON contexts.id = json_extract(tasks.development_context_json, '$.id')
-        UNION SELECT tasks.id, projects.workspace_realpath FROM tasks JOIN projects ON projects.id = tasks.project_id WHERE tasks.development_context_json IS NULL) references_table ON references_table.task_id = tasks.id
-      LEFT JOIN project_development_contexts contexts ON contexts.id = json_extract(tasks.development_context_json, '$.id')
-      WHERE tasks.id <> ? AND NOT (tasks.status = 'done' AND EXISTS (SELECT 1 FROM task_lifecycle_operations op WHERE op.task_id = tasks.id AND op.status = 'succeeded' AND op.target_status = 'done'))`,
+        `
+      SELECT contexts.branch FROM tasks
+      JOIN project_development_contexts contexts ON contexts.id = json_extract(tasks.development_context_json, '$.id')
+      WHERE tasks.id = ?`,
       )
-      .all(taskId) as { id: string; cwd: string | null; branch: string | null }[];
-    return rows.some(
-      (row) =>
-        row.cwd &&
-        (canonicalWorkspace(row.cwd) === snapshot.cwd ||
-          (row.branch === snapshot.branch &&
-            workspaceResourceKeys(row.cwd).includes(`repo:${snapshot.commonDirectory}`))),
-    );
+      .get(taskId) as { branch: string | null } | undefined;
+    if (row?.branch) return row.branch;
+    const job = this.#options.database
+      .prepare(
+        `
+      SELECT json_extract(work_context_json, '$.branch') AS branch FROM jobs
+      WHERE task_id = ? AND json_extract(work_context_json, '$.cwd') = ?
+        AND json_extract(work_context_json, '$.branch') IS NOT NULL
+      ORDER BY rowid DESC LIMIT 1`,
+      )
+      .get(taskId, directory) as { branch: string } | undefined;
+    if (job?.branch) return job.branch;
+    if (previousSnapshot) {
+      const previous = JSON.parse(previousSnapshot) as { cwd?: string; branch?: string };
+      if (
+        previous.cwd &&
+        canonicalGitDirectory(previous.cwd) === canonicalGitDirectory(directory) &&
+        previous.branch
+      )
+        return previous.branch;
+    }
+    return null;
   }
 
   #taskDirectory(taskId: string): string | null {
@@ -375,21 +400,6 @@ export class TaskLifecycleService {
       .get(taskId) as { cwd: string | null };
     return row.cwd;
   }
-  #taskIdentifier(taskId: string): string {
-    return this.#options.taskboard.readTask(
-      taskId,
-      this.#actor(this.#operationForTask(taskId).principalKey),
-    ).identifier;
-  }
-  #operationForTask(taskId: string): Operation {
-    const row = this.#options.database
-      .prepare(
-        "SELECT id FROM task_lifecycle_operations WHERE task_id = ? AND status IN ('pending', 'running', 'failed')",
-      )
-      .get(taskId) as { id: string };
-    return this.#operation(row.id);
-  }
-
   #finish(operation: Operation): TaskMutationResult {
     const { database, taskboard } = this.#options;
     const result = database
@@ -525,7 +535,7 @@ export class TaskLifecycleService {
       notes:
         snapshot?.notes ??
         (operation.targetStatus === "done" && operation.status === "succeeded"
-          ? ["无 Git 工作区，无需提交或删除分支；原目录已保留"]
+          ? ["无 Git 工作区，无需 Git 检查；原目录已保留"]
           : []),
     });
   }

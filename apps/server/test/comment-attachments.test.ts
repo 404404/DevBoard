@@ -284,12 +284,11 @@ it("snapshots description and attachment-only comment files with usable download
     expect(s.service.open(attachment.id, actor).bytes.toString()).toBe("attachment content");
   }
   expect(prompt).not.toContain(hidden.id);
-  const added = s.upload(c.id);
-  s.service.delete(added.id, s.context());
+  expect(() => s.upload(c.id)).toThrow("任务执行中");
   expect(
     s.workspace.readTaskWorkspace(s.task.id, actor).comments.find((comment) => comment.id === c.id)
       ?.version,
-  ).toBe(3);
+  ).toBe(1);
   s.queue.releaseForRetry(job.id, "worker", "INTERNAL_ERROR", "retry");
   s.comment("下一轮评论");
   const retried = s.queue.claimNext("worker");
@@ -459,30 +458,17 @@ it("uses executor-visible paths for attachments when the server runs in Docker",
   expect(prompt).not.toContain("/var/lib/codexboard");
 });
 
-it("attachment changes invalidate an in-flight comment snapshot and become locked only after current-version success", () => {
+it("locks comment attachments during execution and keeps executed comments immutable after success", () => {
   const s = setup();
   const c = s.comment();
-  s.submit();
-  const first = s.queue.claimNext("worker")!;
   const file = s.upload(c.id);
-  expect(
-    s.workspace.readTaskWorkspace(s.task.id, actor).comments.find((entry) => entry.id === c.id)
-      ?.version,
-  ).toBe(2);
-  s.queue.succeedAndRequestReview(first.id, "worker");
-  expect(
-    s.workspace.readTaskWorkspace(s.task.id, actor).comments.find((entry) => entry.id === c.id)
-      ?.executedAt,
-  ).toBeNull();
-  s.service.delete(file.id, s.context());
-  expect(
-    s.workspace.readTaskWorkspace(s.task.id, actor).comments.find((entry) => entry.id === c.id)
-      ?.version,
-  ).toBe(3);
   s.submit();
-  const second = s.queue.claimNext("worker")!;
-  s.queue.succeedAndRequestReview(second.id, "worker");
+  const job = s.queue.claimNext("worker")!;
+  expect(() => s.upload(c.id)).toThrow("任务执行中");
+  expect(() => s.service.delete(file.id, s.context())).toThrow("任务执行中");
+  s.queue.succeedAndRequestReview(job.id, "worker");
   expect(() => s.upload(c.id)).toThrow(/已用于执行/);
+  expect(() => s.service.delete(file.id, s.context())).toThrow(/已用于执行/);
 });
 
 it("keeps authorized immutable attachment downloads after deleting originals and comments", () => {
@@ -494,6 +480,11 @@ it("keeps authorized immutable attachment downloads after deleting originals and
     submitted.workContext.attachmentSnapshot as { id: string; originalAttachmentId: string }[]
   )[0]!;
   expect(snapshot.id).not.toBe(original.id);
+  expect(() => s.service.delete(original.id, s.context())).toThrow("任务执行中");
+  s.queue.claimNext("worker");
+  s.queue.releaseForRetry(submitted.id, "worker", "NOT_SENT", "retry");
+  expect(s.queue.claimNext("worker")!.workContext).toEqual(submitted.workContext);
+  s.queue.fail(submitted.id, "worker", "NOT_SENT", "failed before execution");
   s.service.delete(original.id, s.context());
   s.workspace.deleteComment(c.id, { expectedVersion: 3 }, s.context());
   expect(() => s.service.open(original.id, actor)).toThrow(/不存在/);
@@ -506,10 +497,6 @@ it("keeps authorized immutable attachment downloads after deleting originals and
       role: "member",
     }),
   ).toThrow();
-  s.queue.claimNext("worker");
-  s.queue.releaseForRetry(submitted.id, "worker", "NOT_SENT", "retry");
-  expect(s.queue.claimNext("worker")!.workContext).toEqual(submitted.workContext);
-  expect(s.service.open(snapshot.id, actor).bytes.toString()).toBe("attachment content");
 });
 
 it.each(["queued", "running", "succeeded"])(
@@ -535,5 +522,45 @@ it.each(["queued", "running", "succeeded"])(
       ),
     ).not.toThrow();
     expect(s.service.open(file.id, actor)).toBeDefined();
+  },
+);
+
+it.each(["queued", "running", "waiting_approval", "waiting_input", "canceling"])(
+  "blocks changes to unexecuted comments and their attachments while %s, then unlocks them",
+  (status) => {
+    const s = setup();
+    const c = s.comment("后续补充");
+    const file = s.upload(c.id);
+    const job = s.submit();
+    if (status !== "queued") s.queue.claimNext("worker");
+    s.database.prepare("UPDATE jobs SET status = ? WHERE id = ?").run(status, job.id);
+    expect(s.comment("执行中的新补充").executedAt).toBeNull();
+    expect(c.executedAt).toBeNull();
+    expect(() =>
+      s.workspace.updateComment(c.id, { expectedVersion: c.version, body: "修改" }, s.context()),
+    ).toThrow("任务执行中");
+    expect(() =>
+      s.workspace.deleteComment(c.id, { expectedVersion: c.version }, s.context()),
+    ).toThrow("任务执行中");
+    expect(() => s.upload(c.id)).toThrow("任务执行中");
+    expect(() => s.service.delete(file.id, s.context())).toThrow("任务执行中");
+    expect(
+      s.workspace.readTaskWorkspace(s.task.id, actor).comments.find((value) => value.id === c.id)
+        ?.body,
+    ).toBe("后续补充");
+    s.database.prepare("UPDATE jobs SET status = 'canceled' WHERE id = ?").run(job.id);
+    s.service.delete(file.id, s.context());
+    const current = s.workspace
+      .readTaskWorkspace(s.task.id, actor)
+      .comments.find((value) => value.id === c.id)!;
+    const updated = s.workspace.updateComment(
+      c.id,
+      { expectedVersion: current.version, body: "修改" },
+      s.context(),
+    ).data;
+    expect(
+      s.workspace.deleteComment(c.id, { expectedVersion: updated.version }, s.context()).data
+        .deletedAt,
+    ).not.toBeNull();
   },
 );

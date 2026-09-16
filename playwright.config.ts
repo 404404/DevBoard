@@ -19,6 +19,12 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
     {
+      name: "desktop-webkit",
+      testMatch: "shell.spec.ts",
+      grep: /LAUB-014 评论交互|任务完成等待|完成只检查/,
+      use: { ...devices["Desktop Safari"] },
+    },
+    {
       name: "iphone-webkit",
       testMatch: [
         "remote-composer.spec.ts",

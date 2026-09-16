@@ -1,3 +1,6 @@
+import { DESKTOP_OUTCOME_CORRECTION_SQL } from "./0026-desktop-outcome-correction.js";
+import { EXECUTION_RESULT_RECOVERY_SQL } from "./0025-execution-result-recovery.js";
+import { TASK_MODEL_OPTIONS_SQL } from "./0024-task-model-options.js";
 import { webAccountsMigration } from "./0023-web-accounts.js";
 import { CORE_SCHEMA_SQL } from "./0001-core-schema.js";
 import { PROJECT_CONTEXTS_SQL } from "./0002-project-contexts.js";
@@ -126,6 +129,9 @@ export function identityMigrations(
     feishuUserIdentitiesMigration(mappings),
     { version: 22, name: "multiple_child_tasks", sql: MULTIPLE_CHILD_TASKS_SQL },
     webAccountsMigration,
+    { version: 24, name: "task_model_options", sql: TASK_MODEL_OPTIONS_SQL },
+    { version: 25, name: "execution_result_recovery", sql: EXECUTION_RESULT_RECOVERY_SQL },
+    { version: 26, name: "desktop_outcome_correction", sql: DESKTOP_OUTCOME_CORRECTION_SQL },
   ];
 }
 

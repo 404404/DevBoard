@@ -43,6 +43,10 @@ node packages/taskctl/dist/cli.js issue restore TASK_ID --version 5
 `issue move ... --status done` 和 `canceled` 等待生命周期操作结束。
 `lifecycle request` 提交后立即返回操作状态，可用 `lifecycle get` 查询阶段和错误。
 完成、取消、删除和 Git 操作都保留现有业务限制；`done` 仍须用户明确验收。
+
+Git 任务完成只做检查，不自动提交或清理。main 主工作树任务只需 Git 干净；独立工作树或分支任务还需任务工作树目录、Git worktree 登记及分支均已删除。存在未提交或未跟踪改动、工作树或分支残留时，保留任务原状态并通过 `errorSummary` 返回具体原因；处理后可重试。非 Git 任务不执行 Git 清理。
+
+绑定主会话中 Desktop 用户发送的消息与 Codex 最终回复都会显示在任务对话中；Desktop 用户消息使用 `source: desktop`，是不可修改、删除的历史投影，不会再次作为待执行评论提交。同步只读历史，不恢复或抢占 Desktop 写会话。
 归档隐藏任务；恢复也适用于恢复已取消任务；删除不可由 `restore` 撤销。
 
 ## 评论
@@ -109,3 +113,9 @@ CLI 凭据独立保存在当前用户私有目录中，权限为 0600；不会�
 飞书应用需开通「获取用户 user ID」（`contact:user.employee_id:readonly`）；迁移还需以原应用身份读取通讯录，并确保数据权限覆盖旧用户。参考[飞书应用配置文档](https://open.larkenterprise.com/document/quick-start-of-personnel-and-attendance-management-system/step-1-create-and-configure-an-application)和[获取单个用户信息](https://open.feishu.cn/document/server-docs/contact-v3/user/get)。
 
 升级到数据库 v21 前，服务使用原飞书应用凭证验证企业与旧 open_id 对应的 user_id，再备份和迁移。缺少 user_id 权限、租户不符、映射不完整或重复都会停止迁移；不会猜测或删除用户。升级后接口字段发生变化，旧 CLI 和旧请求格式需同时更新。
+
+### 外部已经合并、部署并清理工作树
+
+完成检查不要求交付记录，也不核验提交是否合并。历史 `refs/taskboard/delivered/` 引用可以保留，但不参与完成判定；无需调用 `record-task-delivery.mjs`。项目自身的提交、合并及清理规则仍由开发流程执行。
+
+工作树已被清理的历史任务也可在核实归属后记录。再次点击完成时，服务核验任务、路径、提交合并状态、主工作区清洁状态、工作树登记及分支是否已经删除，并保留归档引用。缺少或不匹配的证据会明确报错，不把目录丢失直接当作完成。原有身份、待验收状态、活动执行及未执行评论检查仍然适用。

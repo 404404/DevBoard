@@ -1,11 +1,17 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  realpathSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+  symlinkSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
-
 import { TaskGitFinalizer } from "../src/modules/taskboard/task-git-finalizer.js";
-import { fingerprintWorkspace } from "../src/modules/taskboard/task-git-evidence.js";
 
 const roots: string[] = [];
 afterEach(() => {
@@ -14,160 +20,139 @@ afterEach(() => {
 function git(cwd: string, ...args: string[]) {
   return execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8" }).trim();
 }
-async function inspectGit(finalizer: TaskGitFinalizer, cwd: string, taskId: string) {
-  const snapshot = await finalizer.inspect(cwd, taskId);
-  if (!snapshot) throw new Error("expected Git fixture");
-  return snapshot;
-}
-
 function setup() {
-  const root = mkdtempSync(join(tmpdir(), "task-finalize-"));
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "completion-check-")));
   roots.push(root);
   const main = join(root, "main");
   mkdirSync(main);
   git(main, "init", "-b", "main");
-  git(main, "config", "user.name", "Taskboard Test");
-  git(main, "config", "user.email", "taskboard@example.test");
-  writeFileSync(join(main, "source.txt"), "before\n");
+  git(main, "config", "user.name", "Test");
+  git(main, "config", "user.email", "test@example.test");
+  writeFileSync(join(main, "source.txt"), "initial");
   git(main, "add", ".");
   git(main, "commit", "-m", "initial");
-  const worktree = join(root, "worktree");
-  git(main, "worktree", "add", "-b", "feature/task", worktree);
+  const worktree = join(root, "task");
   const finalizer = new TaskGitFinalizer([root]);
-  return { root, main, worktree, finalizer };
+  const check = async (cwd = main, branch: string | null = "main") => {
+    const snapshot = await finalizer.inspect(cwd, "task", "operation", main, branch);
+    return snapshot && finalizer.verify(snapshot);
+  };
+  return { root, main, worktree, finalizer, check };
 }
 
-it("commits an exclusive worktree, preserves its commit under a task ref and removes its branch", async () => {
-  const { main, worktree, finalizer } = setup();
-  writeFileSync(join(worktree, "source.txt"), "finished\n");
-  writeFileSync(join(worktree, "new-source.txt"), "new source\n");
-  const snapshot = {
-    ...(await inspectGit(finalizer, worktree, "task-one")),
-    verifiedFingerprint: (await fingerprintWorkspace(worktree))!.fingerprint,
-  };
-  const committed = await finalizer.commit(snapshot, "TEST-1", false);
-  expect(committed.commitSha).not.toBe(snapshot.initialHead);
-  expect(git(worktree, "status", "--porcelain")).toBe("");
-  const cleaned = await finalizer.cleanup(committed, false);
-  expect(cleaned.worktreeRemoved).toBe(true);
-  expect(cleaned.branchRemoved).toBe(true);
-  expect(existsSync(worktree)).toBe(false);
-  expect(git(main, "rev-parse", cleaned.archiveRef)).toBe(committed.commitSha);
-  expect(git(main, "show", `${cleaned.archiveRef}:new-source.txt`)).toBe("new source");
-  expect(await finalizer.cleanup(cleaned, false)).toEqual(cleaned);
-});
-
-it("refuses to commit changes without execution evidence even for the only task on main", async () => {
-  const { main, finalizer } = setup();
-  writeFileSync(join(main, "personal.txt"), "not task work\n");
-  const snapshot = await inspectGit(finalizer, main, "task-unowned");
-  await expect(finalizer.commit(snapshot, "TEST-5", false)).rejects.toThrow("归属");
-  expect(git(main, "status", "--porcelain")).toContain("personal.txt");
-});
-
-it("revalidates a protected checkout before completing a resumed cleanup", async () => {
-  const { main, finalizer } = setup();
-  const snapshot = await finalizer.commit(
-    await inspectGit(finalizer, main, "task-stale"),
-    "TEST-6",
-    false,
-  );
-  writeFileSync(join(main, "late.txt"), "arrived after commit\n");
-  await expect(finalizer.cleanup(snapshot, false)).rejects.toThrow();
-});
-
-it("preserves a shared clean worktree and refuses to mix shared dirty work into a task commit", async () => {
-  const { worktree, finalizer } = setup();
-  const snapshot = await inspectGit(finalizer, worktree, "task-shared");
-  writeFileSync(join(worktree, "source.txt"), "other task work\n");
-  await expect(finalizer.commit(snapshot, "TEST-2", true)).rejects.toThrow("共享");
-  git(worktree, "checkout", "--", "source.txt");
-  const committed = await finalizer.commit(snapshot, "TEST-2", true);
-  const cleaned = await finalizer.cleanup(committed, true);
-  expect(cleaned.worktreeRemoved).toBe(false);
-  expect(existsSync(worktree)).toBe(true);
-});
-
-it("keeps the main checkout and default branch", async () => {
-  const { main, finalizer } = setup();
-  const snapshot = await inspectGit(finalizer, main, "task-main");
-  const result = await finalizer.cleanup(await finalizer.commit(snapshot, "TEST-3", false), false);
-  expect(result.worktreeRemoved).toBe(false);
-  expect(result.branchRemoved).toBe(false);
+it("completes a clean main checkout without commits, archives, or delivery records", async () => {
+  const { main, check } = setup();
+  const before = git(main, "show-ref");
+  expect(await check()).toMatchObject({ mainTask: true, commitSha: null, archiveRef: null });
+  expect(git(main, "show-ref")).toBe(before);
   expect(existsSync(main)).toBe(true);
 });
 
-it("cleans only the current task temporary namespace and refuses unknown ignored leftovers", async () => {
-  const { worktree, finalizer } = setup();
-  writeFileSync(join(worktree, ".gitignore"), ".tmp/\n");
-  git(worktree, "add", ".gitignore");
-  git(worktree, "commit", "-m", "ignore temp");
-  mkdirSync(join(worktree, ".tmp", "taskboard", "task-temp"), { recursive: true });
-  writeFileSync(join(worktree, ".tmp", "taskboard", "task-temp", "scratch"), "temporary");
-  writeFileSync(join(worktree, ".tmp", "unowned"), "keep");
-  const snapshot = await inspectGit(finalizer, worktree, "task-temp");
-  const committed = await finalizer.commit(snapshot, "TEST-4", false);
-  expect(existsSync(join(worktree, ".tmp", "taskboard", "task-temp"))).toBe(false);
-  await expect(finalizer.cleanup(committed, false)).rejects.toThrow("未归属");
-  expect(existsSync(join(worktree, ".tmp", "unowned"))).toBe(true);
+it.each(["tracked", "staged", "untracked"])(
+  "rejects %s changes and never commits them",
+  async (kind) => {
+    const { main, check } = setup();
+    const head = git(main, "rev-parse", "HEAD");
+    writeFileSync(join(main, kind === "untracked" ? "new.txt" : "source.txt"), "changed");
+    if (kind === "staged") git(main, "add", ".");
+    const before = git(main, "status", "--porcelain");
+    await expect(check()).rejects.toThrow("Git 不干净");
+    expect(git(main, "status", "--porcelain")).toBe(before);
+    expect(git(main, "rev-parse", "HEAD")).toBe(head);
+  },
+);
+
+it("keeps ignored files on main and checks only Git cleanliness", async () => {
+  const { main, check } = setup();
+  writeFileSync(join(main, ".gitignore"), "cache/\n");
+  git(main, "add", ".");
+  git(main, "commit", "-m", "ignore");
+  mkdirSync(join(main, "cache"));
+  writeFileSync(join(main, "cache", "keep"), "keep");
+  await expect(check()).resolves.toMatchObject({ mainTask: true });
+  expect(existsSync(join(main, "cache", "keep"))).toBe(true);
 });
 
-it("keeps task source evidence stable when task temporary files are removed before retry", async () => {
-  const { worktree, finalizer } = setup();
-  writeFileSync(join(worktree, "source.txt"), "task change");
-  const temporary = join(worktree, ".tmp", "taskboard", "task-retry");
-  mkdirSync(temporary, { recursive: true });
-  writeFileSync(join(temporary, "scratch"), "scratch");
-  const snapshot = {
-    ...(await inspectGit(finalizer, worktree, "task-retry")),
-    verifiedFingerprint: (await fingerprintWorkspace(worktree, "task-retry"))!.fingerprint,
-  };
-  // Model a process stop after task-temp removal, before Git commit completes.
-  rmSync(temporary, { recursive: true });
-  const result = await finalizer.commit(snapshot, "TEST-7", false);
-  expect(git(worktree, "show", "HEAD:source.txt")).toBe("task change");
-  expect(result.commitSha).not.toBe(snapshot.initialHead);
-});
-
-it("treats unborn Git repositories as unavailable evidence without blocking dispatch", async () => {
-  const root = mkdtempSync(join(tmpdir(), "unborn-evidence-"));
-  roots.push(root);
-  git(root, "init", "-b", "main");
-  await expect(fingerprintWorkspace(root)).resolves.toBeNull();
-});
-
-it("rejects a branch switch at the same SHA during cleanup", async () => {
-  const { worktree, finalizer } = setup();
-  const snapshot = await finalizer.commit(
-    await inspectGit(finalizer, worktree, "task-switch"),
-    "TEST-8",
-    false,
-  );
-  git(worktree, "switch", "-c", "feature/other");
-  await expect(finalizer.cleanup(snapshot, false)).rejects.toThrow("分支或仓库");
+it("requires both worktree removal and branch removal without performing either", async () => {
+  const { main, worktree, check } = setup();
+  git(main, "worktree", "add", "-b", "feature/task", worktree);
+  await expect(check(worktree, "feature/task")).rejects.toThrow("工作树尚未删除");
   expect(existsSync(worktree)).toBe(true);
+  git(main, "worktree", "remove", worktree);
+  await expect(check(worktree, "feature/task")).rejects.toThrow("分支尚未删除");
+  git(main, "branch", "-d", "feature/task");
+  const refs = git(main, "show-ref");
+  await expect(check(worktree, "feature/task")).resolves.toMatchObject({
+    commitSha: null,
+    archiveRef: null,
+  });
+  expect(git(main, "show-ref")).toBe(refs);
 });
 
-it("commits verified task changes while retaining a shared worktree", async () => {
-  const { worktree, finalizer } = setup();
-  writeFileSync(join(worktree, "source.txt"), "verified shared task work");
-  const snapshot = {
-    ...(await inspectGit(finalizer, worktree, "task-shared-evidence")),
-    verifiedFingerprint: (await fingerprintWorkspace(worktree, "task-shared-evidence"))!
-      .fingerprint,
-  };
-  const committed = await finalizer.commit(snapshot, "TEST-9", true);
-  const cleaned = await finalizer.cleanup(committed, true);
-  expect(git(worktree, "show", "HEAD:source.txt")).toBe("verified shared task work");
-  expect(cleaned.worktreeRemoved).toBe(false);
-  expect(existsSync(worktree)).toBe(true);
+it("rejects a stale worktree registration even when its directory is gone", async () => {
+  const { main, worktree, check } = setup();
+  git(main, "worktree", "add", "-b", "feature/task", worktree);
+  rmSync(worktree, { recursive: true });
+  await expect(check(worktree, "feature/task")).rejects.toThrow("仍登记在 Git");
+  expect(git(main, "worktree", "list", "--porcelain")).toContain(worktree);
 });
 
-it("recognizes an existing non-Git task directory without changing its files", async () => {
-  const root = mkdtempSync(join(tmpdir(), "plain-task-directory-"));
-  roots.push(root);
-  writeFileSync(join(root, "document.txt"), "deliverable");
-  const finalizer = new TaskGitFinalizer([root]);
-  await expect(finalizer.inspect(root, "plain-task")).resolves.toBeNull();
-  expect(existsSync(join(root, "document.txt"))).toBe(true);
+it("does not require a merge commit or a delivery receipt after external deletion", async () => {
+  const { main, worktree, check } = setup();
+  git(main, "worktree", "add", "-b", "feature/task", worktree);
+  writeFileSync(join(worktree, "source.txt"), "unmerged");
+  git(worktree, "commit", "-am", "change");
+  git(main, "worktree", "remove", worktree);
+  git(main, "branch", "-D", "feature/task");
+  await expect(check(worktree, "feature/task")).resolves.toMatchObject({ mainTask: false });
+  writeFileSync(join(main, "late.txt"), "pending");
+  await expect(check(worktree, "feature/task")).rejects.toThrow("Git 不干净");
+});
+
+it("checks the exact task branch, including branch-only contexts on the main checkout", async () => {
+  const { main, check } = setup();
+  git(main, "branch", "feature/task");
+  await expect(check(main, "feature/task")).rejects.toThrow("分支尚未删除");
+  git(main, "branch", "-d", "feature/task");
+  git(main, "branch", "feature/task-other");
+  await expect(check(main, "feature/task")).resolves.toMatchObject({ mainTask: false });
+});
+
+it("fails explicitly if the removed checkout has no recorded branch identity", async () => {
+  const { worktree, check } = setup();
+  await expect(check(worktree, null)).rejects.toThrow("无法确认任务使用的分支");
+});
+
+it("preserves non-Git deliverables and enforces allowed paths before running Git", async () => {
+  const { root, main, finalizer } = setup();
+  const plain = join(root, "plain");
+  mkdirSync(plain);
+  writeFileSync(join(plain, "file"), "keep");
+  expect(await finalizer.inspect(plain, "plain")).toBeNull();
+  expect(existsSync(join(plain, "file"))).toBe(true);
+  await expect(new TaskGitFinalizer([main]).inspect(plain, "outside")).rejects.toThrow("超出允许");
+  symlinkSync(tmpdir(), join(main, "outside"));
+  await expect(
+    new TaskGitFinalizer([main]).inspect(
+      join(main, "outside", "missing"),
+      "outside",
+      undefined,
+      main,
+      "feature/task",
+    ),
+  ).rejects.toThrow("超出允许");
+});
+
+it("uses only read-only Git commands with optional writes disabled", async () => {
+  const { root, main } = setup();
+  const commands: readonly string[][] = [];
+  const checker = new TaskGitFinalizer([root], async (_cwd, command, writes) => {
+    expect(writes).toEqual([]);
+    expect(command.slice(0, 2)).toEqual(["git", "--no-optional-locks"]);
+    (commands as string[][]).push([...command]);
+    return execFileSync(command[0]!, command.slice(1), { encoding: "utf8" });
+  });
+  const snapshot = (await checker.inspect(main, "task", undefined, main, "main"))!;
+  await checker.verify(snapshot);
+  expect(commands.every((c) => ["rev-parse", "status", "worktree"].includes(c[4]!))).toBe(true);
 });

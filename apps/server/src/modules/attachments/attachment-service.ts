@@ -1,3 +1,4 @@
+import { assertCommentsMutable } from "../taskboard/comment-mutation-guard.js";
 import { identityKey, identityFromKey, IdentityKeySchema } from "@codexboard/contracts";
 import { createHash, randomUUID } from "node:crypto";
 
@@ -377,6 +378,7 @@ export class AttachmentService {
   }
 
   #assertCommentMutable(commentId: string, taskId: string, actor: PrincipalView): void {
+    assertCommentsMutable(this.#database, taskId);
     const comment = this.#database
       .prepare(
         `SELECT author_identity_key AS authorKey, executed_at AS executedAt FROM comments

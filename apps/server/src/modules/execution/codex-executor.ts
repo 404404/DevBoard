@@ -1,3 +1,7 @@
+import { desktopUserEvent } from "./desktop-user-events.js";
+import type { TaskModelOptions } from "@codexboard/contracts";
+import { ModelsSchema } from "../codex/model-catalog.js";
+import { AppError } from "../../app-error.js";
 import type { InteractionDecision } from "@codexboard/contracts";
 import { randomUUID } from "node:crypto";
 import { isAbsolute, join } from "node:path";
@@ -33,6 +37,7 @@ export interface CodexExecutionCallbacks {
   onTurn(turnId: string): void;
   onEvent(event: CodexExecutionEvent): void;
   onInteraction(request: CodexServerRequest): Promise<InteractionDecision>;
+  onInteractionResolved?(requestId: string): void;
 }
 
 export interface CodexExecutionResult {
@@ -42,9 +47,24 @@ export interface CodexExecutionResult {
   readonly errorSummary?: string;
 }
 
+export interface CodexRecoveredOutcome extends CodexExecutionResult {
+  readonly events: readonly CodexExecutionEvent[];
+}
+
 export interface CodexExecutor {
+  readHistory?(threadId: string): Promise<CodexThreadHistory | null>;
+  readOutcome?(input: {
+    readonly jobId: string;
+    readonly threadId: string;
+    readonly turnId?: string;
+  }): Promise<CodexRecoveredOutcome | null>;
   start(
-    input: { readonly jobId: string; readonly cwd: string; readonly prompt: string },
+    input: {
+      readonly jobId: string;
+      readonly cwd: string;
+      readonly prompt: string;
+      readonly modelOptions?: TaskModelOptions;
+    },
     callbacks: CodexExecutionCallbacks,
   ): Promise<CodexExecutionResult>;
   continue(
@@ -53,6 +73,7 @@ export interface CodexExecutor {
       readonly threadId: string;
       readonly cwd: string;
       readonly prompt: string;
+      readonly modelOptions?: TaskModelOptions;
     },
     callbacks: CodexExecutionCallbacks,
   ): Promise<CodexExecutionResult>;
@@ -67,10 +88,21 @@ export interface CodexExecutor {
   >;
 }
 
+export interface CodexThreadHistory {
+  readonly threadId: string;
+  readonly turns: readonly {
+    readonly id: string;
+    readonly status: string;
+    readonly events: readonly CodexExecutionEvent[];
+    readonly workingDirectories: readonly string[];
+  }[];
+}
+
 export interface CodexThreadProvisioner {
   createDraft(input: {
     readonly cwd: string | null;
     readonly name: string;
+    readonly modelOptions?: TaskModelOptions;
   }): Promise<{ readonly threadId: string; readonly cwd: string }>;
   archiveThread(threadId: string): Promise<void>;
 }
@@ -125,18 +157,41 @@ export class AppServerCodexExecutor implements CodexExecutor, CodexThreadProvisi
   async createDraft(input: {
     readonly cwd: string | null;
     readonly name: string;
+    readonly modelOptions?: TaskModelOptions;
   }): Promise<{ readonly threadId: string; readonly cwd: string }> {
     await this.#client.connect();
+    const modelOptions = input.modelOptions;
+    if (modelOptions) {
+      const catalog = ModelsSchema.parse(await this.#client.request("model/list", { limit: 100 }));
+      const selected = catalog.data.find(
+        (model) => !model.hidden && model.model === modelOptions.model,
+      );
+      if (
+        !selected ||
+        !selected.supportedReasoningEfforts.some(
+          ({ reasoningEffort }) => reasoningEffort === modelOptions.effort,
+        ) ||
+        (input.modelOptions.serviceTier !== null &&
+          !selected.serviceTiers.some(({ id }) => id === modelOptions.serviceTier))
+      ) {
+        throw new AppError("INVALID_REQUEST", 400, "所选模型、推理强度或速度不可用，请重新选择");
+      }
+    }
     // A null cwd inherits the App Server's project. Allocate on the Codex host,
     // not in the Taskboard container, so Desktop keeps temporary tasks in Recent.
     const cwd = input.cwd ?? (await this.#createRecentWorkspace());
+    // Omit permission overrides so new drafts use Codex's configured defaults.
     const response = DraftThreadResponseSchema.parse(
       await this.#client.request("thread/start", {
         cwd,
-        approvalPolicy: "on-request",
-        approvalsReviewer: "user",
-        sandbox: "workspace-write",
         ephemeral: false,
+        ...(input.modelOptions
+          ? {
+              model: input.modelOptions.model,
+              serviceTier: input.modelOptions.serviceTier,
+              config: { model_reasoning_effort: input.modelOptions.effort },
+            }
+          : {}),
       }),
     );
     try {
@@ -185,7 +240,12 @@ export class AppServerCodexExecutor implements CodexExecutor, CodexThreadProvisi
   }
 
   async start(
-    input: { readonly jobId: string; readonly cwd: string; readonly prompt: string },
+    input: {
+      readonly jobId: string;
+      readonly cwd: string;
+      readonly prompt: string;
+      readonly modelOptions?: TaskModelOptions;
+    },
     callbacks: CodexExecutionCallbacks,
   ): Promise<CodexExecutionResult> {
     callbacks.onDispatchState?.("not_sent");
@@ -193,9 +253,6 @@ export class AppServerCodexExecutor implements CodexExecutor, CodexThreadProvisi
     const response = ThreadResponseSchema.parse(
       await this.#client.request("thread/start", {
         cwd: input.cwd,
-        approvalPolicy: "on-request",
-        approvalsReviewer: "user",
-        sandbox: "workspace-write",
         ephemeral: false,
       }),
     );
@@ -213,6 +270,7 @@ export class AppServerCodexExecutor implements CodexExecutor, CodexThreadProvisi
       readonly threadId: string;
       readonly cwd: string;
       readonly prompt: string;
+      readonly modelOptions?: TaskModelOptions;
     },
     callbacks: CodexExecutionCallbacks,
   ): Promise<CodexExecutionResult> {
@@ -222,9 +280,6 @@ export class AppServerCodexExecutor implements CodexExecutor, CodexThreadProvisi
       await this.#client.request("thread/resume", {
         threadId: input.threadId,
         cwd: input.cwd,
-        approvalPolicy: "on-request",
-        approvalsReviewer: "user",
-        sandbox: "workspace-write",
       }),
     );
     try {
@@ -234,6 +289,121 @@ export class AppServerCodexExecutor implements CodexExecutor, CodexThreadProvisi
     } finally {
       await this.#releaseThread(response.thread.id);
     }
+  }
+
+  async readHistory(threadId: string): Promise<CodexThreadHistory | null> {
+    await this.#client.connect();
+    const result = z
+      .object({
+        thread: z.object({
+          id: z.string(),
+          turns: z.array(
+            z.object({ id: z.string(), status: z.string(), items: z.array(z.unknown()) }),
+          ),
+        }),
+      })
+      .safeParse(await this.#client.request("thread/read", { threadId, includeTurns: true }));
+    if (!result.success || result.data.thread.id !== threadId) return null;
+    return {
+      threadId,
+      turns: result.data.thread.turns.map((turn) => ({
+        id: turn.id,
+        status: turn.status,
+        events: turn.items.flatMap((raw): CodexExecutionEvent[] => {
+          const user = desktopUserEvent(raw, threadId);
+          if (user) return [user];
+          const item = z
+            .object({
+              type: z.literal("agentMessage"),
+              id: z.string(),
+              text: z.string(),
+              phase: z.literal("final_answer"),
+            })
+            .safeParse(raw);
+          if (!item.success || !["completed", "failed", "interrupted"].includes(turn.status))
+            return [];
+          return [
+            {
+              cursor: `${turn.id}:item/completed:${item.data.id}`,
+              kind: "codex.agent_message",
+              summary: item.data.text.slice(0, 2000),
+              safePayload: { text: item.data.text, phase: item.data.phase },
+            },
+          ];
+        }),
+        workingDirectories: turn.items.flatMap((raw) => {
+          const item = z
+            .object({ type: z.literal("commandExecution"), cwd: z.string().min(1) })
+            .safeParse(raw);
+          return item.success ? [item.data.cwd] : [];
+        }),
+      })),
+    };
+  }
+
+  async readOutcome(input: {
+    readonly jobId: string;
+    readonly threadId: string;
+    readonly turnId?: string;
+  }): Promise<CodexRecoveredOutcome | null> {
+    // Read persisted history only. Never resume, start or interrupt a thread here.
+    await this.#client.connect();
+    const response = z
+      .object({
+        thread: z.object({
+          id: z.string(),
+          turns: z.array(
+            z.object({
+              id: z.string(),
+              status: z.enum(["completed", "failed", "interrupted", "inProgress"]),
+              items: z.array(z.unknown()),
+              error: z.object({ message: z.string().optional() }).nullish(),
+            }),
+          ),
+        }),
+      })
+      .safeParse(
+        await this.#client.request("thread/read", { threadId: input.threadId, includeTurns: true }),
+      );
+    if (!response.success || response.data.thread.id !== input.threadId) return null;
+    const matches = response.data.thread.turns.filter((turn) =>
+      input.turnId
+        ? turn.id === input.turnId
+        : turn.items.some((raw) => {
+            const item = z
+              .object({ type: z.literal("userMessage"), clientId: z.string() })
+              .safeParse(raw);
+            return item.success && item.data.clientId === input.jobId;
+          }),
+    );
+    if (matches.length !== 1 || matches[0]!.status === "inProgress") return null;
+    const turn = matches[0]!;
+    const events = turn.items.flatMap((raw): CodexExecutionEvent[] => {
+      const item = z
+        .object({
+          type: z.literal("agentMessage"),
+          id: z.string(),
+          text: z.string(),
+          phase: z.literal("final_answer"),
+        })
+        .safeParse(raw);
+      if (!item.success) return [];
+      return [
+        {
+          cursor: `${turn.id}:item/completed:${item.data.id}`,
+          kind: "codex.agent_message",
+          summary: item.data.text.slice(0, 2000),
+          safePayload: { text: item.data.text, phase: item.data.phase },
+        },
+      ];
+    });
+    return {
+      threadId: input.threadId,
+      turnId: turn.id,
+      status: turn.status as "completed" | "failed" | "interrupted",
+      events,
+      ...(turn.error?.message ? { errorSummary: turn.error.message } : {}),
+    };
   }
 
   async #releaseThread(threadId: string): Promise<void> {
@@ -334,7 +504,12 @@ export class AppServerCodexExecutor implements CodexExecutor, CodexThreadProvisi
 
   async #startTurn(
     threadId: string,
-    input: { readonly jobId: string; readonly cwd: string; readonly prompt: string },
+    input: {
+      readonly jobId: string;
+      readonly cwd: string;
+      readonly prompt: string;
+      readonly modelOptions?: TaskModelOptions;
+    },
     callbacks: CodexExecutionCallbacks,
   ): Promise<CodexExecutionResult> {
     let resolveReady!: (turnId: string | null) => void;
@@ -356,9 +531,8 @@ export class AppServerCodexExecutor implements CodexExecutor, CodexThreadProvisi
         await this.#client.request("turn/start", {
           threadId,
           clientUserMessageId: input.jobId,
+          ...(input.modelOptions ?? {}),
           cwd: input.cwd,
-          approvalPolicy: "on-request",
-          approvalsReviewer: "user",
           input: [{ type: "text", text: input.prompt, text_elements: [] }],
         }),
       );
@@ -475,6 +649,13 @@ export class AppServerCodexExecutor implements CodexExecutor, CodexThreadProvisi
       return;
     }
     if (!execution || !eventTurnId || eventTurnId !== execution.turnId) return;
+    if (
+      method === "serverRequest/resolved" &&
+      (typeof value.requestId === "string" || typeof value.requestId === "number")
+    ) {
+      execution.callbacks.onInteractionResolved?.(String(value.requestId));
+      return;
+    }
     const turnId = typeof value.turnId === "string" ? value.turnId : "turn";
     const item =
       value.item && typeof value.item === "object" ? (value.item as Record<string, unknown>) : {};

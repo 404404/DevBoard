@@ -36,8 +36,16 @@ export function hostWorkspaceCommand(
       result.stderr.includes("not a git repository")
     )
       throw new WorkspaceNotGitError();
-    if (result.exitCode !== 0)
+    if (result.exitCode !== 0) {
+      if (
+        command[0] === "git" &&
+        /cannot lock ref|unable to create directory|[Pp]ermission denied|[Oo]peration not permitted/.test(
+          result.stderr,
+        )
+      )
+        throw new AppError("UPSTREAM_ERROR", 502, "Git 收尾无法写入仓库元数据，请检查工作区权限。");
       throw new AppError("UPSTREAM_ERROR", 502, `宿主机收尾命令失败：${command[0]}`);
+    }
     return result.stdout;
   };
 }

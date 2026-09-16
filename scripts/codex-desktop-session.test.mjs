@@ -763,6 +763,38 @@ test("continues through the Desktop owner and delivers only this turn, including
   await f.session.stop();
 });
 
+for (const serviceTier of [null, "priority"]) {
+  test(`task model settings override collaboration defaults, tier=${serviceTier}`, async (t) => {
+    const collaboration = {
+      mode: "default",
+      settings: { model: "old", reasoning_effort: "low", developer_instructions: "preserve" },
+    };
+    const f = await fixture(t, {
+      initialState: { latestThreadSettings: { collaborationMode: collaboration } },
+    });
+    await f.session.request("turn/start", {
+      threadId: "thread-a",
+      cwd: "/recent",
+      input: [{ type: "text", text: "task" }],
+      model: "chosen",
+      effort: "high",
+      serviceTier,
+      approvalPolicy: "on-request",
+      approvalsReviewer: "user",
+    });
+    const sent = f.requests.find((m) => m.method === "thread-follower-start-turn").params.turnStart
+      .request;
+    assert.equal(sent.model, "chosen");
+    assert.equal(sent.effort, "high");
+    assert.equal(sent.serviceTier, serviceTier);
+    assert.deepEqual(sent.collaborationMode, {
+      mode: "default",
+      settings: { model: "chosen", reasoning_effort: "high", developer_instructions: "preserve" },
+    });
+    assert.equal(sent.approvalsReviewer, "user");
+  });
+}
+
 test("forwards approval responses and interruption to the same owner without stopping Desktop", async (t) => {
   const f = await fixture(t);
   await f.session.request("turn/start", { threadId: "thread-a", cwd: "/recent", input: [] });
@@ -854,6 +886,48 @@ test("round-trips command, file, permissions and user input approvals for the ac
     f.messages.some((m) => m.method === "turn/completed"),
     false,
   );
+});
+
+test("desktop-resolved approvals release the board waiter and late responses preserve completion", async (t) => {
+  const f = await fixture(t, { autoComplete: false });
+  await f.session.request("turn/start", { threadId: "thread-a", cwd: "/recent", input: [] });
+  const turn = { turnId: "turn-new", status: "inProgress", items: [] };
+  f.snapshot(
+    {
+      turns: [turn],
+      requests: [
+        {
+          id: 12,
+          method: "item/commandExecution/requestApproval",
+          params: { threadId: "thread-a", turnId: "turn-new" },
+        },
+      ],
+    },
+    3,
+  );
+  await waitFor(() => f.messages.some((m) => m.id === 12));
+  f.snapshot({ turns: [turn], requests: [] }, 4);
+  await waitFor(() => f.messages.some((m) => m.method === "serverRequest/resolved"));
+  await f.session.write({ id: 12, error: { code: -32603, message: "already handled" } });
+  f.snapshot(
+    {
+      turns: [
+        {
+          ...turn,
+          status: "completed",
+          items: [{ id: "final", type: "agentMessage", phase: "final_answer", text: "done" }],
+        },
+      ],
+    },
+    5,
+  );
+  await waitFor(() => f.messages.some((m) => m.method === "turn/completed"));
+  assert.deepEqual(f.disconnects, []);
+  assert.equal(
+    f.requests.filter((m) => m.method === "thread-follower-command-approval-decision").length,
+    0,
+  );
+  assert.equal(f.messages.filter((m) => m.method === "serverRequest/resolved").length, 1);
 });
 
 test("applies streamed canonical patches and emits completion once", async (t) => {
@@ -1367,3 +1441,32 @@ test("edit refuses to overwrite a running turn", async (t) => {
     false,
   );
 });
+
+for (const reviewer of ["auto_review", "user"]) {
+  test(`task turns inherit the owner's ${reviewer} permissions without overrides`, async (t) => {
+    const f = await fixture(t, {
+      initialState: {
+        latestThreadSettings: {
+          approvalPolicy: "on-request",
+          approvalsReviewer: reviewer,
+          sandboxPolicy: { type: "workspaceWrite", networkAccess: false },
+        },
+      },
+    });
+    await f.session.request("thread/resume", { threadId: "thread-a", cwd: "/recent" });
+    await f.session.request("turn/start", {
+      threadId: "thread-a",
+      cwd: "/recent",
+      input: [{ type: "text", text: "task" }],
+    });
+    const forwarded = f.requests.find((r) => r.method === "thread-follower-start-turn");
+    assert.equal(forwarded.targetClientId, "owner");
+    assert.equal(forwarded.params.turnStart.context.inheritThreadSettings, true);
+    for (const key of ["approvalPolicy", "approvalsReviewer", "sandbox", "sandboxPolicy"])
+      assert.equal(Object.hasOwn(forwarded.params.turnStart.request, key), false);
+    assert.equal(
+      f.requests.some((r) => /resume|interrupt|update-thread-settings/.test(r.method)),
+      false,
+    );
+  });
+}

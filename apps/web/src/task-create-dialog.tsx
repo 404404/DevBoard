@@ -1,3 +1,7 @@
+import { AttachmentCard } from "./attachment-card";
+import { RemoteModelSettings } from "./remote-model-settings";
+import { RemoteEffortGauge } from "./remote-effort-gauge";
+import { readComposerOptions, effortLabels, type ComposerOptions } from "./remote-composer-model";
 import { userErrorMessage } from "./user-error";
 import { currentAssignee } from "./task-assignee";
 import { GitBranch } from "./git-branch-icon";
@@ -12,13 +16,13 @@ import type {
   TaskRelationCandidate,
   TaskStatus,
   TaskView,
+  RemoteModel,
 } from "@codexboard/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUpToLine,
   Ellipsis,
   FolderKanban,
-  Image as ImageIcon,
   Link as LinkIcon,
   ListTree,
   LoaderCircle,
@@ -49,7 +53,6 @@ import { PriorityIcon } from "./priority-icon";
 import { TASK_STATUS_META } from "./task-status";
 import {
   appendAttachmentFiles,
-  attachmentFileExtension,
   fitDialogRectToContent,
   formatBytes,
   filterTaskRelationCandidates,
@@ -68,7 +71,7 @@ const STATUSES: readonly TaskStatus[] = ["backlog", "todo"];
 const PRIORITIES: readonly TaskPriority[] = ["none", "urgent", "high", "medium", "low"];
 const DEFAULT_ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024;
 
-type OpenPanel = "priority" | "labels" | "more" | null;
+type OpenPanel = "model" | "priority" | "labels" | "more" | null;
 type RelationMenu = "child" | "parent" | "related" | null;
 
 interface AttachmentDraft {
@@ -198,6 +201,7 @@ function selectedCandidate(
 }
 
 export function TaskCreateDialog({
+  open,
   project,
   projects,
   csrfToken,
@@ -205,6 +209,7 @@ export function TaskCreateDialog({
   onClose,
   onCreated,
 }: {
+  readonly open: boolean;
   readonly project: ProjectView;
   readonly projects: readonly ProjectView[];
   readonly csrfToken: string;
@@ -238,6 +243,8 @@ export function TaskCreateDialog({
       ? document.activeElement
       : null,
   );
+  const [modelOptions, setModelOptions] = useState<ComposerOptions>();
+  const [modelMenu, setModelMenu] = useState<"model" | "models">("models");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<TaskStatus>("todo");
@@ -267,6 +274,7 @@ export function TaskCreateDialog({
     queryKey: ["task-creation-options", targetProjectId],
     queryFn: () => readTaskCreationOptions(targetProjectId),
     enabled:
+      open &&
       Boolean(targetProjectId) &&
       projects.some((candidate) => candidate.id === targetProjectId && !candidate.archivedAt),
     staleTime: 0,
@@ -322,6 +330,15 @@ export function TaskCreateDialog({
         task = await createTask(
           {
             projectId: targetProjectId,
+            ...(modelOptions
+              ? {
+                  modelOptions: {
+                    model: modelOptions.model,
+                    effort: modelOptions.effort,
+                    serviceTier: modelOptions.serviceTier,
+                  },
+                }
+              : {}),
             title,
             description,
             status,
@@ -402,13 +419,12 @@ export function TaskCreateDialog({
     const dialog = dialogRef.current;
     if (!dialog) return;
     const returnTarget = returnFocusRef.current;
-    if (!dialog.open) dialog.showModal();
-    titleInputRef.current?.focus();
+    if (open) {
+      if (!dialog.open) dialog.showModal();
+      titleInputRef.current?.focus();
+    } else if (dialog.open) dialog.close();
     return () => {
       if (dialog.open) dialog.close();
-      for (const item of attachmentItemsRef.current) {
-        if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
-      }
       queueMicrotask(() => {
         if (
           !creationSucceededRef.current &&
@@ -419,7 +435,16 @@ export function TaskCreateDialog({
         }
       });
     };
-  }, []);
+  }, [open]);
+
+  useEffect(
+    () => () => {
+      for (const item of attachmentItemsRef.current) {
+        if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     const data = creationOptions.data;
@@ -571,7 +596,15 @@ export function TaskCreateDialog({
       setRelationSearch("");
       return;
     }
-    setPopoverAnchor(measurePopoverAnchor(trigger, panelRef.current, panel === "more"));
+    const anchor = measurePopoverAnchor(trigger, panelRef.current, panel === "more");
+    setPopoverAnchor(
+      panel === "model"
+        ? {
+            ...anchor,
+            maxHeight: Math.min(420, Math.max(120, trigger.getBoundingClientRect().top - 24)),
+          }
+        : anchor,
+    );
     setOpenPanel(panel);
     setRelationMenu(null);
     setRelationSearch("");
@@ -844,45 +877,15 @@ export function TaskCreateDialog({
           {attachmentItems.length > 0 ? (
             <div className="task-create-attachment-list" aria-label="已添加附件">
               {attachmentItems.map((item) => (
-                <article
-                  className={`task-create-attachment${
-                    item.error ? " task-create-attachment--error" : ""
-                  }`}
+                <AttachmentCard
                   key={item.id}
-                >
-                  {item.previewUrl ? (
-                    <img src={item.previewUrl} alt="" />
-                  ) : (
-                    <span>
-                      {item.file.type.startsWith("image/") ? (
-                        <ImageIcon aria-hidden="true" />
-                      ) : (
-                        <b className="task-create-file-extension">
-                          {attachmentFileExtension(item.file.name)}
-                        </b>
-                      )}
-                    </span>
-                  )}
-                  <div>
-                    <strong title={item.file.name}>{item.file.name}</strong>
-                    <small>
-                      {formatBytes(item.file.size)}
-                      {item.error ? " · 上传失败" : ""}
-                    </small>
-                    <Notice
-                      message={item.error ? `${item.file.name}：${item.error}` : null}
-                      eventKey={mutation.submittedAt}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    aria-label={`删除附件 ${item.file.name}`}
-                    onClick={() => removeAttachment(item.id)}
-                    disabled={mutation.isPending}
-                  >
-                    <X aria-hidden="true" />
-                  </button>
-                </article>
+                  name={item.file.name}
+                  size={item.file.size}
+                  imageUrl={item.previewUrl ?? undefined}
+                  error={item.error}
+                  onRemove={() => removeAttachment(item.id)}
+                  removeDisabled={mutation.isPending}
+                />
               ))}
             </div>
           ) : null}
@@ -915,6 +918,54 @@ export function TaskCreateDialog({
                     <span>{targetProject.name}</span>
                   </div>
                 )}
+
+                <div className="task-create-menu-anchor task-create-model">
+                  <button
+                    type="button"
+                    className="task-create-meta-control"
+                    data-task-trigger
+                    aria-label="模型与推理强度"
+                    aria-expanded={openPanel === "model"}
+                    disabled={!optionControlsEnabled}
+                    onClick={(event) => {
+                      setModelMenu(modelOptions ? "model" : "models");
+                      togglePanel("model", event.currentTarget);
+                    }}
+                  >
+                    <RemoteEffortGauge effort={modelOptions?.effort} />
+                    <span>
+                      {modelOptions
+                        ? `${queryClient.getQueryData<RemoteModel[]>(["remote-models"])?.find((model) => model.id === modelOptions.model)?.name ?? modelOptions.model} · ${effortLabels[modelOptions.effort] ?? modelOptions.effort}${modelOptions.serviceTier ? " · 加速" : ""}`
+                        : "Codex 默认模型"}
+                    </span>
+                  </button>
+                  {openPanel === "model" && (
+                    <div
+                      className="task-create-popover remote-composer-popover task-create-model-popover"
+                      data-task-popover
+                      role="dialog"
+                      aria-label="模型设置"
+                      style={popoverStyle()}
+                    >
+                      <RemoteModelSettings
+                        options={modelOptions ?? readComposerOptions(null)}
+                        onOptions={setModelOptions}
+                        menu={modelMenu}
+                        setMenu={setModelMenu}
+                      />
+                      <button
+                        className="task-create-model-default"
+                        type="button"
+                        onClick={() => {
+                          setModelOptions(undefined);
+                          setOpenPanel(null);
+                        }}
+                      >
+                        使用 Codex 默认设置
+                      </button>
+                    </div>
+                  )}
+                </div>
 
                 <label className="task-create-meta-control" htmlFor="task-create-status">
                   <SfSymbol name={TASK_STATUS_META[status].symbol} size={16} />

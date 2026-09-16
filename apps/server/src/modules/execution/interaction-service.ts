@@ -264,6 +264,28 @@ export class InteractionService {
     this.#queue.resumeAfterInteraction(interaction.jobId, owner);
   }
 
+  resolveExternally(jobId: string, owner: string, requestId: string): void {
+    const pending = this.listForJob(jobId).find(
+      (item) => item.serverRequestId === requestId && item.status === "pending",
+    );
+    if (!pending) return;
+    const timestamp = this.#now().toISOString();
+    this.#database
+      .prepare(
+        "UPDATE job_interactions SET status = 'expired', decided_at = ? WHERE id = ? AND status = 'pending'",
+      )
+      .run(timestamp, pending.id);
+    this.#responders.get(pending.id)?.reject(new Error("请求已在 Codex 桌面处理"));
+    this.#responders.delete(pending.id);
+    const job = this.#queue.readJob(jobId);
+    if (
+      ["waiting_approval", "waiting_input"].includes(job.status) &&
+      !this.listForJob(jobId).some((item) => item.status === "pending")
+    ) {
+      this.#queue.resumeAfterInteraction(jobId, owner);
+    }
+  }
+
   expirePending(reason = "Codex 连接已中断"): number {
     const timestamp = this.#now().toISOString();
     const pending = this.#database

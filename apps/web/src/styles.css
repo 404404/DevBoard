@@ -1448,6 +1448,10 @@ p {
   background: rgba(27, 27, 25, 0.3);
 }
 
+.task-create-backdrop:not([open]) {
+  display: none;
+}
+
 .task-create-dialog {
   position: fixed;
   display: flex;
@@ -1522,7 +1526,7 @@ p {
 .task-create-title-input {
   min-height: 44px;
   color: var(--text);
-  font-size: 1.75rem;
+  font-size: 1.25rem;
   font-weight: 700;
   letter-spacing: -0.025em;
 }
@@ -3655,7 +3659,7 @@ body.is-resizing-task-dialog {
   }
 
   .task-create-title-input {
-    font-size: 1.65rem;
+    font-size: 1.125rem;
   }
 
   .task-create-description-input {
@@ -3727,7 +3731,7 @@ body.is-resizing-task-dialog {
 
   .task-create-title-input {
     min-height: 44px;
-    font-size: 1.5rem;
+    font-size: 1.125rem;
   }
 
   .task-create-description-input {
@@ -4172,4 +4176,34 @@ body.is-resizing-task-dialog {
 .web-session-controls {
   display: flex;
   gap: 8px;
+}
+
+.task-create-model {
+  --remote-surface: var(--surface);
+  --remote-border: var(--border);
+  --remote-muted: var(--muted);
+  --remote-text: var(--text);
+  --remote-subtle: var(--surface-subtle);
+}
+.task-create-model > button > span {
+  max-width: 230px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-create-model-popover.remote-composer-popover {
+  position: fixed;
+  width: min(360px, calc(100vw - 48px));
+  padding: 16px;
+  border-radius: 24px;
+  transform: none;
+  animation: none;
+}
+.task-create-model-popover .task-create-model-default {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 8px;
+  text-align: center;
+  color: var(--muted);
 }

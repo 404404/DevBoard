@@ -1,4 +1,4 @@
-import { REMOTE_UPLOAD_MAX_BASE64_LENGTH } from "@codexboard/contracts";
+import { REMOTE_UPLOAD_MAX_BASE64_LENGTH, remoteTurnItems } from "@codexboard/contracts";
 import { readTaskProgress } from "./codex-task-progress.mjs";
 import { readRemoteImage } from "./codex-remote-image.mjs";
 import { storeRemoteUpload, readRemoteUploadImage } from "./codex-remote-upload.mjs";
@@ -6,6 +6,7 @@ import { readRemoteReview } from "./codex-remote-review.mjs";
 import { readCodexThreadTitle } from "./codex-thread-title.mjs";
 import { readGitOrigins } from "./git-origin-reader.mjs";
 import { loadDesktopSession } from "./codex-desktop-loader.mjs";
+import { connectDesktopSession } from "./codex-desktop-session.mjs";
 import { spawn } from "node:child_process";
 import { timingSafeEqual } from "node:crypto";
 import { accessSync, chmodSync, constants } from "node:fs";
@@ -265,6 +266,13 @@ export async function createCodexSessionBridge({
             const id = `bridge-request-${++nextServerRequest}`;
             serverRequests.set(id, { worker: desktop, id: notification.id });
             send({ ...notification, id });
+          } else if (notification.method === "serverRequest/resolved") {
+            for (const [id, request] of serverRequests) {
+              if (request.worker !== desktop || request.id !== notification.params?.requestId)
+                continue;
+              serverRequests.delete(id);
+              send({ ...notification, params: { ...notification.params, requestId: id } });
+            }
           } else send(notification);
         },
         onDisconnect: (turnId) => {
@@ -291,7 +299,7 @@ export async function createCodexSessionBridge({
       threads.set(threadId, desktop);
       return desktop;
     }
-    async function handle(message) {
+    async function handle(message, readOnlyOwner = false) {
       if (!("method" in message)) {
         const request = serverRequests.get(message.id);
         if (request) {
@@ -375,7 +383,12 @@ export async function createCodexSessionBridge({
           reader = { timer: undefined, promise: undefined, users: 0 };
           const entry = reader;
           if (keepReader) readers.set(threadId, entry);
-          entry.promise = desktopSessionConnector({
+          // Background reconciliation must not navigate Desktop to old tasks.
+          const connector =
+            readOnlyOwner && desktopSessionConnector === loadDesktopSession
+              ? connectDesktopSession
+              : desktopSessionConnector;
+          entry.promise = connector({
             codexHome,
             threadId,
             signal: lifetime.signal,
@@ -457,14 +470,62 @@ export async function createCodexSessionBridge({
         });
       }
       if (["thread/resume", "turn/start", "turn/interrupt"].includes(message.method)) {
+        let params = message.params;
+        if (message.method === "turn/start") {
+          // Desktop can persist its default reviewer when loading an unstarted
+          // draft, even when App Server's project config selects auto-review.
+          // Resolve on every task turn so existing drafts and continued tasks
+          // also honor configuration changes. Leave sandbox/policy inheritance
+          // and Remote's explicit permission selection untouched.
+          const { config } = await control.request("config/read", {
+            cwd: params.cwd,
+            includeLayers: false,
+          });
+          const reviewer = config?.approvals_reviewer;
+          if (reviewer != null) {
+            if (!["user", "auto_review", "guardian_subagent"].includes(reviewer))
+              throw new Error("Codex 审批人配置无效，请检查项目配置");
+            params = {
+              ...params,
+              approvalsReviewer: reviewer === "guardian_subagent" ? "auto_review" : reviewer,
+            };
+          }
+        }
         const desktop = await desktopFor(threadId);
-        return await desktop.request(message.method, message.params);
+        return await desktop.request(message.method, params);
       }
       if (message.method === "thread/archive" && typeof threadId === "string" && threadId) {
         await threads.get(threadId)?.stop();
         return await archiveUnloadedThread(threadId, message.params);
       }
-      if (["thread/read", "thread/name/set"].includes(message.method)) {
+      if (message.method === "thread/read") {
+        // Persisted App Server history can report an interrupted turn while its
+        // Desktop owner is still working. Only the hydrated owner snapshot can
+        // establish its outcome; an unreachable owner is not a failed turn.
+        const state = await handle({ ...message, method: "taskboard/remote/read" }, true);
+        const turns =
+          state.turnHistory?.kind === "canonical"
+            ? Object.values(state.turnHistory.history.entitiesByKey)
+            : state.turns;
+        if (state.id !== threadId || !Array.isArray(turns))
+          throw new Error("Desktop 对话状态尚未确认");
+        return {
+          thread: {
+            id: threadId,
+            cwd: state.cwd,
+            turns: turns
+              .slice()
+              .sort((a, b) => Number(a.turnStartedAtMs ?? 0) - Number(b.turnStartedAtMs ?? 0))
+              .map((turn) => ({
+                id: turn.turnId,
+                status: turn.status,
+                error: turn.error ?? null,
+                items: remoteTurnItems(turn),
+              })),
+          },
+        };
+      }
+      if (message.method === "thread/name/set") {
         return await withHelper((worker) => worker.request(message.method, message.params));
       }
       if (

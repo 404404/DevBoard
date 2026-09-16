@@ -388,6 +388,9 @@ it("creates once and returns the original ID before loading Desktop", async () =
     "fs/createDirectory",
     "thread/start",
   ]);
+  const params = f.request.mock.calls.find(([method]) => method === "thread/start")?.[1];
+  for (const key of ["approvalPolicy", "approvalsReviewer", "sandbox", "sandboxPolicy"])
+    expect(params).not.toHaveProperty(key);
 });
 
 it("projects canonical turns in order, includes ongoing text and all questions, strips private settings", () => {

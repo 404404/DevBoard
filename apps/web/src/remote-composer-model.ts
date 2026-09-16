@@ -103,3 +103,14 @@ export function defaultRemotePresets(models: RemoteModel[]) {
       : [],
   );
 }
+
+export const effortLabels: Record<string, string> = {
+  none: "无",
+  minimal: "最低",
+  low: "轻度",
+  medium: "中",
+  high: "高",
+  xhigh: "极高",
+  max: "最大",
+  ultra: "超高",
+};

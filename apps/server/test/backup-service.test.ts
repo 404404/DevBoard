@@ -102,7 +102,7 @@ describe("BackupService", () => {
     const verified = BackupService.verify(destination);
 
     expect(verified).toEqual(manifest);
-    expect(manifest.schemaVersion).toBe(23);
+    expect(manifest.schemaVersion).toBe(26);
     expect(manifest.attachments).toEqual([
       expect.objectContaining({ path: "aa/file.bin", size: 19 }),
     ]);

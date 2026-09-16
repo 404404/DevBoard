@@ -1,4 +1,7 @@
+import { TaskModelOptionsSchema } from "@codexboard/contracts";
 import type { JobView } from "@codexboard/contracts";
+import { isAbsolute, relative, sep } from "node:path";
+import type { ProjectRegistry } from "../project-registry/project-registry.js";
 
 import { CodexProtocolError, CodexRequestError, type CodexServerRequest } from "../codex/index.js";
 import {
@@ -16,6 +19,7 @@ interface ExecutionOrchestratorOptions {
   readonly interactions: InteractionService;
   readonly owner: string;
   readonly codexVersion?: string;
+  readonly projectRegistry?: ProjectRegistry;
 }
 
 export class ExecutionOrchestrator {
@@ -24,6 +28,7 @@ export class ExecutionOrchestrator {
   readonly #interactions: InteractionService;
   readonly #owner: string;
   readonly #codexVersion: string | undefined;
+  readonly #projectRegistry: ProjectRegistry | undefined;
   #stopping = false;
 
   constructor(options: ExecutionOrchestratorOptions) {
@@ -32,6 +37,7 @@ export class ExecutionOrchestrator {
     this.#interactions = options.interactions;
     this.#owner = options.owner;
     this.#codexVersion = options.codexVersion;
+    this.#projectRegistry = options.projectRegistry;
   }
 
   stop(): void {
@@ -40,6 +46,90 @@ export class ExecutionOrchestrator {
 
   #assertRunning(): void {
     if (this.#stopping) throw new Error("执行调度正在停止");
+  }
+
+  async recoverUncertain(): Promise<number> {
+    if (this.#stopping || !this.#executor.readOutcome) return 0;
+    let recovered = 0;
+    for (const job of this.#queue.recoverableResultJobs()) {
+      if (this.#stopping) break;
+      const thread = this.#queue.primaryThread(job.taskId);
+      if (!thread || thread.id !== job.taskThreadId) continue;
+      let outcome;
+      try {
+        outcome = await this.#executor.readOutcome({
+          jobId: job.id,
+          threadId: thread.threadId,
+          ...(typeof job.recoveryCheckpoint?.turnId === "string"
+            ? { turnId: job.recoveryCheckpoint.turnId }
+            : {}),
+        });
+      } catch {
+        // Unreachable history is not proof of completion. Never replay the prompt.
+        continue;
+      }
+      if (this.#stopping) break;
+      if (!outcome || isModelAtCapacity(outcome.errorSummary)) continue;
+      if (this.#queue.completeRecovered(job.id, this.#owner, outcome)) {
+        this.#interactions.cancelForJob(job.id);
+        recovered += 1;
+      }
+    }
+    return recovered;
+  }
+
+  async syncConversations(): Promise<void> {
+    if (this.#stopping || !this.#executor.readHistory) return;
+    for (const job of this.#queue.observedJobs()) {
+      if (this.#stopping) break;
+      const thread = this.#queue.primaryThread(job.taskId);
+      if (!thread) continue;
+      try {
+        // Reconnect for persisted history only; never acquire Desktop's writer or replay a turn.
+        const history = await this.#executor.readHistory(thread.threadId);
+        if (!history || history.threadId !== thread.threadId || this.#stopping) continue;
+        this.#queue.syncThreadHistory(job.id, history);
+        const anchor = history.turns.findIndex(
+          (turn) => turn.id === job.recoveryCheckpoint?.turnId,
+        );
+        if (!this.#projectRegistry || anchor < 0) continue;
+        const main = await this.#projectRegistry.resolveExecutionContext(
+          String(job.workContext.projectId),
+        );
+        if (thread.cwd !== main.cwd) continue;
+        const candidates = [
+          ...new Set(history.turns.slice(anchor).flatMap((turn) => turn.workingDirectories)),
+        ].filter(
+          (cwd) => isAbsolute(cwd) && relative(main.cwd, cwd).startsWith(`.worktrees${sep}`),
+        );
+        if (!candidates.length) continue;
+        const contexts = await this.#projectRegistry.scanDevelopmentContexts(main.projectId);
+        const matches = contexts.filter(
+          (context) =>
+            context.executable &&
+            context.worktreeRealpath !== main.cwd &&
+            context.worktreeRealpath &&
+            candidates.some((cwd) => {
+              const suffix = relative(context.worktreeRealpath!, cwd);
+              return (
+                suffix === "" ||
+                (!isAbsolute(suffix) && suffix !== ".." && !suffix.startsWith(`..${sep}`))
+              );
+            }),
+        );
+        const paths = new Set(matches.map((context) => context.worktreeRealpath));
+        if (paths.size !== 1) continue;
+        const selected = matches[0]!;
+        const verified = await this.#projectRegistry.resolveExecutionContext(
+          main.projectId,
+          selected.id,
+        );
+        if (this.#stopping) break;
+        this.#queue.syncWorkspace(job.id, thread.cwd, { id: selected.id, cwd: verified.cwd });
+      } catch {
+        // An unavailable thread or workspace is retried without changing execution state.
+      }
+    }
   }
 
   async runNext(scope: JobClaimScope = "any"): Promise<JobView | null> {
@@ -165,6 +255,9 @@ export class ExecutionOrchestrator {
         }
       },
       onInteraction: (request: CodexServerRequest) => this.#handleInteraction(job, request),
+      onInteractionResolved: (requestId) => {
+        if (!this.#stopping) this.#interactions.resolveExternally(job.id, this.#owner, requestId);
+      },
     };
     let result;
     await this.#queue.captureWorkspaceStart(job.id);
@@ -190,6 +283,9 @@ export class ExecutionOrchestrator {
           threadId: thread.threadId,
           cwd,
           prompt,
+          ...(job.workContext.modelOptions
+            ? { modelOptions: TaskModelOptionsSchema.parse(job.workContext.modelOptions) }
+            : {}),
         },
         callbacks,
       );

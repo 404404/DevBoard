@@ -1,3 +1,4 @@
+import { ModelsSchema } from "./model-catalog.js";
 import {
   RemoteUploadChunks,
   RemoteChunkQuery,
@@ -52,20 +53,6 @@ const UsageResponse = z.object({
   rateLimitsByLimitId: z.record(z.string(), UsageBucket).nullish(),
 });
 const Params = z.object({ threadId: z.uuid() });
-const Models = z.object({
-  data: z.array(
-    z.object({
-      model: z.string(),
-      displayName: z.string(),
-      hidden: z.boolean().optional(),
-      supportedReasoningEfforts: z.array(z.object({ reasoningEffort: z.string() })),
-      defaultReasoningEffort: z.string(),
-      serviceTiers: z
-        .array(z.object({ id: z.string(), name: z.string(), description: z.string().nullish() }))
-        .default([]),
-    }),
-  ),
-});
 const ThreadList = z.object({
   data: z.array(
     z.object({
@@ -123,7 +110,7 @@ export function registerRemoteRoutes(
     }
   }
   async function models() {
-    const result = Models.parse(await rpc("model/list", { limit: 100 }));
+    const result = ModelsSchema.parse(await rpc("model/list", { limit: 100 }));
     return result.data
       .filter((m) => !m.hidden)
       .map((m) =>
@@ -352,9 +339,6 @@ export function registerRemoteRoutes(
         const result = z.object({ thread: z.object({ id: z.uuid() }) }).parse(
           await rpc("thread/start", {
             cwd,
-            approvalPolicy: "on-request",
-            approvalsReviewer: "user",
-            sandbox: "workspace-write",
             ephemeral: false,
           }),
         );

@@ -28,7 +28,7 @@ export const UpdateCommentCommandSchema = z.object({
 export const DeleteCommentCommandSchema = z.object({ expectedVersion: EntityVersionSchema });
 
 export const CommentViewSchema = z.object({
-  source: z.enum(["user", "codex"]).optional(),
+  source: z.enum(["user", "codex", "desktop"]).optional(),
   executedAt: z.string().nullable().optional(),
   codexThreadId: z.string().nullable().optional(),
   id: EntityIdSchema,

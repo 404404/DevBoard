@@ -336,7 +336,7 @@ function taskctl(...args: string[]): { data: Record<string, unknown> } {
       env: {
         ...process.env,
         CODEXBOARD_DATA_DIR: dataDirectory,
-        CODEXBOARD_AUTH_FILE: syntheticAuthFile(),
+        CODEXBOARD_AUTH_FILE: `${syntheticAuthFile()}-${process.pid}`,
       },
       encoding: "utf8",
     },
@@ -539,7 +539,7 @@ async function selectProject(page: Page, project: RegisteredProject): Promise<vo
   await expect(
     page.getByRole("button", { name: new RegExp(`当前：${project.name}`) }),
   ).toBeVisible();
-  await expect(page.getByTestId("realtime-state")).toContainText("实时同步");
+  await expect(page.getByRole("button", { name: "新增任务", exact: true })).toBeEnabled();
 }
 
 async function selectProjectByName(page: Page, name: string): Promise<void> {
@@ -782,6 +782,61 @@ async function selectCreateRelation(
   }
   await relationMenu.getByRole("button", { name: taskName }).click();
 }
+
+test("新增任务选择模型推理强度和速度并传递到创建请求", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await openWorkspace(page);
+  const dialog = await openTaskCreateDialog(page);
+  await dialog.getByLabel("任务标题").fill("模型选择测试");
+  const trigger = dialog.getByRole("button", { name: "模型与推理强度", exact: true });
+  await trigger.click();
+  const picker = dialog.getByRole("dialog", { name: "模型设置", exact: true });
+  await picker.getByRole("button", { name: "GPT-6 Astra", exact: true }).click();
+  const slider = picker.getByRole("slider", { name: "推理强度" });
+  await slider.fill("1");
+  await expect(slider).toHaveAttribute("aria-valuetext", "高");
+  await picker.getByRole("button", { name: /点击开启/ }).click();
+  await expect(picker.getByRole("button", { name: /已开启/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.screenshot({
+    path: testInfo.outputPath("task-model-settings-desktop.png"),
+    animations: "disabled",
+  });
+  await picker.getByRole("button", { name: "选择模型", exact: true }).click();
+  await picker.getByRole("button", { name: "Test model", exact: true }).click();
+  await expect(slider).toHaveValue("0");
+  await expect(picker.getByRole("button", { name: /倍速不可用/ })).toBeDisabled();
+  await picker.getByRole("button", { name: "使用 Codex 默认设置" }).click();
+  await expect(trigger).toContainText("Codex 默认模型");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await trigger.click();
+  await picker.getByRole("button", { name: "GPT-6 Astra", exact: true }).click();
+  await slider.fill("1");
+  await picker.getByRole("button", { name: /点击开启/ }).click();
+  await expect(slider).toBeInViewport();
+  await page.screenshot({
+    path: testInfo.outputPath("task-model-settings-mobile.png"),
+    animations: "disabled",
+  });
+  await dialog.getByRole("heading", { name: "新增任务" }).click();
+  const submitted = page.waitForRequest(
+    (request) => request.url().endsWith("/api/v1/tasks") && request.method() === "POST",
+  );
+  const response = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/v1/tasks") && response.request().method() === "POST",
+  );
+  await dialog.getByRole("button", { name: "创建任务", exact: true }).click();
+  expect((await submitted).postDataJSON().modelOptions).toEqual({
+    model: "gpt-6-astra",
+    effort: "high",
+    serviceTier: "priority",
+  });
+  expect((await response).status()).toBe(201);
+  await expect(dialog).toHaveCount(0);
+});
 
 test("新增任务按钮按需打开任务信息弹窗", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -4453,6 +4508,9 @@ test("任务详情完成 Codex 启动、一次性审批、继续与取消闭环"
   await conversation.getByRole("textbox", { name: "新评论", exact: true }).fill("未保存草稿");
   await expect(detail.getByRole("button", { name: "任务完成", exact: true })).toBeDisabled();
   await conversation.getByRole("textbox", { name: "新评论", exact: true }).fill("");
+  // Completion checks Git; committing belongs to the external development workflow.
+  execFileSync("git", ["-C", project.rootPath, "add", "feature-result.txt"]);
+  execFileSync("git", ["-C", project.rootPath, "commit", "-m", "complete fixture implementation"]);
   await detail.getByRole("button", { name: "任务完成", exact: true }).click();
   await expect(detail).not.toBeVisible();
   await page.getByTestId(`task-card-${identifier}`).click();
@@ -4789,7 +4847,7 @@ test("详情修复：相邻状态、活动实时更新、评论菜单和图片�
       "base64",
     ),
   });
-  await detail.getByRole("link", { name: /preview.png/ }).click();
+  await detail.getByRole("button", { name: "查看图片 preview.png" }).click();
   const preview = page.getByRole("dialog", { name: "预览图片 preview.png" });
   await expect(preview).toBeVisible();
   await expect
@@ -4797,7 +4855,7 @@ test("详情修复：相邻状态、活动实时更新、评论菜单和图片�
     .toBe(1);
   await preview.getByRole("button", { name: "关闭图片预览" }).click();
   await detail.getByRole("button", { name: "删除附件 preview.png" }).click();
-  await expect(detail.getByRole("link", { name: /preview.png/ })).toHaveCount(0);
+  await expect(detail.getByRole("button", { name: "查看图片 preview.png" })).toHaveCount(0);
   await expect(detail.getByText("删除了附件", { exact: false })).toBeVisible();
   const currentTask = (
     await readPublicData<{ tasks: TaskFixture[] }>(page, `/api/v1/projects/${project.id}/board`)
@@ -5330,4 +5388,405 @@ test("手机新增任务附件按钮保留回形针图标", async ({ page }, tes
   await attachment.click();
   expect(await chooser).toBeTruthy();
   await page.screenshot({ path: testInfo.outputPath("mobile-attachment-icon.png") });
+});
+
+test("LAUB-014 评论交互：未执行评论可编辑删除，图片可预览，草稿提示使用辅助字号", async ({
+  page,
+}) => {
+  const project = await registerProject("COMMENTFIX");
+  await openWorkspace(page);
+  await selectProject(page, project);
+  const detail = await createTaskAndOpenDetail(page, "评论交互验收");
+  await detail.getByLabel("新评论").fill("图片评论验收");
+  await detail.getByLabel("添加评论附件").setInputFiles({
+    name: "comment-preview.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6OmQAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  });
+  await detail.getByRole("button", { name: "发表评论" }).click();
+  const comment = detail.locator(".comment").filter({ hasText: "图片评论验收" });
+  await expect(comment).toBeVisible();
+  await comment.getByRole("button", { name: "查看图片 comment-preview.png" }).click();
+  const preview = page.getByRole("dialog", { name: "预览图片 comment-preview.png" });
+  await expect(preview).toBeVisible();
+  await expect
+    .poll(() => preview.locator("img").evaluate((img: HTMLImageElement) => img.naturalWidth))
+    .toBe(1);
+  const download = preview.getByRole("link", { name: "下载原图" });
+  await expect(download).toHaveClass("button");
+  await expect(download).toHaveCSS(
+    "font-size",
+    await preview
+      .getByRole("button", { name: "关闭图片预览" })
+      .evaluate((button) => getComputedStyle(button).fontSize),
+  );
+  const originalViewport = page.viewportSize()!;
+  for (const viewport of [originalViewport, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    const bounds = (await preview.boundingBox())!;
+    expect(Math.abs(bounds.x + bounds.width / 2 - viewport.width / 2)).toBeLessThan(2);
+    expect(Math.abs(bounds.y + bounds.height / 2 - viewport.height / 2)).toBeLessThan(2);
+    await expect(download).toBeVisible();
+  }
+  await page.setViewportSize(originalViewport);
+  const downloaded = page.waitForEvent("download");
+  await download.click();
+  expect((await downloaded).suggestedFilename()).toBe("comment-preview.png");
+  await preview.getByRole("button", { name: "关闭图片预览" }).click();
+  await expect(preview).toHaveCount(0);
+  await comment.hover();
+  await comment.getByRole("button", { name: "评论操作", exact: true }).click();
+  await comment.getByRole("menuitem", { name: "编辑评论" }).click();
+  await expect(comment.getByLabel("编辑评论")).toBeVisible();
+  await comment.getByLabel("编辑评论").fill("修订图片评论");
+  await expect(detail.getByText("请先保存或放弃评论草稿，再操作任务。", { exact: true })).toHaveCSS(
+    "font-size",
+    "12px",
+  );
+  await detail.getByRole("button", { name: "保存", exact: true }).click();
+  const edited = detail.locator(".comment").filter({ hasText: "修订图片评论" });
+  await expect(edited).toBeVisible();
+  const current = (
+    await readPublicData<{ tasks: TaskFixture[] }>(page, `/api/v1/projects/${project.id}/board`)
+  ).tasks[0]!;
+  const taskUrl = `**/api/v1/tasks/${current.id}`;
+  // Exercise read-only display without completing or canceling a real job.
+  for (const status of ["done", "canceled"]) {
+    await page.route(taskUrl, async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      await route.fulfill({ response, json: { ...body, data: { ...body.data, status } } });
+    });
+    await page.goto(`/?project=${project.id}&task=${current.id}`);
+    await expect(detail.getByLabel("标题", { exact: true })).toBeDisabled();
+    await expect(edited.getByRole("button", { name: "评论操作", exact: true })).toHaveCount(0);
+    await edited.getByRole("button", { name: "查看图片 comment-preview.png" }).click();
+    await expect(preview).toBeVisible();
+    await expect
+      .poll(() => preview.locator("img").evaluate((img: HTMLImageElement) => img.naturalWidth))
+      .toBe(1);
+    await preview.getByRole("button", { name: "关闭图片预览" }).click();
+    await expect(preview).toHaveCount(0);
+    await edited.getByRole("button", { name: "查看图片 comment-preview.png" }).press("Enter");
+    await expect(preview).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(preview).toHaveCount(0);
+    await page.unroute(taskUrl);
+  }
+  await page.reload();
+  await edited.hover();
+  await edited.getByRole("button", { name: "评论操作", exact: true }).click();
+  await edited.getByRole("menuitem", { name: "删除评论" }).click();
+  await expect(edited).toHaveCount(0);
+  await expect(detail.getByRole("button", { name: "查看图片 comment-preview.png" })).toHaveCount(0);
+});
+
+test("LAUB-016 关闭保留新建草稿，图片附件统一缩略图与预览", async ({ page }, testInfo) => {
+  const project = await registerProject("DRAFTFIX");
+  await openWorkspace(page);
+  await selectProject(page, project);
+  const dialog = await openTaskCreateDialog(page);
+  await dialog.getByLabel("任务标题", { exact: true }).fill("保留草稿验收");
+  await dialog.getByLabel("任务描述", { exact: true }).fill("草稿描述");
+  const file = {
+    name: "draft.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6OmQAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  };
+  await dialog.locator('input[type="file"]').setInputFiles(file);
+  await dialog.getByRole("button", { name: "查看图片 draft.png" }).click();
+  const preview = page.getByRole("dialog", { name: "预览图片 draft.png" });
+  await expect(preview.locator("img")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(preview).toHaveCount(0);
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await openTaskCreateDialog(page);
+  await expect(dialog.getByLabel("任务标题", { exact: true })).toHaveValue("保留草稿验收");
+  await expect(dialog.getByLabel("任务描述", { exact: true })).toHaveValue("草稿描述");
+  await expect
+    .poll(() =>
+      dialog.locator(".attachment-card img").evaluate((img: HTMLImageElement) => img.naturalWidth),
+    )
+    .toBe(1);
+  await page.screenshot({ path: testInfo.outputPath("draft-restored.png") });
+  await dialog.getByRole("button", { name: "创建任务", exact: true }).click();
+  const detail = page.getByRole("region", { name: "任务详情", exact: true });
+  await expect(detail).toBeVisible();
+  await expect
+    .poll(() =>
+      detail.locator(".attachment-card img").evaluate((img: HTMLImageElement) => img.naturalWidth),
+    )
+    .toBe(1);
+  await detail.getByRole("button", { name: "查看图片 draft.png" }).click();
+  await expect(preview).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(detail).toBeVisible();
+  await detail.getByLabel("添加评论附件").setInputFiles(file);
+  const pending = detail.getByLabel("待发送附件");
+  await expect
+    .poll(() => pending.locator("img").evaluate((img: HTMLImageElement) => img.naturalWidth))
+    .toBe(1);
+  await pending.getByRole("button", { name: "查看图片 draft.png" }).click();
+  await expect(preview).toBeVisible();
+  await page.keyboard.press("Escape");
+  await detail.getByRole("button", { name: "发表评论", exact: true }).click();
+  await expect(pending).toHaveCount(0);
+  await expect(detail.locator(".comment .attachment-card img")).toBeVisible();
+  await expect(detail.getByText("可直接粘贴或拖入文件", { exact: true })).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath("unified-attachments.png") });
+  const current = (
+    await readPublicData<{ tasks: TaskFixture[] }>(page, `/api/v1/projects/${project.id}/board`)
+  ).tasks[0]!;
+  const workspaceUrl = `**/api/v1/tasks/${current.id}/workspace`;
+  await page.route(workspaceUrl, async (route) => {
+    const response = await route.fetch();
+    const payload = await response.json();
+    payload.data.executionSummary.active = 1;
+    await route.fulfill({ response, json: payload });
+  });
+  await page.goto(`/?project=${project.id}&task=${current.id}`);
+  await expect(
+    detail.locator(".comment").getByRole("button", { name: "评论操作", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    detail.locator(".comment").getByRole("button", { name: "删除附件 draft.png" }),
+  ).toHaveCount(0);
+  await expect(detail.getByLabel("新评论")).toBeEnabled();
+  await detail.locator(".comment").getByRole("button", { name: "查看图片 draft.png" }).click();
+  await expect(preview).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.unroute(workspaceUrl);
+  await page.goto(`/?project=${project.id}&task=${current.id}`);
+  await expect(
+    detail.locator(".comment").getByRole("button", { name: "评论操作", exact: true }),
+  ).toHaveCount(1);
+  await detail.getByRole("button", { name: "返回看板" }).click();
+  await openTaskCreateDialog(page);
+  await expect(dialog.getByLabel("任务标题", { exact: true })).toHaveValue("");
+  await expect(dialog.getByLabel("已添加附件")).toHaveCount(0);
+});
+
+test("LAUB-016 Desktop 用户消息只读展示，收尾失败持续显示具体原因", async ({ page }, testInfo) => {
+  const project = await registerProject("DESKTOPSYNC");
+  await openWorkspace(page);
+  await selectProject(page, project);
+  await createTaskAndOpenDetail(page, "Desktop 对话同步验收");
+  const current = (
+    await readPublicData<{ tasks: TaskFixture[] }>(page, `/api/v1/projects/${project.id}/board`)
+  ).tasks[0]!;
+  await page.route(`**/api/v1/tasks/${current.id}`, async (route) => {
+    const response = await route.fetch();
+    const payload = await response.json();
+    payload.data.status = "in_review";
+    await route.fulfill({ response, json: payload });
+  });
+  const timestamp = new Date().toISOString();
+  await page.route(`**/api/v1/tasks/${current.id}/workspace`, async (route) => {
+    const response = await route.fetch();
+    const payload = await response.json();
+    payload.data.comments.push({
+      id: randomUUID(),
+      taskId: current.id,
+      source: "desktop",
+      author: null,
+      body: "请同步这条 Desktop 用户消息",
+      codexThreadId: randomUUID(),
+      executedAt: null,
+      version: 1,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      deletedAt: null,
+    });
+    await route.fulfill({ response, json: payload });
+  });
+  await page.route(`**/api/v1/tasks/${current.id}/lifecycle`, async (route) => {
+    await route.fulfill({
+      json: {
+        data: {
+          id: randomUUID(),
+          taskId: current.id,
+          targetStatus: "done",
+          status: "failed",
+          phase: "cleaning",
+          errorSummary: "任务未完成：工作树包含被 Git 忽略的本地文件，无法安全删除：.tmp/unowned",
+          commitSha: null,
+          archiveRef: null,
+          notes: [],
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+      },
+    });
+  });
+  await page.goto(`/?project=${project.id}&task=${current.id}`);
+  const detail = page.getByRole("region", { name: "任务详情", exact: true });
+  const comment = detail.locator(".comment").filter({ hasText: "请同步这条 Desktop 用户消息" });
+  await expect(comment.getByText("Desktop 用户", { exact: true })).toBeVisible();
+  await expect(comment.getByRole("button", { name: "评论操作", exact: true })).toHaveCount(0);
+  await expect(comment.getByRole("link", { name: "打开 Codex 对话" })).toBeVisible();
+  await expect(detail.getByRole("button", { name: "重试任务收尾" })).toBeEnabled();
+  const failure = detail.getByRole("alert").filter({ hasText: "任务未完成" });
+  await expect(failure).toContainText(".tmp/unowned");
+  // Keep the reason visible beyond the transient notification timeout.
+  await expect
+    .poll(async () => {
+      const age = await failure.evaluate((element) => {
+        const key = "data-observed-at";
+        const start = Number(element.getAttribute(key) || Date.now());
+        element.setAttribute(key, String(start));
+        return Date.now() - start;
+      });
+      return age;
+    })
+    .toBeGreaterThan(1500);
+  await expect(failure).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("desktop-message-cleanup-error.png") });
+  await page.unrouteAll({ behavior: "wait" });
+});
+
+for (const order of ["task-first", "operation-first", "failure-retry"] as const) {
+  test(`任务完成等待收尾成功和已完成状态后返回看板：${order}`, async ({ page }) => {
+    const project = await registerProject("FINISHWAIT");
+    await openWorkspace(page);
+    await selectProject(page, project);
+    await createTaskAndOpenDetail(page, "等待完成检查");
+    const current = (
+      await readPublicData<{ tasks: TaskFixture[] }>(page, `/api/v1/projects/${project.id}/board`)
+    ).tasks[0]!;
+    let taskDone = false;
+    let taskReads = 0;
+    let lifecycleReads = 0;
+    let submissions = 0;
+    const timestamp = new Date().toISOString();
+    let operation: null | {
+      id: string;
+      taskId: string;
+      targetStatus: "done";
+      status: "pending" | "running" | "succeeded" | "failed";
+      phase: "checking" | "cleaning" | "completed";
+      errorSummary: string | null;
+      commitSha: null;
+      archiveRef: null;
+      notes: string[];
+      createdAt: string;
+      updatedAt: string;
+    } = null;
+    await page.route(`**/api/v1/tasks/${current.id}`, async (route) => {
+      const response = await route.fetch();
+      const payload = await response.json();
+      payload.data.status = taskDone ? "done" : "in_review";
+      taskReads++;
+      await route.fulfill({ response, json: payload });
+    });
+    await page.route(`**/api/v1/tasks/${current.id}/lifecycle`, async (route) => {
+      if (route.request().method() === "POST") {
+        submissions++;
+        operation = {
+          id: randomUUID(),
+          taskId: current.id,
+          targetStatus: "done",
+          status: "pending",
+          phase: "checking",
+          errorSummary: null,
+          commitSha: null,
+          archiveRef: null,
+          notes: [],
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        };
+      } else lifecycleReads++;
+      await route.fulfill({
+        status: route.request().method() === "POST" ? 202 : 200,
+        json: { data: operation },
+      });
+    });
+    await page.goto(`/?project=${project.id}&task=${current.id}`);
+    const detail = page.getByRole("region", { name: "任务详情", exact: true });
+    await detail.getByRole("button", { name: "任务完成", exact: true }).click();
+    await expect(detail.getByText("检查任务与工作区…", { exact: true })).toBeVisible();
+    await expect(detail.getByRole("button", { name: "任务完成", exact: true })).toBeDisabled();
+    expect(submissions).toBe(1);
+    if (order === "failure-retry") {
+      operation!.status = "failed";
+      operation!.errorSummary = "任务未完成：缺少可核验的任务交付记录";
+      await expect(detail.getByRole("alert")).toContainText("缺少可核验的任务交付记录");
+      await detail.getByRole("button", { name: "重试任务收尾" }).click();
+      await expect(detail.getByText("检查任务与工作区…", { exact: true })).toBeVisible();
+      expect(submissions).toBe(2);
+    }
+    if (order === "task-first") {
+      const before = taskReads;
+      taskDone = true;
+      await expect.poll(() => taskReads).toBeGreaterThan(before);
+      await expect(detail.getByRole("button", { name: "状态", exact: true })).toContainText(
+        "已完成",
+      );
+      await expect(detail).toBeVisible();
+    } else {
+      const before = lifecycleReads;
+      operation!.status = "succeeded";
+      operation!.phase = "completed";
+      await expect.poll(() => lifecycleReads).toBeGreaterThan(before);
+      await expect(detail.locator(".task-completion-result")).toBeVisible();
+      await expect(detail).toBeVisible();
+    }
+    taskDone = true;
+    operation!.status = "succeeded";
+    operation!.phase = "completed";
+    await expect(detail).not.toBeVisible();
+    // Opening an already completed task is read-only inspection, not a fresh completion request.
+    await page.goto(`/?project=${project.id}&task=${current.id}`);
+    await expect(detail.getByRole("button", { name: "状态", exact: true })).toContainText("已完成");
+    await expect(detail.locator(".task-completion-result")).toBeVisible();
+    await expect(detail).toBeVisible();
+    await page.unrouteAll({ behavior: "wait" });
+  });
+}
+
+test("完成只检查 main 的 Git 状态：失败留在详情，手动提交后重试成功", async ({ page }) => {
+  const project = await registerProject("CHECKONLY");
+  await openWorkspace(page);
+  await selectProject(page, project);
+  const detail = await createTaskAndOpenDetail(page, "只读完成检查");
+  const task = (
+    await readPublicData<{ tasks: (TaskFixture & { version: number })[] }>(
+      page,
+      `/api/v1/projects/${project.id}/board`,
+    )
+  ).tasks[0]!;
+  taskctl("issue", "move", task.id, "--version", String(task.version), "--status", "in_review");
+  await expect(detail.getByRole("button", { name: "状态", exact: true })).toContainText("待验收");
+  const git = (...args: string[]) =>
+    execFileSync("git", ["-C", project.rootPath, ...args], { encoding: "utf8" }).trim();
+  git("init", "-b", "main");
+  git("config", "user.name", "Completion Test");
+  git("config", "user.email", "completion@example.test");
+  writeFileSync(join(project.rootPath, "initial.txt"), "initial");
+  git("add", "initial.txt");
+  git("commit", "-m", "initial");
+  const head = git("rev-parse", "HEAD");
+  writeFileSync(join(project.rootPath, "pending.txt"), "not committed");
+  await detail.getByRole("button", { name: "任务完成", exact: true }).click();
+  await expect(detail.getByRole("alert")).toContainText("Git 不干净");
+  await expect(detail).toBeVisible();
+  expect(git("rev-parse", "HEAD")).toBe(head);
+  expect(git("status", "--porcelain")).toContain("pending.txt");
+  git("add", "pending.txt");
+  git("commit", "-m", "user completes work");
+  const delivered = git("rev-parse", "HEAD");
+  await detail.getByRole("button", { name: "重试任务收尾" }).click();
+  await expect(detail).not.toBeVisible();
+  const completed = await readPublicData<{ status: string }>(page, `/api/v1/tasks/${task.id}`);
+  expect(completed.status).toBe("done");
+  expect(git("rev-parse", "HEAD")).toBe(delivered);
+  expect(git("branch", "--show-current")).toBe("main");
+  expect(git("for-each-ref", "--format=%(refname)", "refs/taskboard")).toBe("");
 });

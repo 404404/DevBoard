@@ -39,6 +39,73 @@ async function waitForMessage(transport: FakeTransport, index: number): Promise<
   return transport.sent[index]!;
 }
 
+describe("read-only outcome recovery", () => {
+  it.each(["exact", "client-id", "running", "wrong-turn", "wrong-thread", "no-client-id"])(
+    "reads only the identified terminal turn: %s",
+    async (mode) => {
+      const transport = new FakeTransport();
+      const client = new CodexJsonRpcClient({ transport, requestTimeoutMs: 1000 });
+      const executor = new AppServerCodexExecutor(client);
+      const reading = executor.readOutcome({
+        jobId: "job",
+        threadId: "thread",
+        ...(["client-id", "no-client-id"].includes(mode) ? {} : { turnId: "original" }),
+      });
+      const initialize = (await waitForMessage(transport, 0)) as { id: number };
+      transport.receive({ id: initialize.id, result: {} });
+      const read = (await waitForMessage(transport, 2)) as { id: number };
+      expect(read).toMatchObject({
+        method: "thread/read",
+        params: { threadId: "thread", includeTurns: true },
+      });
+      transport.receive({
+        id: read.id,
+        result: {
+          thread: {
+            id: mode === "wrong-thread" ? "other" : "thread",
+            turns: [
+              {
+                id: mode === "wrong-turn" ? "other" : "original",
+                status: mode === "running" ? "inProgress" : "completed",
+                items: [
+                  { type: "userMessage", clientId: mode === "no-client-id" ? "other-job" : "job" },
+                  { id: "progress", type: "agentMessage", phase: "commentary", text: "progress" },
+                  {
+                    id: "answer",
+                    type: "agentMessage",
+                    phase: "final_answer",
+                    text: "full result",
+                  },
+                ],
+              },
+              { id: "newer", status: "inProgress", items: [] },
+            ],
+          },
+        },
+      });
+      const result = await reading;
+      if (["exact", "client-id"].includes(mode))
+        expect(result).toMatchObject({
+          turnId: "original",
+          status: "completed",
+          events: [
+            {
+              cursor: "original:item/completed:answer",
+              safePayload: { text: "full result", phase: "final_answer" },
+            },
+          ],
+        });
+      else expect(result).toBeNull();
+      expect(
+        transport.sent.filter(
+          (message) => "method" in message && /thread\/(resume|start)|turn\//.test(message.method),
+        ),
+      ).toHaveLength(0);
+      await client.close();
+    },
+  );
+});
+
 describe("App Server Codex executor", () => {
   it.each([true, false])(
     "stops waiting without retry when Desktop loses the turn stream (early=%s)",
@@ -100,13 +167,12 @@ describe("App Server Codex executor", () => {
       method: string;
       params: Record<string, unknown>;
     };
+    for (const key of ["approvalPolicy", "approvalsReviewer", "sandbox", "sandboxPolicy"])
+      expect(threadStart.params).not.toHaveProperty(key);
     expect(threadStart).toMatchObject({
       method: "thread/start",
       params: {
         cwd: mkdir.params.path,
-        approvalPolicy: "on-request",
-        approvalsReviewer: "user",
-        sandbox: "workspace-write",
         ephemeral: false,
       },
     });
@@ -170,6 +236,72 @@ describe("App Server Codex executor", () => {
     await client.close();
   });
 
+  it.each(["valid", "model", "effort", "tier", "hidden"])(
+    "validates draft model settings (%s)",
+    async (variant) => {
+      const transport = new FakeTransport();
+      const client = new CodexJsonRpcClient({ transport, requestTimeoutMs: 1000 });
+      const executor = new AppServerCodexExecutor(client);
+      const modelOptions = {
+        model: variant === "model" ? "missing" : "test-model",
+        effort: variant === "effort" ? "ultra" : "high",
+        serviceTier: variant === "tier" ? "missing" : "priority",
+      };
+      const creating = executor.createDraft({
+        cwd: "/workspace/project",
+        name: "TASK-1 模型",
+        modelOptions,
+      });
+      const outcome = creating.then(
+        (value) => ({ value, error: undefined }),
+        (error: unknown) => ({ value: undefined, error }),
+      );
+      const initialize = (await waitForMessage(transport, 0)) as { id: number };
+      transport.receive({ id: initialize.id, result: {} });
+      const list = (await waitForMessage(transport, 2)) as { id: number };
+      expect(list).toMatchObject({ method: "model/list" });
+      transport.receive({
+        id: list.id,
+        result: {
+          data: [
+            {
+              model: "test-model",
+              displayName: "Test",
+              hidden: variant === "hidden",
+              supportedReasoningEfforts: [{ reasoningEffort: "high" }],
+              defaultReasoningEffort: "high",
+              serviceTiers: [{ id: "priority", name: "Fast" }],
+            },
+          ],
+        },
+      });
+      if (variant !== "valid") {
+        expect((await outcome).error).toMatchObject({ message: expect.stringContaining("不可用") });
+        expect(transport.sent.some((m) => "method" in m && m.method === "thread/start")).toBe(
+          false,
+        );
+      } else {
+        const start = (await waitForMessage(transport, 3)) as { id: number };
+        expect(start).toMatchObject({
+          method: "thread/start",
+          params: {
+            model: "test-model",
+            serviceTier: "priority",
+            config: { model_reasoning_effort: "high" },
+          },
+        });
+        transport.receive({
+          id: start.id,
+          result: { thread: { id: "selected" }, cwd: "/workspace/project" },
+        });
+        const name = (await waitForMessage(transport, 4)) as { id: number };
+        transport.receive({ id: name.id, result: {} });
+        expect((await outcome).value).toMatchObject({ threadId: "selected" });
+      }
+      await client.close();
+    },
+  );
+
   it("archives a newly created draft Thread when naming fails", async () => {
     const transport = new FakeTransport();
     const client = new CodexJsonRpcClient({ transport, requestTimeoutMs: 1_000 });
@@ -224,13 +356,12 @@ describe("App Server Codex executor", () => {
       method: string;
       params: Record<string, unknown>;
     };
+    for (const key of ["approvalPolicy", "approvalsReviewer", "sandbox", "sandboxPolicy"])
+      expect(threadStart.params).not.toHaveProperty(key);
     expect(threadStart).toMatchObject({
       method: "thread/start",
       params: {
         cwd: "/workspace/project",
-        approvalPolicy: "on-request",
-        approvalsReviewer: "user",
-        sandbox: "workspace-write",
         ephemeral: false,
       },
     });
@@ -240,13 +371,13 @@ describe("App Server Codex executor", () => {
       method: string;
       params: Record<string, unknown>;
     };
+    for (const key of ["approvalPolicy", "approvalsReviewer", "sandbox", "sandboxPolicy"])
+      expect(turnStart.params).not.toHaveProperty(key);
     expect(turnStart).toMatchObject({
       method: "turn/start",
       params: {
         threadId: "thread-real",
         cwd: "/workspace/project",
-        approvalPolicy: "on-request",
-        approvalsReviewer: "user",
         clientUserMessageId: "job-real",
         input: [{ type: "text", text: "完成任务", text_elements: [] }],
       },
@@ -325,7 +456,13 @@ describe("App Server Codex executor", () => {
       const client = new CodexJsonRpcClient({ transport, requestTimeoutMs: 1000 });
       const executor = new AppServerCodexExecutor(client);
       const running = executor.continue(
-        { jobId: "test", threadId: "thread-test", cwd: "/workspace", prompt: "test" },
+        {
+          jobId: "test",
+          threadId: "thread-test",
+          cwd: "/workspace",
+          prompt: "test",
+          modelOptions: { model: "test-model", effort: "high", serviceTier: null },
+        },
         {
           onThread() {},
           onTurn() {},
@@ -339,9 +476,23 @@ describe("App Server Codex executor", () => {
       );
       const initialize = (await waitForMessage(transport, 0)) as { id: number };
       transport.receive({ id: initialize.id, result: {} });
-      const resume = (await waitForMessage(transport, 2)) as { id: number };
+      const resume = (await waitForMessage(transport, 2)) as {
+        id: number;
+        params: Record<string, unknown>;
+      };
+      for (const key of ["approvalPolicy", "approvalsReviewer", "sandbox", "sandboxPolicy"])
+        expect(resume.params).not.toHaveProperty(key);
       transport.receive({ id: resume.id, result: { thread: { id: "thread-test" } } });
-      const start = (await waitForMessage(transport, 3)) as { id: number };
+      const start = (await waitForMessage(transport, 3)) as {
+        id: number;
+        params: Record<string, unknown>;
+      };
+      for (const key of ["approvalPolicy", "approvalsReviewer", "sandbox", "sandboxPolicy"])
+        expect(start.params).not.toHaveProperty(key);
+      expect(start).toMatchObject({
+        method: "turn/start",
+        params: { model: "test-model", effort: "high", serviceTier: null },
+      });
       expect(transport.sent.some((m) => "method" in m && m.method === "thread/unsubscribe")).toBe(
         false,
       );
@@ -833,4 +984,87 @@ it("delivers a reconciled cancellation completion before the original turn respo
   await Promise.all([running, stopping]);
   await client.close();
   expect(stoppedBeforeResponse).toBe(true);
+});
+
+it("reads follow-up final answers and observed command directories without resuming the thread", async () => {
+  const transport = new FakeTransport();
+  const client = new CodexJsonRpcClient({ transport, requestTimeoutMs: 1000 });
+  const executor = new AppServerCodexExecutor(client);
+  const reading = executor.readHistory("thread");
+  const initialize = (await waitForMessage(transport, 0)) as { id: number };
+  transport.receive({ id: initialize.id, result: {} });
+  const read = (await waitForMessage(transport, 2)) as { id: number };
+  expect(read).toMatchObject({
+    method: "thread/read",
+    params: { threadId: "thread", includeTurns: true },
+  });
+  transport.receive({
+    id: read.id,
+    result: {
+      thread: {
+        id: "thread",
+        turns: [
+          {
+            id: "first",
+            status: "completed",
+            items: [
+              { id: "note", type: "agentMessage", phase: "commentary", text: "working" },
+              {
+                id: "command",
+                type: "commandExecution",
+                cwd: "/project/.worktrees/fix",
+                command: "private command",
+              },
+              { id: "answer", type: "agentMessage", phase: "final_answer", text: "done" },
+            ],
+          },
+          {
+            id: "next",
+            status: "inProgress",
+            items: [
+              { id: "user", type: "userMessage", content: [{ type: "text", text: "用户补充" }] },
+              { id: "answer", type: "agentMessage", phase: "final_answer", text: "incomplete" },
+            ],
+          },
+        ],
+      },
+    },
+  });
+  expect(await reading).toEqual({
+    threadId: "thread",
+    turns: [
+      {
+        id: "first",
+        status: "completed",
+        workingDirectories: ["/project/.worktrees/fix"],
+        events: [
+          {
+            cursor: "first:item/completed:answer",
+            kind: "codex.agent_message",
+            summary: "done",
+            safePayload: { text: "done", phase: "final_answer" },
+          },
+        ],
+      },
+      {
+        id: "next",
+        status: "inProgress",
+        workingDirectories: [],
+        events: [
+          {
+            cursor: "desktop-user:user",
+            kind: "codex.user_message",
+            summary: "用户补充",
+            safePayload: { text: "用户补充", itemType: "userMessage", messageIds: ["user"] },
+          },
+        ],
+      },
+    ],
+  });
+  expect(
+    transport.sent
+      .filter((message) => "method" in message)
+      .map((message) => "method" in message && message.method),
+  ).toEqual(["initialize", "initialized", "thread/read"]);
+  await client.close();
 });

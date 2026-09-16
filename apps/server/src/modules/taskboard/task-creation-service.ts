@@ -62,10 +62,12 @@ export class TaskCreationService {
       draft = await this.#provisioner.createDraft({
         cwd,
         name: `${created.task.identifier} ${created.task.title}`,
+        ...(command.modelOptions ? { modelOptions: command.modelOptions } : {}),
       });
       const bound = this.#queue.bindDraftThread(created.task.id, {
         threadId: draft.threadId,
         cwd: draft.cwd,
+        ...(command.modelOptions ? { modelOptions: command.modelOptions } : {}),
         ...(this.#codexVersion ? { codexVersion: this.#codexVersion } : {}),
       });
       return this.#taskboard.finalizeTaskCreation(

@@ -1,3 +1,4 @@
+import type { TaskModelOptions } from "@codexboard/contracts";
 import {
   GitManagementViewSchema,
   type CreateGitResourceCommand,
@@ -444,6 +445,7 @@ export async function deleteRelation(
 
 export async function createTask(
   input: {
+    modelOptions?: TaskModelOptions;
     projectId: string;
     title: string;
     description: string;

@@ -237,6 +237,7 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
     ? new ExecutionOrchestrator({
         queue: executionQueue,
         executor: options.codexExecutor,
+        projectRegistry,
         interactions,
         owner: `server:${process.pid}`,
       })
@@ -282,10 +283,7 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
     database: options.database,
     taskboard,
     queue: executionQueue,
-    gitFinalizer: new TaskGitFinalizer(
-      options.config.CODEXBOARD_WORKSPACE_ROOTS,
-      options.workspaceCommandRunner,
-    ),
+    gitFinalizer: new TaskGitFinalizer(options.config.CODEXBOARD_WORKSPACE_ROOTS),
     scheduleExecution: schedule,
     onRevisionCommitted: (revision) => eventFeed.notifyCommitted(revision),
   });
@@ -319,10 +317,28 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
       projectSync,
     },
   });
+  let recoveryActive = false;
+  const recoverUncertain = async () => {
+    if (stopping || recoveryActive || !orchestrator) return;
+    recoveryActive = true;
+    try {
+      if (await orchestrator.recoverUncertain()) schedule();
+      await orchestrator.syncConversations();
+    } catch {
+      app.log.warn("Codex 执行结果恢复暂未成功，将保留原状态并稍后重试");
+    } finally {
+      recoveryActive = false;
+    }
+  };
+  const recoveryTimer = orchestrator
+    ? setInterval(() => void recoverUncertain(), 10_000)
+    : undefined;
+  recoveryTimer?.unref();
   interactions.expirePending("服务重启后原 Codex 请求已失效");
   executionQueue.recoverAfterRestart();
   if (orchestrator) {
     setImmediate(schedule);
+    setImmediate(() => void recoverUncertain());
   }
   registerTaskboardRoutes(app, {
     config: options.config,
@@ -373,6 +389,7 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
 
   app.addHook("onClose", async () => {
     stopping = true;
+    if (recoveryTimer) clearInterval(recoveryTimer);
     orchestrator?.stop();
     APP_CONTROLS.delete(app);
     await projectSnapshotWatcher.close();

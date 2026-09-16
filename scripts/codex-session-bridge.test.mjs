@@ -42,6 +42,11 @@ const send = m => process.stdout.write(JSON.stringify(m)+'\\n');
 readline.createInterface({input:process.stdin}).on('line', line => {
  const m=JSON.parse(line); if (!('id' in m)) return;
  if(m.method) fs.appendFileSync(${JSON.stringify(join(directory, "helper-methods.log"))},m.method+'\\n');
+ if(m.method==='config/read') {
+  const reviewer = {'/auto':'auto_review','/ask':'user','/legacy':'guardian_subagent','/invalid':'bad'}[m.params.cwd];
+  if(m.params.cwd==='/config-error') return send({id:m.id,error:{code:-32603,message:'config unavailable'}});
+  return send({id:m.id,result:{config:{approvals_reviewer:reviewer ?? null}}});
+ }
  if(m.method==='account/rateLimits/read') return send({id:m.id,result:{rateLimits:{secondary:{usedPercent:37}}}});
  if(m.method==='thread/name/set') {
   fs.appendFileSync(${JSON.stringify(join(directory, "session_index.jsonl"))},JSON.stringify({id:m.params.threadId,thread_name:m.params.name})+'\\n');
@@ -89,6 +94,7 @@ process.on('SIGTERM',()=>setTimeout(()=>{if(lock && fs.existsSync(lock)) fs.unli
 `,
     { mode: 0o700 },
   );
+  const desktopRequests = [];
   let desktopStopped = false;
   let desktopConnections = 0;
   const bridge = await createCodexSessionBridge({
@@ -106,7 +112,8 @@ process.on('SIGTERM',()=>setTimeout(()=>{if(lock && fs.existsSync(lock)) fs.unli
             }, 30)
           : null;
       return {
-        request: async (method) => {
+        request: async (method, params) => {
+          desktopRequests.push({ method, params });
           if (
             threadId === "live-remote" &&
             ["taskboard/remote/steer", "taskboard/remote/queue"].includes(method)
@@ -114,6 +121,29 @@ process.on('SIGTERM',()=>setTimeout(()=>{if(lock && fs.existsSync(lock)) fs.unli
             if (liveRevision !== 1) throw new Error("当前回合已变化，请刷新后操作");
             return { revision: liveRevision };
           }
+          if (method === "taskboard/remote/read" && threadId === "owner-active")
+            return {
+              id: threadId,
+              cwd: "/project",
+              turnHistory: {
+                kind: "canonical",
+                history: {
+                  entitiesByKey: {
+                    live: {
+                      turnId: "turn-live",
+                      status: "inProgress",
+                      params: {
+                        clientUserMessageId: "job-live",
+                        input: [{ type: "text", text: "continue" }],
+                      },
+                      items: [],
+                    },
+                  },
+                },
+              },
+            };
+          if (method === "taskboard/remote/read" && threadId === "owner-unreachable")
+            throw new Error("owner unavailable");
           if (method === "taskboard/remote/read" && threadId === "live-remote")
             return { id: threadId, revision: liveRevision };
           if (method === "taskboard/remote/read" && threadId === "review-thread")
@@ -297,6 +327,31 @@ process.on('SIGTERM',()=>setTimeout(()=>{if(lock && fs.existsSync(lock)) fs.unli
       connectionsBeforeRemote + 1,
       "remote read must not release the task executor's follower",
     );
+    const helperBeforeOutcome = readFileSync(join(directory, "helper-methods.log"), "utf8");
+    const executionRequests = desktopRequests.filter((r) =>
+      ["turn/start", "thread/resume", "turn/interrupt"].includes(r.method),
+    ).length;
+    const ownerHistory = await request("thread/read", {
+      threadId: "owner-active",
+      includeTurns: true,
+    });
+    assert.equal(ownerHistory.thread.turns[0].status, "inProgress");
+    assert.equal(ownerHistory.thread.turns[0].items[0].clientId, "job-live");
+    assert.equal(
+      desktopRequests.filter((r) =>
+        ["turn/start", "thread/resume", "turn/interrupt"].includes(r.method),
+      ).length,
+      executionRequests,
+    );
+    await assert.rejects(
+      request("thread/read", { threadId: "owner-unreachable", includeTurns: true }),
+      /Codex 会话连接失败/,
+    );
+    assert.equal(
+      readFileSync(join(directory, "helper-methods.log"), "utf8"),
+      helperBeforeOutcome,
+      "outcome reads must not fall back to persisted App Server history",
+    );
     const beforeLive = desktopConnections;
     assert.equal((await request("taskboard/remote/read", { threadId: "live-remote" })).revision, 0);
     await new Promise((resolve) => realSetTimeout(resolve, 60));
@@ -353,6 +408,26 @@ process.on('SIGTERM',()=>setTimeout(()=>{if(lock && fs.existsSync(lock)) fs.unli
       helperMethodsBeforeImage,
       "review must only follow Desktop and must not initialize or resume a helper thread",
     );
+    // The same existing Desktop thread may still have reviewer=user saved.
+    // Each task turn must use the current project config, without relaxing its sandbox.
+    for (const [cwd, reviewer] of [
+      ["/auto", "auto_review"],
+      ["/ask", "user"],
+      ["/legacy", "auto_review"],
+      ["/unset", undefined],
+    ]) {
+      await request("turn/start", { threadId: "desktop-thread", cwd, input: [] });
+      const sent = desktopRequests.at(-1);
+      assert.equal(sent.method, "turn/start");
+      assert.equal(sent.params.approvalsReviewer, reviewer);
+      for (const key of ["approvalPolicy", "sandbox", "sandboxPolicy"])
+        assert.equal(Object.hasOwn(sent.params, key), false);
+    }
+    for (const cwd of ["/invalid", "/config-error"]) {
+      const before = desktopRequests.length;
+      await assert.rejects(request("turn/start", { threadId: "desktop-thread", cwd, input: [] }));
+      assert.equal(desktopRequests.length, before, "configuration errors must not dispatch a turn");
+    }
     await request("thread/unsubscribe", { threadId: "desktop-thread" });
     assert.equal(desktopStopped, true);
     await request("thread/start", { cwd: "thread-a" });

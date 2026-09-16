@@ -72,7 +72,7 @@ import {
   submitTaskJob,
 } from "./api";
 import { useProjectEvents, visibleRealtimeState } from "./event-feed";
-import { isJobActive, isJobCancelable } from "./job-status";
+import { isJobActive, isJobCancelable, isJobReconciling, executionNotice } from "./job-status";
 import { executionAvailability } from "./execution-availability";
 import { jobStatusLabel, useUiCopy } from "./locale";
 import { SfSymbol } from "./sf-symbol";
@@ -181,6 +181,7 @@ export function BoardPage({
   const [selectedTaskId, setSelectedTaskId] = useState<string | undefined>(
     () => new URL(window.location.href).searchParams.get("task") ?? undefined,
   );
+  const [taskCreateOpen, setTaskCreateOpen] = useState(false);
   const [taskCreateProject, setTaskCreateProject] = useState<ProjectView>();
   const [tagManagerOpen, setTagManagerOpen] = useState(false);
   const [gitManagerOpen, setGitManagerOpen] = useState(false);
@@ -417,7 +418,10 @@ export function BoardPage({
                   className="button button--primary"
                   type="button"
                   disabled={!canCreateTask || realtime === "offline"}
-                  onClick={() => setTaskCreateProject(selectedProject)}
+                  onClick={() => {
+                    if (!taskCreateProject) setTaskCreateProject(selectedProject);
+                    setTaskCreateOpen(true);
+                  }}
                 >
                   <Plus aria-hidden="true" />
                   {copy.newTask}
@@ -532,12 +536,14 @@ export function BoardPage({
 
       {taskCreateProject ? (
         <TaskCreateDialog
+          open={taskCreateOpen}
           project={currentTaskCreateProject ?? taskCreateProject}
           projects={taskCreationProjects}
           csrfToken={session.csrfToken}
           mutationsEnabled={canSubmitTaskCreation}
-          onClose={() => setTaskCreateProject(undefined)}
+          onClose={() => setTaskCreateOpen(false)}
           onCreated={(task) => {
+            setTaskCreateProject(undefined);
             setSelectedTaskId(task.id);
             setNotice(undefined);
           }}
@@ -1007,6 +1013,8 @@ function CodexExecutionPanel({
     enabled: Boolean(current),
     refetchInterval: 2_000,
   });
+  const reconciling = isJobReconciling(current);
+  const notice = executionNotice(current);
   const retryCancel =
     current?.status === "canceling" &&
     Boolean(current.errorCode) &&
@@ -1017,6 +1025,7 @@ function CodexExecutionPanel({
   const hasStartedTurn = threadState === "started" || Boolean(current);
   const availability = executionAvailability({
     hasStarted: hasStartedTurn,
+    reconciling,
     ...(current ? { status: current.status } : {}),
     pendingComments:
       workspace.data?.comments.some(
@@ -1066,7 +1075,7 @@ function CodexExecutionPanel({
         </div>
         {current ? (
           <span className={`job-status job-status--${current.status}`}>
-            {jobStatusLabel(current.status)}
+            {reconciling ? "同步中" : jobStatusLabel(current.status)}
           </span>
         ) : null}
       </header>
@@ -1128,11 +1137,13 @@ function CodexExecutionPanel({
           }}
         >
           <Square aria-hidden="true" />
-          {retryCancel
-            ? "重试取消执行"
-            : current?.status === "canceling"
-              ? "取消中…"
-              : copy.cancelExecution}
+          {reconciling
+            ? "取消执行"
+            : retryCancel
+              ? "重试取消执行"
+              : current?.status === "canceling"
+                ? "取消中…"
+                : copy.cancelExecution}
         </button>
       </div>
       {availability.reason && (
@@ -1154,14 +1165,8 @@ function CodexExecutionPanel({
       ) : null}
 
       <Notice
-        message={
-          current?.errorSummary
-            ? current.errorCode === "MODEL_AT_CAPACITY"
-              ? "模型暂时繁忙，请稍后重试。"
-              : "任务执行失败，请重试。"
-            : null
-        }
-        tone={current?.errorCode === "MODEL_AT_CAPACITY" ? "info" : "error"}
+        message={notice?.message ?? null}
+        tone={notice?.tone ?? "info"}
         eventKey={current?.id}
       />
     </section>

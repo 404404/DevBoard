@@ -41,31 +41,12 @@ export function RemoteImages({ threadId, item }: { threadId: string; item: Remot
           );
         })}
       </div>
-      {selected && <ImagePreview image={selected} onClose={() => setSelected(undefined)} />}
+      {selected && <RemoteImagePreview image={selected} onClose={() => setSelected(undefined)} />}
     </>
   );
 }
 
-export function RemoteAttachmentImage({ id, name }: { id: string; name: string }) {
-  const [failed, setFailed] = useState(false);
-  const [preview, setPreview] = useState(false);
-  const url = `/api/v1/remote/uploads/${encodeURIComponent(id)}/preview`;
-  return (
-    <>
-      <button
-        className="remote-attachment-image"
-        type="button"
-        aria-label={`查看图片 ${name}`}
-        onClick={() => setPreview(true)}
-      >
-        {failed ? <span>图片</span> : <img src={url} alt={name} onError={() => setFailed(true)} />}
-      </button>
-      {preview && <ImagePreview image={{ url, name }} onClose={() => setPreview(false)} />}
-    </>
-  );
-}
-
-function ImagePreview({
+export function RemoteImagePreview({
   image,
   onClose,
 }: {

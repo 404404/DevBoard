@@ -3,7 +3,7 @@ import { userErrorMessage } from "./user-error";
 import { TaskBranchProperty } from "./task-branch-property";
 import { Notice } from "./notification-center";
 import { notify } from "./notifications";
-import type { ProjectKind, SessionView, TaskView } from "@codexboard/contracts";
+import type { ProjectKind, SessionView, TaskLifecycleView, TaskView } from "@codexboard/contracts";
 import { ALL_PROJECT_ID } from "@codexboard/contracts";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -59,11 +59,40 @@ interface DetailProps {
 }
 
 export function TaskDetail(props: DetailProps) {
+  const { taskId, onClose } = props;
+  // Keep the requested operation above the editor: terminal task updates remount it.
+  const [completion, setCompletion] = useState<{ taskId: string; operationId: string }>();
+  const closedOperation = useRef<string | undefined>(undefined);
+  const onLifecycleAccepted = (operation: TaskLifecycleView) => {
+    if (operation.targetStatus === "canceled") {
+      props.onClose();
+      return;
+    }
+    setCompletion({ taskId: operation.taskId, operationId: operation.id });
+  };
+  const lifecycle = useQuery({
+    queryKey: ["lifecycle", props.taskId],
+    queryFn: () => readTaskLifecycle(props.taskId),
+    enabled: completion?.taskId === props.taskId,
+    refetchInterval: completion?.taskId === props.taskId ? 2_000 : false,
+  });
   const query = useQuery({
     queryKey: ["task", props.taskId],
     queryFn: () => readTask(props.taskId),
     refetchInterval: 2_000,
   });
+  useEffect(() => {
+    if (
+      completion?.taskId === taskId &&
+      lifecycle.data?.id === completion.operationId &&
+      lifecycle.data.status === "succeeded" &&
+      query.data?.status === "done" &&
+      closedOperation.current !== completion.operationId
+    ) {
+      closedOperation.current = completion.operationId;
+      onClose();
+    }
+  }, [completion, lifecycle.data, query.data?.status, taskId, onClose]);
   if (!query.data)
     return (
       <section className="task-detail-page" aria-label="任务详情">
@@ -94,11 +123,18 @@ export function TaskDetail(props: DetailProps) {
       key={`${props.taskId}:${query.data.status === "done" || query.data.status === "canceled"}`}
       {...props}
       task={query.data}
+      onLifecycleAccepted={onLifecycleAccepted}
     />
   );
 }
 
-function TaskDetailEditor({ task, ...props }: DetailProps & { readonly task: TaskView }) {
+function TaskDetailEditor({
+  task,
+  ...props
+}: DetailProps & {
+  readonly task: TaskView;
+  readonly onLifecycleAccepted: (operation: TaskLifecycleView) => void;
+}) {
   const queryClient = useQueryClient();
   const [save] = useState(
     () =>
@@ -321,6 +357,11 @@ function TaskDetailEditor({ task, ...props }: DetailProps & { readonly task: Tas
         onClickCapture={
           terminal
             ? (event) => {
+                if (
+                  event.target instanceof Element &&
+                  event.target.closest("a[href], .attachment-preview")
+                )
+                  return;
                 event.preventDefault();
                 event.stopPropagation();
               }
@@ -329,6 +370,11 @@ function TaskDetailEditor({ task, ...props }: DetailProps & { readonly task: Tas
         onKeyDownCapture={
           terminal
             ? (event) => {
+                if (
+                  event.target instanceof Element &&
+                  event.target.closest("a[href], .attachment-preview")
+                )
+                  return;
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
                   event.stopPropagation();
@@ -489,7 +535,9 @@ function TaskDetailEditor({ task, ...props }: DetailProps & { readonly task: Tas
                     !state.pending &&
                     !state.dirty,
                 )}
-              {hasCommentDrafts && <p className="muted">请先保存或放弃评论草稿，再操作任务。</p>}
+              {hasCommentDrafts && (
+                <p className="execution-availability-hint">请先保存或放弃评论草稿，再操作任务。</p>
+              )}
               <TaskLifecycleActions
                 task={state.task}
                 csrfToken={props.csrfToken}
@@ -504,7 +552,7 @@ function TaskDetailEditor({ task, ...props }: DetailProps & { readonly task: Tas
                   !lifecycle.isPending &&
                   !lifecycle.isError
                 }
-                onAccepted={props.onClose}
+                onAccepted={props.onLifecycleAccepted}
                 onInitiate={() => changeProperty("status", { status: "todo" })}
                 initiateEnabled={writable && !lifecycle.isPending && !lifecycle.isError}
                 operation={lifecycle.data}

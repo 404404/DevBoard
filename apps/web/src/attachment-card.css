@@ -1,0 +1,134 @@
+.attachment-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 240px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-muted);
+}
+.attachment-card[data-error="true"] {
+  border-color: #e5484d;
+}
+.attachment-card .attachment-card-open {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-decoration: none;
+  text-align: left;
+}
+.attachment-card-open img,
+.attachment-card-icon {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 7px;
+  object-fit: cover;
+  background: var(--surface);
+}
+.attachment-card-icon {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 10px;
+}
+.attachment-card .attachment-card-text {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.attachment-card .attachment-card-text strong,
+.attachment-card .attachment-card-text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attachment-card .attachment-card-text strong {
+  font-size: 12px;
+}
+.attachment-card .attachment-card-text small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.attachment-card .attachment-card-remove {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #e5484d;
+  color: white;
+}
+.comment-pending-files > li:has(.attachment-card) {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.inline-attachments .attachment-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.attachment-preview {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  font-size: var(--control-font-size);
+  max-width: min(960px, 94vw);
+  max-height: 90vh;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+}
+.attachment-preview::backdrop {
+  background: #0009;
+}
+.attachment-preview-content {
+  display: grid;
+  gap: 12px;
+}
+.attachment-preview-content header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.attachment-preview-content header strong {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.attachment-preview-content > .button {
+  justify-self: start;
+}
+.attachment-preview-content > img {
+  display: block;
+  max-width: 100%;
+  max-height: 65vh;
+  object-fit: contain;
+  margin: auto;
+}
+
+.remote-attachment-list > .attachment-card {
+  flex: 0 0 auto;
+}
+.remote-attachment-list .attachment-card-remove .sf-symbol {
+  color: white;
+  width: 14px;
+  height: 14px;
+}

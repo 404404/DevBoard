@@ -159,3 +159,28 @@ it("全部项目的游标通知触发受鉴权重读，普通项目不因其他�
   expect(cursorInvalidationKeys(ALL_PROJECT_ID)).toEqual(fullRefreshQueryKeys(ALL_PROJECT_ID));
   expect(cursorInvalidationKeys(projectId)).toEqual([]);
 });
+
+it("refreshes replies and project context options after conversation synchronization", () => {
+  const projectId = "project";
+  const taskId = "task";
+  const base = {
+    revision: 1,
+    aggregateId: taskId,
+    safePayload: { projectId, taskId },
+    createdAt: "2026-09-16T00:00:00.000Z",
+  };
+  expect(
+    eventInvalidationKeys(projectId, {
+      ...base,
+      aggregateType: "task",
+      eventType: "task.workspace_synced",
+    }),
+  ).toContainEqual(["task-creation-options", projectId]);
+  expect(
+    eventInvalidationKeys(projectId, {
+      ...base,
+      aggregateType: "job",
+      eventType: "codex.history_synced",
+    }),
+  ).toContainEqual(["workspace", taskId]);
+});

@@ -1,3 +1,4 @@
+import { AttachmentCard, FileAttachmentCard } from "./attachment-card";
 import { QueryNotice } from "./query-notice";
 import { userErrorMessage } from "./user-error";
 import { sameIdentity } from "@codexboard/contracts";
@@ -91,6 +92,7 @@ export function TaskWorkspacePanel({
         attachments={workspace.data.attachments}
         activities={workspace.data.activities}
         comments={workspace.data.comments}
+        commentsMutable={workspace.data.executionSummary.active === 0}
         taskId={task.id}
         actor={actor}
         csrfToken={csrfToken}
@@ -118,6 +120,7 @@ export function TaskWorkspacePanel({
 }
 
 function CommentsSection({
+  commentsMutable,
   attachments,
   activities,
   comments,
@@ -130,6 +133,7 @@ function CommentsSection({
 }: {
   readonly attachments: readonly AttachmentView[];
   readonly activities: readonly ActivityView[];
+  readonly commentsMutable: boolean;
   readonly comments: readonly CommentView[];
   readonly taskId: string;
   readonly actor: PrincipalView;
@@ -227,7 +231,7 @@ function CommentsSection({
                   )}
                   actor={actor}
                   csrfToken={csrfToken}
-                  writable={writable}
+                  writable={writable && commentsMutable}
                   onChanged={onChanged}
                   onDraftChange={onDraftChange}
                 />
@@ -257,17 +261,11 @@ function CommentsSection({
                 <ul className="comment-pending-files" aria-label="待发送附件">
                   {files.map((entry) => (
                     <li key={entry.key}>
-                      <Paperclip aria-hidden="true" />
-                      <span>
-                        {entry.file.name}
-                        <small>{formatBytes(entry.file.size)}</small>
-                      </span>
-                      <button
-                        type="button"
-                        className="icon-button"
-                        aria-label={`移除待发送附件 ${entry.file.name}`}
-                        disabled={create.isPending || removingFile}
-                        onClick={async () => {
+                      <FileAttachmentCard
+                        file={entry.file}
+                        removeLabel={`移除待发送附件 ${entry.file.name}`}
+                        removeDisabled={create.isPending || removingFile}
+                        onRemove={async () => {
                           setRemovingFile(true);
                           setFileError("");
                           try {
@@ -282,9 +280,7 @@ function CommentsSection({
                             setRemovingFile(false);
                           }
                         }}
-                      >
-                        <Trash2 aria-hidden="true" />
-                      </button>
+                      />
                     </li>
                   ))}
                 </ul>
@@ -438,7 +434,7 @@ function CommentItem({
   }, [onDraftChange, comment.id, commentDirty]);
   const owned =
     writable &&
-    comment.source !== "codex" &&
+    (comment.source === undefined || comment.source === "user") &&
     !comment.executedAt &&
     actor.identity.kind !== "service" &&
     sameIdentity(comment.author?.identity, actor.identity) &&
@@ -449,13 +445,19 @@ function CommentItem({
         {comment.source === "codex" ? (
           <img className="system-activity-avatar" src={codexDesktopIcon} alt="" />
         ) : (
-          <PersonAvatar person={comment.author} />
+          <PersonAvatar
+            person={comment.source === "desktop" ? { name: "Desktop 用户" } : comment.author}
+          />
         )}
         <strong>
-          {comment.source === "codex" ? "Codex" : (comment.author?.name ?? copy.deletedUser)}
+          {comment.source === "codex"
+            ? "Codex"
+            : comment.source === "desktop"
+              ? "Desktop 用户"
+              : (comment.author?.name ?? copy.deletedUser)}
         </strong>
         <small>{new Date(comment.createdAt).toLocaleString("zh-CN")}</small>
-        {comment.source === "codex" && comment.codexThreadId && (
+        {(comment.source === "codex" || comment.source === "desktop") && comment.codexThreadId && (
           <a
             className="comment-codex-link"
             href={`codex://threads/${encodeURIComponent(comment.codexThreadId)}`}
@@ -467,7 +469,7 @@ function CommentItem({
           <small title="此评论已提交执行，不能编辑或删除">已执行</small>
         )}
       </header>
-      {editing ? (
+      {editing && owned ? (
         <textarea
           autoFocus
           aria-label={copy.editComment}
@@ -550,7 +552,14 @@ function CommentItem({
                 <SfSymbol name="ellipsis" size={18} />
               </button>
               {menuOpen && (
-                <div className="comment-menu-options" role="menu" aria-label="评论操作菜单">
+                <div
+                  className="comment-menu-options"
+                  role="menu"
+                  aria-label="评论操作菜单"
+                  // Safari does not focus clicked buttons. Keep focus inside the menu
+                  // until click runs, otherwise onBlur removes the action first.
+                  onMouseDown={(event) => event.preventDefault()}
+                >
                   <button
                     type="button"
                     role="menuitem"
@@ -660,7 +669,6 @@ export function TaskDescriptionAttachments({
                 }}
               />
             </label>
-            <small>可直接粘贴或拖入文件</small>
           </div>
         ) : null,
       )}
@@ -703,7 +711,6 @@ function AttachmentsSection({
   readonly label?: string;
 }) {
   const copy = useUiCopy();
-  const [preview, setPreview] = useState<(typeof attachments)[number] | null>(null);
   const remove = useMutation({
     mutationFn: (id: string) => deleteAttachment(id, csrfToken),
     onSuccess: onChanged,
@@ -713,101 +720,24 @@ function AttachmentsSection({
       <div className="attachment-list">
         {attachments.length > 0 &&
           attachments.map((attachment) => (
-            <div className="attachment-row" key={attachment.id}>
-              <a
-                href={attachment.downloadUrl}
-                onClick={(event) => {
-                  if (attachment.contentType.startsWith("image/")) {
-                    event.preventDefault();
-                    setPreview(attachment);
-                  }
-                }}
-              >
-                <span>
-                  <strong>{attachment.filename}</strong>
-                  <small>
-                    {formatBytes(attachment.sizeBytes)} ·{" "}
-                    {attachment.uploader?.name ?? copy.unknown}
-                  </small>
-                </span>
-                <Paperclip aria-hidden="true" />
-              </a>
-              {writable && (
-                <button
-                  type="button"
-                  className="icon-button"
-                  aria-label={`删除附件 ${attachment.filename}`}
-                  disabled={remove.isPending}
-                  onClick={() => remove.mutate(attachment.id)}
-                >
-                  <Trash2 aria-hidden="true" />
-                </button>
-              )}
-            </div>
+            <AttachmentCard
+              key={attachment.id}
+              name={attachment.filename}
+              size={attachment.sizeBytes}
+              imageUrl={
+                attachment.contentType.startsWith("image/")
+                  ? `${attachment.downloadUrl}?preview=1`
+                  : undefined
+              }
+              downloadUrl={attachment.downloadUrl}
+              onRemove={writable ? () => remove.mutate(attachment.id) : undefined}
+              removeDisabled={remove.isPending}
+            />
           ))}
       </div>
-      {preview && <ImagePreview attachment={preview} onClose={() => setPreview(null)} />}
       {remove.isError ? (
         <Notice message={message(remove.error, copy.operationFailed)} eventKey={remove.error} />
       ) : null}
     </div>
-  );
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1_024) return `${bytes} B`;
-  if (bytes < 1_048_576) return `${(bytes / 1_024).toFixed(1)} KB`;
-  return `${(bytes / 1_048_576).toFixed(1)} MB`;
-}
-
-function ImagePreview({
-  attachment,
-  onClose,
-}: {
-  readonly attachment: import("@codexboard/contracts").AttachmentView;
-  readonly onClose: () => void;
-}) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    const element = dialog.current;
-    element?.showModal();
-    return () => element?.close();
-  }, []);
-  return (
-    <dialog
-      ref={dialog}
-      className="attachment-preview"
-      aria-label={`预览图片 ${attachment.filename}`}
-      onCancel={onClose}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div className="attachment-preview-content">
-        <header>
-          <strong>{attachment.filename}</strong>
-          <button
-            autoFocus
-            className="icon-button"
-            type="button"
-            aria-label="关闭图片预览"
-            onClick={onClose}
-          >
-            <SfSymbol name="xmark" size={18} />
-          </button>
-        </header>
-        {failed ? (
-          <Notice message="图片加载失败，可下载后查看。" />
-        ) : (
-          <img
-            src={`${attachment.downloadUrl}?preview=1`}
-            alt={attachment.filename}
-            onError={() => setFailed(true)}
-          />
-        )}
-        <a href={attachment.downloadUrl}>下载原图</a>
-      </div>
-    </dialog>
   );
 }

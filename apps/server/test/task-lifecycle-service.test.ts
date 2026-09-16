@@ -2,7 +2,7 @@ import { identityKey } from "@codexboard/contracts";
 import { seedFeishuTestActor, TEST_FEISHU_ACTOR } from "./helpers/identity.js";
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -186,7 +186,7 @@ it.each(["backlog", "todo", "in_progress", "in_review", "blocked"] as const)(
   },
 );
 
-it("uses execution fingerprints to commit completed task work and records its recoverable SHA", async () => {
+it("requires a clean main checkout even with execution evidence and never commits changes", async () => {
   const { database, taskboard, task, queue } = setup();
   const root = mkdtempSync(join(tmpdir(), "lifecycle-evidence-"));
   roots.push(root);
@@ -228,10 +228,18 @@ it("uses execution fingerprints to commit completed task work and records its re
     { expectedVersion: taskboard.readTask(task.id, actor).version, targetStatus: "done" },
     context(),
   );
+  await expect(service.wait(operation.id)).rejects.toThrow("Git 不干净");
+  expect(taskboard.readTask(task.id, actor).status).toBe("in_review");
+  expect(git("status", "--porcelain")).not.toBe("");
+  expect(git("show", "HEAD:app.txt")).toBe("initial");
+  git("commit", "-am", "user commits changes");
+  service.request(
+    task.id,
+    { expectedVersion: taskboard.readTask(task.id, actor).version, targetStatus: "done" },
+    context(),
+  );
   expect((await service.wait(operation.id)).task.status).toBe("done");
-  expect(git("status", "--porcelain")).toBe("");
-  expect(service.readLatest(task.id, actor)?.commitSha).toBe(git("rev-parse", "HEAD"));
-  expect(git("show", "HEAD:app.txt")).toBe("implemented");
+  expect(service.readLatest(task.id, actor)?.commitSha).toBeNull();
 });
 
 it("rejects terminal operations on an archived project", () => {
@@ -297,7 +305,7 @@ it("checks project mutability before replayed Git work", async () => {
     database,
     taskboard,
     queue,
-    gitFinalizer: { inspect, commit: vi.fn(), cleanup: vi.fn() },
+    gitFinalizer: { inspect, verify: vi.fn() },
     scheduleExecution: () => {},
   });
   const ctx = context();
@@ -310,62 +318,6 @@ it("checks project mutability before replayed Git work", async () => {
   service.request(task.id, command, ctx);
   await expect(service.wait(first.id)).rejects.toThrow("归档");
   expect(inspect).toHaveBeenCalledTimes(1);
-});
-
-it("preserves a worktree referenced by another task secondary thread", async () => {
-  const { database, taskboard, task, queue } = setup();
-  database
-    .prepare("UPDATE projects SET workspace_realpath = '/tmp' WHERE id = ?")
-    .run(task.projectId);
-  const other = taskboard.createTask(
-    CreateTaskCommandSchema.parse({ projectId: task.projectId, title: "其他任务" }),
-    context(),
-  ).task;
-  database
-    .prepare(
-      "INSERT INTO task_threads (id, task_id, thread_id, cwd, is_primary) VALUES (?, ?, ?, '/other/workspace', 1)",
-    )
-    .run(randomUUID(), other.id, randomUUID());
-  database
-    .prepare(
-      "INSERT INTO task_threads (id, task_id, thread_id, cwd, is_primary) VALUES (?, ?, ?, '/tmp', 0)",
-    )
-    .run(randomUUID(), other.id, randomUUID());
-  const snapshot = {
-    cwd: "/private/tmp",
-    mainCwd: "/private/tmp",
-    commonDirectory: "/private/tmp",
-    branch: "feature/task",
-    initialHead: "before",
-    taskId: task.id,
-    archiveRef: "refs/taskboard/test",
-    protectedCheckout: false,
-    commitSha: null,
-    worktreeRemoved: false,
-    branchRemoved: false,
-    notes: [],
-    verifiedFingerprint: null,
-  };
-  const committed = { ...snapshot, commitSha: "after" };
-  const cleanup = vi.fn().mockResolvedValue(committed);
-  const service = new TaskLifecycleService({
-    database,
-    taskboard,
-    queue,
-    gitFinalizer: {
-      inspect: vi.fn().mockResolvedValue(snapshot),
-      commit: vi.fn().mockResolvedValue(committed),
-      cleanup,
-    },
-    scheduleExecution: () => {},
-  });
-  const op = service.request(
-    task.id,
-    { expectedVersion: task.version, targetStatus: "done" },
-    context(),
-  );
-  await service.wait(op.id);
-  expect(cleanup).toHaveBeenCalledWith(committed, true);
 });
 
 it("completes a non-Git task directory and preserves its deliverables", async () => {
@@ -465,4 +417,121 @@ it("keeps description locked after an earlier success even when the latest run f
       context(),
     ),
   ).toThrow("任务描述已锁定");
+});
+
+it.each(["legacy", "context"])(
+  "checks externally deleted worktrees using %s metadata without a receipt",
+  async (source) => {
+    const { database, taskboard, task, queue } = setup();
+    const root = mkdtempSync(join(tmpdir(), "lifecycle-check-only-"));
+    roots.push(root);
+    const main = join(root, "main");
+    const worktree = join(root, "task");
+    mkdirSync(main);
+    const git = (...args: string[]) =>
+      execFileSync("git", ["-C", main, ...args], { encoding: "utf8" }).trim();
+    git("init", "-b", "main");
+    git("config", "user.name", "Test");
+    git("config", "user.email", "test@example.test");
+    writeFileSync(join(main, "source.txt"), "initial");
+    git("add", ".");
+    git("commit", "-m", "initial");
+    git("worktree", "add", "-b", "feature/task", worktree);
+    database
+      .prepare("UPDATE projects SET workspace_realpath = ? WHERE id = ?")
+      .run(main, task.projectId);
+    database
+      .prepare("INSERT INTO task_threads (id,task_id,thread_id,cwd,is_primary) VALUES (?,?,?,?,1)")
+      .run(randomUUID(), task.id, randomUUID(), worktree);
+    const service = new TaskLifecycleService({
+      database,
+      taskboard,
+      queue,
+      gitFinalizer: new TaskGitFinalizer([root]),
+      scheduleExecution: () => {},
+    });
+    const operation = service.request(
+      task.id,
+      { expectedVersion: task.version, targetStatus: "done" },
+      context(),
+    );
+    await expect(service.wait(operation.id)).rejects.toThrow("工作树尚未删除");
+    expect(existsSync(worktree)).toBe(true);
+    expect(
+      database
+        .prepare("SELECT COUNT(*) FROM task_lifecycle_resources WHERE operation_id = ?")
+        .pluck()
+        .get(operation.id),
+    ).toBe(0);
+    if (source === "context") {
+      const contextId = randomUUID();
+      database
+        .prepare(
+          `INSERT INTO project_development_contexts
+      (id, project_id, context_key, kind, label, branch, worktree_realpath, active, scanned_at)
+      VALUES (?, ?, ?, 'worktree', 'task', 'feature/task', ?, 0, ?)`,
+        )
+        .run(contextId, task.projectId, contextId, worktree, new Date().toISOString());
+      database
+        .prepare("UPDATE tasks SET development_context_json = ? WHERE id = ?")
+        .run(JSON.stringify({ id: contextId }), task.id);
+    }
+    // A persisted old checkpoint must not resume commits or depend on an archive/delivery ref.
+    database
+      .prepare(
+        "UPDATE task_lifecycle_operations SET phase = 'cleaning', snapshot_json = ? WHERE id = ?",
+      )
+      .run(
+        JSON.stringify({
+          cwd: worktree,
+          branch: "feature/task",
+          commitSha: "old-sha",
+          archiveRef: "refs/old",
+        }),
+        operation.id,
+      );
+    git("worktree", "remove", worktree);
+    service.request(task.id, { expectedVersion: task.version, targetStatus: "done" }, context());
+    await expect(service.wait(operation.id)).rejects.toThrow("分支尚未删除");
+    git("branch", "-d", "feature/task");
+    if (source === "context")
+      database
+        .prepare("UPDATE task_lifecycle_operations SET snapshot_json = NULL WHERE id = ?")
+        .run(operation.id);
+    service.request(task.id, { expectedVersion: task.version, targetStatus: "done" }, context());
+    expect((await service.wait(operation.id)).task.status).toBe("done");
+    expect(service.readLatest(task.id, actor)).toMatchObject({
+      status: "succeeded",
+      phase: "completed",
+      commitSha: null,
+      archiveRef: null,
+    });
+    expect(git("for-each-ref", "--format=%(refname)", "refs/taskboard")).toBe("");
+  },
+);
+
+it("releases legacy failed completion locks on restart so Git cleanup remains available", async () => {
+  const { database, task, service } = setup();
+  database
+    .prepare("UPDATE projects SET workspace_realpath = '/missing-worktree' WHERE id = ?")
+    .run(task.projectId);
+  const operation = service.request(
+    task.id,
+    { targetStatus: "done", expectedVersion: task.version },
+    context(),
+  );
+  await expect(service.wait(operation.id)).rejects.toThrow();
+  database
+    .prepare(
+      "INSERT INTO task_lifecycle_resources (resource_key, operation_id) VALUES ('repo:/old', ?)",
+    )
+    .run(operation.id);
+  await service.resumePending();
+  expect(
+    database
+      .prepare("SELECT COUNT(*) FROM task_lifecycle_resources WHERE operation_id = ?")
+      .pluck()
+      .get(operation.id),
+  ).toBe(0);
+  expect(service.readLatest(task.id, actor)?.status).toBe("failed");
 });

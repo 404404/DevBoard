@@ -72,10 +72,18 @@ function validDateRange(value: {
   return new Date(value.startAt).getTime() <= new Date(value.dueAt).getTime();
 }
 
+export const TaskModelOptionsSchema = z.strictObject({
+  model: z.string().trim().min(1).max(200),
+  effort: z.string().trim().min(1).max(80),
+  serviceTier: z.string().trim().min(1).max(80).nullable(),
+});
+export type TaskModelOptions = z.infer<typeof TaskModelOptionsSchema>;
+
 export const CreateTaskCommandSchema = z
   .strictObject({
     projectId: EntityIdSchema,
     title: TaskTitleSchema,
+    modelOptions: TaskModelOptionsSchema.optional(),
     description: TaskDescriptionSchema.default(""),
     status: TaskStatusSchema.default("backlog"),
     priority: TaskPrioritySchema.default("none"),

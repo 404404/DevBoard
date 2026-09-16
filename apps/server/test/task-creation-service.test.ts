@@ -165,6 +165,28 @@ describe("Task creation service", () => {
     });
   });
 
+  it("persists model options with the draft and replays creation without reprovisioning", async () => {
+    const { database, project, provisioner, service } = setup();
+    const modelOptions = { model: "test-model", effort: "high", serviceTier: "priority" };
+    const command = CreateTaskCommandSchema.parse({
+      projectId: project.id,
+      title: "模型选择",
+      modelOptions,
+    });
+    const result = await service.create(command, context("model-options"));
+    expect(provisioner.created).toEqual([expect.objectContaining({ modelOptions })]);
+    const restartedQueue = new ExecutionQueue({ database });
+    expect(restartedQueue.primaryThread(result.task.id)?.modelOptions).toEqual(modelOptions);
+    await service.create(command, context("model-options"));
+    expect(provisioner.created).toHaveLength(1);
+    await expect(
+      service.create(
+        { ...command, modelOptions: { ...modelOptions, effort: "low" } },
+        context("model-options"),
+      ),
+    ).rejects.toThrow();
+  });
+
   it("creates a temporary task in Codex Recent without a source folder", async () => {
     const { provisioner, queue, service } = setup();
 

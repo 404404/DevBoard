@@ -1,3 +1,5 @@
+import { hasActiveDesktopTurn } from "./desktop-execution-state.js";
+import { assertCommentsMutable } from "./comment-mutation-guard.js";
 import { identityKey, identityFromKey, IdentityKeySchema } from "@codexboard/contracts";
 import { createHash, randomUUID } from "node:crypto";
 
@@ -271,6 +273,7 @@ export class TaskWorkspace {
       WorkspaceMutationResultSchema(CommentViewSchema),
       () => {
         assertTaskDeletionAvailable(this.#database, visible.taskId);
+        assertCommentsMutable(this.#database, visible.taskId);
         const current = this.#readCommentRow(commentId);
         if (current.executedAt)
           throw new AppError("INVALID_REQUEST", 409, "已用于执行的评论不能编辑或删除");
@@ -328,6 +331,7 @@ export class TaskWorkspace {
       WorkspaceMutationResultSchema(CommentViewSchema),
       () => {
         assertTaskDeletionAvailable(this.#database, visible.taskId);
+        assertCommentsMutable(this.#database, visible.taskId);
         const current = this.#readCommentRow(commentId);
         if (current.executedAt)
           throw new AppError("INVALID_REQUEST", 409, "已用于执行的评论不能编辑或删除");
@@ -518,7 +522,10 @@ export class TaskWorkspace {
       activities,
       executionSummary: {
         total: jobs.length,
-        active: jobs.filter((job) => ACTIVE_JOB_STATUSES.includes(job.status as never)).length,
+        active: Math.max(
+          jobs.filter((job) => ACTIVE_JOB_STATUSES.includes(job.status as never)).length,
+          hasActiveDesktopTurn(this.#database, taskId) ? 1 : 0,
+        ),
         latest: jobs[0] ?? null,
       },
     });
@@ -681,21 +688,22 @@ export class TaskWorkspace {
       )
       .pluck()
       .all(taskId) as string[];
-    // Keep all messages in the event log, but only expose explicitly classified
-    // final answers as comments. Missing phase is not evidence of a final answer.
+    // Desktop user messages are read-only event projections; assistant messages
+    // require an explicit final-answer phase. Neither becomes a pending comment.
     const replies = this.#database
       .prepare(
         `
-      SELECT job_events.id, job_events.summary, job_events.safe_payload_json AS payload,
+      SELECT job_events.id, job_events.kind, job_events.summary, job_events.safe_payload_json AS payload,
         job_events.created_at AS createdAt, task_threads.thread_id AS codexThreadId
       FROM job_events JOIN jobs ON jobs.id = job_events.job_id
       LEFT JOIN task_threads ON task_threads.id = jobs.task_thread_id
-      WHERE jobs.task_id = ? AND job_events.kind = 'codex.agent_message'
+      WHERE jobs.task_id = ? AND job_events.kind IN ('codex.agent_message', 'codex.user_message')
       ORDER BY job_events.created_at, jobs.queued_at, job_events.seq
     `,
       )
       .all(taskId) as {
       id: string;
+      kind: string;
       summary: string;
       payload: string;
       createdAt: string;
@@ -703,14 +711,15 @@ export class TaskWorkspace {
     }[];
     const codexComments = replies.flatMap((reply) => {
       const payload = JSON.parse(reply.payload) as Record<string, unknown>;
-      if (payload.phase !== "final_answer") return [];
+      const desktop = reply.kind === "codex.user_message";
+      if (!desktop && payload.phase !== "final_answer") return [];
       const body = typeof payload.text === "string" ? payload.text : reply.summary;
       if (!body.trim()) return [];
       return [
         {
           id: reply.id,
           taskId,
-          source: "codex" as const,
+          source: desktop ? ("desktop" as const) : ("codex" as const),
           executedAt: null,
           codexThreadId: reply.codexThreadId,
           author: null,

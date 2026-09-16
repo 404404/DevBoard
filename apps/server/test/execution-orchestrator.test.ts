@@ -1,3 +1,8 @@
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { ProjectRegistry } from "../src/modules/project-registry/project-registry.js";
 import { identityKey } from "@codexboard/contracts";
 import { TEST_FEISHU_ACTOR, seedFeishuTestActor } from "./helpers/identity.js";
 import type { PrincipalView, JobView } from "@codexboard/contracts";
@@ -161,6 +166,109 @@ function submit(
   );
 }
 
+function uncertainFixture() {
+  const setupResult = setup();
+  const { queue } = setupResult;
+  const job = submit(queue);
+  queue.claimNext("old-worker");
+  queue.bindThread(job.id, "old-worker", { threadId: "codex-thread-1", cwd: "/workspace/project" });
+  queue.recordTurn(job.id, "old-worker", "original-turn");
+  queue.holdUncertain(job.id, "old-worker", "CODEX_OUTCOME_UNKNOWN", "connection lost");
+  const outcome = {
+    threadId: "codex-thread-1",
+    turnId: "original-turn",
+    status: "completed" as const,
+    events: [
+      {
+        cursor: "original-turn:item/completed:answer",
+        kind: "codex.agent_message",
+        summary: "真实完成结果",
+        safePayload: { text: "真实完成结果", phase: "final_answer" },
+      },
+    ],
+  };
+  return { ...setupResult, job, outcome };
+}
+
+describe("completion recovery", () => {
+  it.each([false, true])(
+    "recovers the original result once without executing again (restart=%s)",
+    async (restart) => {
+      const { queue, executor, orchestrator, workspace, job, outcome } = uncertainFixture();
+      if (restart) queue.recoverAfterRestart();
+      const readOutcome = vi.fn().mockResolvedValue(outcome);
+      Object.assign(executor, { readOutcome });
+      expect(await orchestrator.recoverUncertain()).toBe(1);
+      expect(await orchestrator.recoverUncertain()).toBe(0);
+      expect(readOutcome).toHaveBeenCalledWith({
+        jobId: job.id,
+        threadId: outcome.threadId,
+        turnId: outcome.turnId,
+      });
+      expect(queue.readJob(job.id)).toMatchObject({ status: "succeeded", errorCode: null });
+      const detail = workspace.readTaskWorkspace(TASK_ID, ACTOR);
+      expect(detail.task.status).toBe("in_review");
+      expect(detail.comments).toEqual([
+        expect.objectContaining({ source: "codex", author: null, body: "真实完成结果" }),
+      ]);
+      expect(executor.starts).toHaveLength(0);
+      expect(executor.continuations).toHaveLength(0);
+      expect(executor.interruptions).toHaveLength(0);
+    },
+  );
+  it.each(["missing", "error", "wrong-turn", "wrong-thread", "canceled", "canceled-during-read"])(
+    "preserves uncertain ownership when proof is insufficient or cancellation wins: %s",
+    async (mode) => {
+      const { queue, executor, orchestrator, job, outcome, workspace } = uncertainFixture();
+      const cancel = () =>
+        queue.requestCancel(job.id, { actor: ACTOR, idempotencyKey: crypto.randomUUID() });
+      if (mode === "canceled") cancel();
+      Object.assign(executor, {
+        readOutcome: async () => {
+          if (mode === "error") throw new Error("offline");
+          if (mode === "missing") return null;
+          if (mode === "canceled-during-read") cancel();
+          return {
+            ...outcome,
+            ...(mode === "wrong-turn" ? { turnId: "other" } : {}),
+            ...(mode === "wrong-thread" ? { threadId: "other" } : {}),
+          };
+        },
+      });
+      expect(await orchestrator.recoverUncertain()).toBe(0);
+      expect(queue.readJob(job.id).status).toBe("canceling");
+      expect(workspace.readTaskWorkspace(TASK_ID, ACTOR).comments).toHaveLength(0);
+    },
+  );
+  it("expires desktop-resolved approvals without inventing a decision and accepts the next request", async () => {
+    const { queue, interactions } = setup();
+    const job = submit(queue);
+    queue.claimNext("worker-test");
+    const pending = interactions.open(job.id, "worker-test", {
+      id: "first",
+      method: "item/commandExecution/requestApproval",
+      params: {},
+    });
+    const resolved = expect(pending.decision).rejects.toThrow("桌面处理");
+    interactions.resolveExternally(job.id, "worker-test", "first");
+    await resolved;
+    expect(interactions.read(pending.interaction.id)).toMatchObject({
+      status: "expired",
+      decision: null,
+      decidedBy: null,
+    });
+    expect(queue.readJob(job.id).status).toBe("running");
+    const next = interactions.open(job.id, "worker-test", {
+      id: "second",
+      method: "item/commandExecution/requestApproval",
+      params: {},
+    });
+    const stopped = expect(next.decision).rejects.toThrow();
+    interactions.cancelForJob(job.id);
+    await stopped;
+  });
+});
+
 describe("Codex execution orchestration", () => {
   it.each(["failed", "interrupted"] as const)(
     "keeps a capacity-stopped %s turn active until explicitly canceled, including after restart",
@@ -281,13 +389,13 @@ describe("Codex execution orchestration", () => {
     const job = submit(queue);
     const claimed = queue.claimNext("worker")!;
     expect(claimed.workContext.prompt).toContain("本轮需求");
-    expect(
+    expect(() =>
       workspace.updateComment(
         used.id,
         { expectedVersion: used.version, body: "修改后的本轮需求" },
         context(),
-      ).data.executedAt,
-    ).toBeNull();
+      ),
+    ).toThrow("任务执行中");
     const later = workspace.createComment(TASK_ID, { body: "下一轮需求" }, context()).data;
     // Even a concurrent status change must not make completion hide pending work.
     database.prepare("UPDATE tasks SET status = 'in_progress' WHERE id = ?").run(TASK_ID);
@@ -394,6 +502,25 @@ describe("Codex execution orchestration", () => {
         .all(TASK_ID),
     ).toEqual(["codex.thread_created"]);
   });
+
+  it.each([null, "priority"])(
+    "forwards durable model options to the draft execution (tier=%s)",
+    async (serviceTier) => {
+      const { database, queue, executor, orchestrator } = setup();
+      const modelOptions = { model: "test-model", effort: "high", serviceTier };
+      queue.bindDraftThread(TASK_ID, {
+        threadId: "codex-thread-1",
+        cwd: "/workspace/project",
+        modelOptions,
+      });
+      const restartedQueue = new ExecutionQueue({ database });
+      const submitted = submit(restartedQueue, "continue");
+      expect(submitted.workContext.modelOptions).toEqual(modelOptions);
+      await expect(orchestrator.runNext()).resolves.toMatchObject({ status: "succeeded" });
+      expect(executor.starts).toHaveLength(0);
+      expect(executor.continuations).toEqual([expect.objectContaining({ modelOptions })]);
+    },
+  );
 
   it("starts a thread and turn atomically, deduplicates events and advances only to review", async () => {
     const { database, queue, executor, orchestrator } = setup();
@@ -767,3 +894,459 @@ it.each(["preparation", "execution"] as const)(
     await expect(orchestrator.runNext()).resolves.toBeNull();
   },
 );
+
+describe("ended job conversation synchronization", () => {
+  function history() {
+    return {
+      threadId: "codex-thread-1",
+      turns: ["before", "original-turn", "follow-up"].map((id) => ({
+        id,
+        status: "completed",
+        workingDirectories: [],
+        events: [
+          {
+            cursor: `${id}:item/completed:answer`,
+            kind: "codex.agent_message",
+            summary: id,
+            safePayload: { text: id, phase: "final_answer" },
+          },
+        ],
+      })),
+    };
+  }
+
+  it("reconnects to history, fills late replies once, and preserves ended job state", async () => {
+    const { queue, executor, orchestrator, workspace, job, outcome } = uncertainFixture();
+    queue.completeRecovered(job.id, "worker-test", outcome);
+    const before = queue.readJob(job.id);
+    const readHistory = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValue(history());
+    Object.assign(executor, { readHistory });
+    await orchestrator.syncConversations();
+    await orchestrator.syncConversations();
+    await orchestrator.syncConversations();
+    expect(
+      workspace.readTaskWorkspace(TASK_ID, ACTOR).comments.map((comment) => comment.body),
+    ).toEqual(["真实完成结果", "follow-up"]);
+    expect(queue.readJob(job.id)).toMatchObject({
+      status: before.status,
+      completedAt: before.completedAt,
+      recoveryCheckpoint: before.recoveryCheckpoint,
+    });
+    expect(executor.starts).toHaveLength(0);
+    expect(executor.continuations).toHaveLength(0);
+  });
+
+  it.each([false, true])(
+    "syncs Desktop user messages exactly once during active turns, without replaying board prompts (active board job=%s)",
+    async (active) => {
+      const { queue, executor, orchestrator, workspace, job, outcome, database } =
+        uncertainFixture();
+      if (!active) queue.completeRecovered(job.id, "worker-test", outcome);
+      const user = (id: string, text: string, clientId?: string) => ({
+        cursor: `desktop-user:${id}`,
+        kind: "codex.user_message",
+        summary: text,
+        safePayload: {
+          text,
+          messageIds: [id],
+          itemType: "userMessage",
+          ...(clientId ? { clientId } : {}),
+        },
+      });
+      const snapshot = {
+        threadId: "codex-thread-1",
+        turns: [
+          {
+            id: "before",
+            status: "completed",
+            workingDirectories: [],
+            events: [user("unrelated", "before")],
+          },
+          {
+            id: "original-turn",
+            status: active ? "inProgress" : "completed",
+            workingDirectories: [],
+            events: [user("board", "duplicated board prompt", job.id)],
+          },
+          {
+            id: "desktop-next",
+            status: "inProgress",
+            workingDirectories: [],
+            events: [user("desktop", "Desktop 新补充")],
+          },
+        ],
+      };
+      Object.assign(executor, { readHistory: async () => snapshot });
+      const before = queue.readJob(job.id);
+      await orchestrator.syncConversations();
+      await orchestrator.syncConversations();
+      const comments = workspace.readTaskWorkspace(TASK_ID, ACTOR).comments;
+      expect(comments.filter((c) => c.source === "desktop")).toMatchObject([
+        { body: "Desktop 新补充", author: null, codexThreadId: "codex-thread-1" },
+      ]);
+      expect(
+        comments.some((c) => c.body === "duplicated board prompt" || c.body === "before"),
+      ).toBe(false);
+      expect(
+        database.prepare("SELECT count(*) FROM comments WHERE task_id = ?").pluck().get(TASK_ID),
+      ).toBe(0);
+      expect(queue.readJob(job.id)).toMatchObject({
+        status: before.status,
+        completedAt: before.completedAt,
+      });
+      expect(workspace.readTaskWorkspace(TASK_ID, ACTOR).executionSummary.active).toBeGreaterThan(
+        0,
+      );
+      snapshot.turns[2]!.status = "completed";
+      await orchestrator.syncConversations();
+      if (!active)
+        expect(workspace.readTaskWorkspace(TASK_ID, ACTOR).executionSummary.active).toBe(0);
+      expect(executor.starts).toHaveLength(0);
+      expect(executor.continuations).toHaveLength(0);
+    },
+  );
+
+  it.each(["completed", "failed", "interrupted"])(
+    "projects Desktop execution to task status through repeated turns ending as %s",
+    async (terminalStatus) => {
+      const { queue, executor, orchestrator, workspace, job, outcome, database } =
+        uncertainFixture();
+      queue.completeRecovered(job.id, "worker-test", outcome);
+      const snapshot = history();
+      snapshot.turns[2]!.status = "inProgress";
+      Object.assign(executor, { readHistory: async () => snapshot });
+      const originalJob = queue.readJob(job.id);
+      const task = () => workspace.readTaskWorkspace(TASK_ID, ACTOR).task;
+      for (const turnId of ["follow-up", "second-desktop-turn"]) {
+        snapshot.turns[2]!.id = turnId;
+        snapshot.turns[2]!.status = "inProgress";
+        const version = task().version;
+        await orchestrator.syncConversations();
+        expect(task()).toMatchObject({ status: "in_progress", version: version + 1 });
+        await orchestrator.syncConversations();
+        expect(task().version).toBe(version + 1);
+        snapshot.turns[2]!.status = terminalStatus;
+        await orchestrator.syncConversations();
+        expect(task()).toMatchObject({ status: "in_review", version: version + 2 });
+        await orchestrator.syncConversations();
+        expect(task().version).toBe(version + 2);
+      }
+      expect(queue.readJob(job.id)).toMatchObject({
+        status: originalJob.status,
+        completedAt: originalJob.completedAt,
+        recoveryCheckpoint: originalJob.recoveryCheckpoint,
+      });
+      expect(database.prepare("SELECT COUNT(*) FROM jobs").pluck().get()).toBe(1);
+      expect(
+        database
+          .prepare(
+            "SELECT COUNT(*) FROM activities WHERE json_extract(changes_json, '$.source') = 'desktop'",
+          )
+          .pluck()
+          .get(),
+      ).toBe(4);
+      expect(executor.starts).toHaveLength(0);
+      expect(executor.continuations).toHaveLength(0);
+    },
+  );
+
+  it("observes a fast completed Desktop turn once without overriding subsequent manual changes", async () => {
+    const { queue, executor, orchestrator, workspace, job, outcome, database } = uncertainFixture();
+    queue.completeRecovered(job.id, "worker-test", outcome);
+    database.prepare("UPDATE tasks SET status = 'todo' WHERE id = ?").run(TASK_ID);
+    const snapshot = history();
+    Object.assign(executor, { readHistory: async () => snapshot });
+    await orchestrator.syncConversations();
+    expect(workspace.readTaskWorkspace(TASK_ID, ACTOR).task.status).toBe("in_review");
+    database.prepare("UPDATE tasks SET status = 'todo' WHERE id = ?").run(TASK_ID);
+    await orchestrator.syncConversations();
+    expect(workspace.readTaskWorkspace(TASK_ID, ACTOR).task.status).toBe("todo");
+    snapshot.turns[2]!.id = "another-fast-turn";
+    await orchestrator.syncConversations();
+    expect(workspace.readTaskWorkspace(TASK_ID, ACTOR).task.status).toBe("in_review");
+  });
+
+  it("keeps Desktop execution active when history is unavailable and clears blocked origin on start", async () => {
+    const { queue, executor, orchestrator, workspace, job, outcome, database } = uncertainFixture();
+    queue.completeRecovered(job.id, "worker-test", outcome);
+    database
+      .prepare(
+        "UPDATE tasks SET status = 'blocked', blocked_from_status = 'in_review' WHERE id = ?",
+      )
+      .run(TASK_ID);
+    const snapshot = history();
+    snapshot.turns[2]!.status = "inProgress";
+    const readHistory = vi.fn().mockResolvedValue(snapshot);
+    Object.assign(executor, { readHistory });
+    await orchestrator.syncConversations();
+    expect(workspace.readTaskWorkspace(TASK_ID, ACTOR).task).toMatchObject({
+      status: "in_progress",
+      blockedFromStatus: null,
+    });
+    readHistory.mockRejectedValueOnce(new Error("offline"));
+    await orchestrator.syncConversations();
+    expect(workspace.readTaskWorkspace(TASK_ID, ACTOR).task.status).toBe("in_progress");
+    snapshot.turns[2]!.status = "completed";
+    await orchestrator.syncConversations();
+    expect(workspace.readTaskWorkspace(TASK_ID, ACTOR).task.status).toBe("in_review");
+  });
+
+  it.each(["done", "canceled", "archived", "active-board"])(
+    "does not let Desktop history override %s tasks",
+    async (mode) => {
+      const { queue, executor, orchestrator, workspace, job, outcome, database } =
+        uncertainFixture();
+      queue.completeRecovered(job.id, "worker-test", outcome);
+      const snapshot = history();
+      if (mode === "active-board") submit(queue, "continue", queue.primaryThread(TASK_ID)!.id);
+      else if (mode === "archived")
+        database
+          .prepare("UPDATE tasks SET archived_at = ? WHERE id = ?")
+          .run(new Date().toISOString(), TASK_ID);
+      else database.prepare("UPDATE tasks SET status = ? WHERE id = ?").run(mode, TASK_ID);
+      const before = workspace.readTaskWorkspace(TASK_ID, ACTOR).task;
+      Object.assign(executor, { readHistory: async () => snapshot });
+      for (const status of ["inProgress", "completed"]) {
+        snapshot.turns[2]!.status = status;
+        await orchestrator.syncConversations();
+        expect(workspace.readTaskWorkspace(TASK_ID, ACTOR).task).toMatchObject({
+          status: before.status,
+          version: before.version,
+        });
+      }
+    },
+  );
+
+  it("does not change task status from history predating the latest board turn", async () => {
+    const { queue, executor, orchestrator, workspace, job, outcome, database } = uncertainFixture();
+    queue.completeRecovered(job.id, "worker-test", outcome);
+    submit(queue, "continue", queue.primaryThread(TASK_ID)!.id);
+    await orchestrator.runNext();
+    database.prepare("UPDATE tasks SET status = 'todo' WHERE id = ?").run(TASK_ID);
+    const snapshot = history();
+    Object.assign(executor, { readHistory: async () => snapshot });
+    for (const status of ["inProgress", "completed"]) {
+      snapshot.turns[2]!.status = status;
+      await orchestrator.syncConversations();
+      expect(workspace.readTaskWorkspace(TASK_ID, ACTOR).task.status).toBe("todo");
+    }
+  });
+
+  it("fills the gap even if a newer board job completed before the next poll", async () => {
+    const { queue, executor, orchestrator, workspace, job, outcome } = uncertainFixture();
+    queue.completeRecovered(job.id, "worker-test", outcome);
+    submit(queue, "continue", queue.primaryThread(TASK_ID)!.id);
+    await orchestrator.runNext();
+    const snapshot = history();
+    snapshot.turns.push({
+      id: "codex-turn-1",
+      status: "completed",
+      workingDirectories: [],
+      events: [],
+    });
+    Object.assign(executor, { readHistory: async () => snapshot });
+    await orchestrator.syncConversations();
+    await orchestrator.syncConversations();
+    expect(
+      workspace.readTaskWorkspace(TASK_ID, ACTOR).comments.map((comment) => comment.body),
+    ).toContain("follow-up");
+    expect(
+      queue.readJob(job.id).events.filter((event) => event.summary === "follow-up"),
+    ).toHaveLength(1);
+  });
+
+  it.each([
+    "wrong-thread",
+    "missing-anchor",
+    "running-turn",
+    "commentary",
+    "canceled",
+    "archived",
+    "new-job",
+  ])("does not import unrelated or unsafe history: %s", async (mode) => {
+    const { queue, executor, orchestrator, workspace, job, outcome, database } = uncertainFixture();
+    queue.completeRecovered(job.id, "worker-test", outcome);
+    const snapshot = history();
+    if (mode === "wrong-thread") snapshot.threadId = "other";
+    if (mode === "missing-anchor") snapshot.turns.splice(1, 1);
+    if (mode === "running-turn") snapshot.turns[2]!.status = "inProgress";
+    if (mode === "commentary") snapshot.turns[2]!.events[0]!.safePayload.phase = "commentary";
+    Object.assign(executor, {
+      readHistory: async () => {
+        if (mode === "canceled")
+          database.prepare("UPDATE tasks SET status = 'canceled' WHERE id = ?").run(TASK_ID);
+        if (mode === "archived")
+          database
+            .prepare("UPDATE tasks SET archived_at = ? WHERE id = ?")
+            .run(new Date().toISOString(), TASK_ID);
+        if (mode === "new-job") submit(queue, "continue", queue.primaryThread(TASK_ID)!.id);
+        return snapshot;
+      },
+    });
+    await orchestrator.syncConversations();
+    expect(workspace.readTaskWorkspace(TASK_ID, ACTOR).comments).toHaveLength(1);
+  });
+});
+
+it.each(["unique", "ambiguous", "outside", "canceled-during-read"])(
+  "synchronizes only a verified, unambiguous task worktree: %s",
+  async (mode) => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "codexboard-workspace-sync-")));
+    const git = (...args: string[]) =>
+      execFileSync("git", ["-C", root, ...args], { stdio: "pipe" });
+    try {
+      git("init", "-b", "main");
+      git("config", "user.email", "test@example.test");
+      git("config", "user.name", "Test");
+      writeFileSync(join(root, ".gitignore"), ".worktrees/\n");
+      git("add", ".gitignore");
+      git("commit", "-m", "initial");
+      const target = join(root, ".worktrees", "fix");
+      git("worktree", "add", target, "-b", "feature/fix");
+      const second = join(root, ".worktrees", "other");
+      if (mode === "ambiguous") git("worktree", "add", second, "-b", "feature/other");
+      const { database, queue, executor, interactions, workspace } = setup();
+      const projectId = "10000000-0000-4000-8000-000000000001";
+      database
+        .prepare("UPDATE projects SET workspace_realpath = ? WHERE id = ?")
+        .run(root, projectId);
+      const registry = new ProjectRegistry(database, [root]);
+      const job = queue.submit(
+        {
+          taskId: TASK_ID,
+          kind: "start",
+          executionKey: root,
+          workContext: { cwd: root, projectId, prompt: "使用新的 worktree" },
+        },
+        { actor: ACTOR, idempotencyKey: crypto.randomUUID() },
+      );
+      queue.claimNext("worker-test");
+      queue.bindThread(job.id, "worker-test", { threadId: "thread", cwd: root });
+      queue.recordTurn(job.id, "worker-test", "turn");
+      const dirs =
+        mode === "ambiguous"
+          ? [target, second]
+          : mode === "outside"
+            ? [join(root, "untracked")]
+            : [target];
+      Object.assign(executor, {
+        readHistory: async () => {
+          if (mode === "canceled-during-read")
+            queue.requestCancel(job.id, { actor: ACTOR, idempotencyKey: crypto.randomUUID() });
+          return {
+            threadId: "thread",
+            turns: [{ id: "turn", status: "inProgress", events: [], workingDirectories: dirs }],
+          };
+        },
+      });
+      const orchestrator = new ExecutionOrchestrator({
+        queue,
+        executor,
+        interactions,
+        projectRegistry: registry,
+        owner: "worker-test",
+      });
+      const before = workspace.readTaskWorkspace(TASK_ID, ACTOR).task;
+      await orchestrator.syncConversations();
+      await orchestrator.syncConversations();
+      const task = workspace.readTaskWorkspace(TASK_ID, ACTOR).task;
+      if (mode === "unique") {
+        expect(task.workingDirectory).toBe(target);
+        expect(task.version).toBe(before.version + 1);
+        expect(task.developmentContextId).not.toBeNull();
+        expect(
+          await registry.resolveExecutionContext(projectId, task.developmentContextId!),
+        ).toMatchObject({ cwd: target, branch: "feature/fix" });
+      } else {
+        expect(task.workingDirectory).toBe(root);
+        expect(task.developmentContextId).toBeNull();
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+describe("Desktop outcome reconciliation", () => {
+  it("keeps an active owner uncertain after restart without failure events", async () => {
+    const { queue, orchestrator, executor, job } = uncertainFixture();
+    queue.recoverAfterRestart();
+    Object.assign(executor, { readOutcome: async () => null });
+    expect(await orchestrator.recoverUncertain()).toBe(0);
+    expect(queue.readJob(job.id)).toMatchObject({ status: "canceling", completedAt: null });
+    expect(
+      queue
+        .readJob(job.id)
+        .events.some((event) => ["job.failed", "job.failed_recoverable"].includes(event.kind)),
+    ).toBe(false);
+    expect(executor.starts).toHaveLength(0);
+    expect(executor.continuations).toHaveLength(0);
+  });
+
+  it.each([false, true])(
+    "corrects a previously recovered false interruption without disturbing a newer job (%s)",
+    async (newer) => {
+      const { queue, orchestrator, executor, job, outcome, workspace } = uncertainFixture();
+      queue.completeRecovered(job.id, "worker-test", {
+        ...outcome,
+        status: "interrupted",
+        events: [],
+      });
+      expect(queue.readJob(job.id).status).toBe("failed");
+      let next;
+      if (newer) {
+        next = submit(queue, "continue", queue.primaryThread(TASK_ID)!.id);
+        queue.claimNext("new-worker");
+      }
+      const taskBefore = workspace.readTaskWorkspace(TASK_ID, ACTOR).task;
+      Object.assign(executor, {
+        readOutcome: async (input: { jobId: string }) => (input.jobId === job.id ? outcome : null),
+      });
+      expect(await orchestrator.recoverUncertain()).toBe(1);
+      expect(await orchestrator.recoverUncertain()).toBe(0);
+      expect(queue.readJob(job.id)).toMatchObject({
+        status: "succeeded",
+        errorCode: null,
+        errorSummary: null,
+      });
+      expect(workspace.readTaskWorkspace(TASK_ID, ACTOR).comments).toHaveLength(1);
+      if (next) {
+        expect(queue.readJob(next.id)).toMatchObject({
+          status: "running",
+          leaseOwner: "new-worker",
+        });
+        expect(workspace.readTaskWorkspace(TASK_ID, ACTOR).task).toEqual(taskBefore);
+      } else expect(workspace.readTaskWorkspace(TASK_ID, ACTOR).task.status).toBe("in_review");
+    },
+  );
+
+  it("does not rewrite a confirmed failure or repair from another turn", async () => {
+    const { queue, orchestrator, executor, job, outcome } = uncertainFixture();
+    queue.completeRecovered(job.id, "worker-test", { ...outcome, status: "failed", events: [] });
+    Object.assign(executor, { readOutcome: async () => ({ ...outcome, turnId: "unrelated" }) });
+    expect(await orchestrator.recoverUncertain()).toBe(0);
+    Object.assign(executor, { readOutcome: async () => ({ ...outcome, status: "failed" }) });
+    expect(await orchestrator.recoverUncertain()).toBe(0);
+    expect(queue.readJob(job.id).status).toBe("failed");
+  });
+});
+
+it("rejects terminal result corrections without matching recovery evidence", () => {
+  const { database, queue, job, outcome } = uncertainFixture();
+  queue.completeRecovered(job.id, "worker-test", { ...outcome, status: "interrupted", events: [] });
+  expect(() =>
+    database.prepare("UPDATE jobs SET status = 'succeeded' WHERE id = ?").run(job.id),
+  ).toThrow("illegal job status transition");
+  expect(() =>
+    database
+      .prepare("UPDATE jobs SET status = 'succeeded', recovery_checkpoint_json = ? WHERE id = ?")
+      .run(
+        JSON.stringify({ ...queue.readJob(job.id).recoveryCheckpoint, correctedTurnId: "other" }),
+        job.id,
+      ),
+  ).toThrow("illegal job status transition");
+  expect(queue.readJob(job.id).status).toBe("failed");
+});

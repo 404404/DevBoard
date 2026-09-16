@@ -1,9 +1,8 @@
 import { userErrorMessage } from "./user-error";
-import { Notice } from "./notification-center";
 import type { TaskLifecycleView, TaskView } from "@codexboard/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { readTaskWorkspace, requestTaskLifecycle } from "./api";
+import { ApiError, readTaskWorkspace, requestTaskLifecycle } from "./api";
 import { SfSymbol } from "./sf-symbol";
 import { TaskRestoreButton } from "./task-restore-button";
 import { createUuid } from "./random-id";
@@ -11,8 +10,8 @@ import { createUuid } from "./random-id";
 const PHASE_LABELS: Record<TaskLifecycleView["phase"], string> = {
   checking: "检查任务与工作区…",
   canceling: "等待 Codex 停止…",
-  committing: "提交改动并清理任务临时文件…",
-  cleaning: "保存提交记录并清理独占工作区…",
+  committing: "核对 Git 状态…",
+  cleaning: "核对分支与工作树…",
   completed: "操作已完成",
 };
 
@@ -28,7 +27,7 @@ export function TaskLifecycleActions({
   readonly task: TaskView;
   readonly csrfToken: string;
   readonly enabled: boolean;
-  readonly onAccepted: () => void;
+  readonly onAccepted: (operation: TaskLifecycleView) => void;
   readonly onInitiate: () => void;
   readonly initiateEnabled: boolean;
   readonly operation: TaskLifecycleView | null | undefined;
@@ -49,7 +48,7 @@ export function TaskLifecycleActions({
     onSuccess(result) {
       queryClient.setQueryData(["lifecycle", task.id], result);
       void queryClient.invalidateQueries({ queryKey: ["jobs", task.id] });
-      onAccepted();
+      onAccepted(result);
     },
   });
   useEffect(() => {
@@ -138,9 +137,20 @@ export function TaskLifecycleActions({
         )}
       </div>
       {running && <p role="status">{PHASE_LABELS[operation.phase]}</p>}
-      {failed && <Notice message="任务操作失败，请重试。" eventKey={operation.updatedAt} />}
+      {failed && (
+        <p role="alert" className="task-completion-error">
+          {operation.errorSummary ||
+            `任务未完成：${PHASE_LABELS[operation.phase].replace(/…$/, "")}失败，请检查工作区后重试。`}
+        </p>
+      )}
       {mutation.isError && (
-        <Notice message={userErrorMessage(mutation.error)} eventKey={mutation.error} />
+        <p role="alert" className="task-completion-error">
+          {mutation.error instanceof ApiError &&
+          mutation.error.status === 409 &&
+          mutation.error.code === "INVALID_REQUEST"
+            ? mutation.error.message
+            : userErrorMessage(mutation.error)}
+        </p>
       )}
       {task.status !== "backlog" && !running && completeReason && (
         <p className="muted">{completeReason}</p>
