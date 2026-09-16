@@ -68,6 +68,18 @@ fn control(
 fn open_board(state: tauri::State<Controller>) -> Result<(), String> {
     control("open_board".into(), None, state)
 }
+#[tauri::command]
+fn open_release_page() -> Result<(), String> {
+    let status = Command::new("/usr/bin/open")
+        .arg("https://github.com/RocYan98/CodexBoard/releases/latest")
+        .status()
+        .map_err(|_| "无法打开默认浏览器".to_string())?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err("无法打开默认浏览器".into())
+    }
+}
 fn quit(app: tauri::AppHandle) {
     let state = app.state::<Controller>();
     let mut input = state.input.lock().unwrap();
@@ -210,7 +222,7 @@ fn main() {
   let update_stop_ack=Arc::new(Mutex::new(None));let ack=update_stop_ack.clone();
   std::thread::spawn(move||{for line in BufReader::new(output).lines().map_while(Result::ok){if let Ok(value)=serde_json::from_str::<Value>(&line){if let (Some(id),Some(ok))=(value["id"].as_u64(),value["ok"].as_bool()) { if id>=2 { *ack.lock().unwrap()=Some((id,ok)); } } if value["event"]=="state"{*copy.lock().unwrap()=value["data"].clone()}else if value["ok"]==false{copy.lock().unwrap()["message"]=value["error"].clone()}}}let mut s=copy.lock().unwrap();s["phase"]=json!("error");s["message"]=json!("服务管理器已退出，请重新打开应用");});
   app.manage(Controller{child:Mutex::new(child),input:Mutex::new(input),snapshot,quitting:AtomicBool::new(false),installing:AtomicBool::new(false),update_stop_ack,_lock:lock});Ok(())
- }).invoke_handler(tauri::generate_handler![snapshot,control,open_board,updater::update_status,updater::check_updates,updater::download_update,updater::install_update,skills::skill_status,skills::install_skill,skills::dismiss_skill_offer]).on_window_event(|window,event|{if let tauri::WindowEvent::CloseRequested{api,..}=event{api.prevent_close();let _ = window.hide();
+ }).invoke_handler(tauri::generate_handler![snapshot,control,open_board,open_release_page,updater::update_status,updater::check_updates,updater::download_update,updater::install_update,skills::skill_status,skills::install_skill,skills::dismiss_skill_offer]).on_window_event(|window,event|{if let tauri::WindowEvent::CloseRequested{api,..}=event{api.prevent_close();let _ = window.hide();
     #[cfg(target_os = "macos")]
     let _ = window.app_handle().set_activation_policy(tauri::ActivationPolicy::Accessory);}}).build(tauri::generate_context!()).expect("无法启动 CodexBoard");
     app.run(|app, event| {

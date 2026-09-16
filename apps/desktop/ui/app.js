@@ -49,7 +49,6 @@ const pageNames = {
   overview: "服务概览",
   guide: "使用引导",
   connections: "连接配置",
-  ports: "端口设置",
   settings: "应用设置",
   logs: "运行日志",
 };
@@ -210,6 +209,7 @@ $("setup-open-board").onclick = () =>
     : action("open_board");
 $("setup-configure-web").onclick = () => {
   showPage("settings");
+  $("web-accounts-card").open = true;
   $("web-username").focus();
   action("control", { action: "web_accounts", settings: { operation: "list" } });
 };

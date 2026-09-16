@@ -289,3 +289,25 @@ test("browser preview never issues update commands and install confirmation expl
   assert.match(html, /原有配置与任务数据会保留/);
   assert.match(html, /<script src="updater\.js"><\/script>/);
 });
+
+test("manual release download remains available during downloads and reports browser errors", async () => {
+  const ui = await updater({ status: "downloading" });
+  let prevented = false;
+  await ui.get("update-release-link").onclick({
+    preventDefault() {
+      prevented = true;
+    },
+  });
+  assert.equal(prevented, true);
+  assert.equal(ui.calls.at(-1).command, "open_release_page");
+  const failed = await updater(
+    { status: "error" },
+    {
+      command: async (command) => {
+        if (command === "open_release_page") throw new Error("browser unavailable");
+      },
+    },
+  );
+  await failed.get("update-release-link").onclick({ preventDefault() {} });
+  assert.match(failed.get("update-error").textContent, /复制 Release 链接/);
+});

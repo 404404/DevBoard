@@ -56,6 +56,16 @@ for (const [name, engine] of Object.entries({ chromium, webkit }))
       assert.equal(await page.locator("#settings").isVisible(), false);
       await page.locator("#update-notice-open").click();
       assert.equal(await page.locator("#settings").isVisible(), true);
+      const release = page.locator("#update-release-link");
+      assert.equal(
+        await release.getAttribute("href"),
+        "https://github.com/RocYan98/CodexBoard/releases/latest",
+      );
+      await release.click();
+      assert.equal((await page.evaluate(() => window.updateCalls)).at(-1), "open_release_page");
+      await page.evaluate(() => {
+        window.updateCalls = [];
+      });
       await page.locator("#update-download").click();
       await page.locator("#update-install").waitFor({ state: "visible" });
       assert.deepEqual(await page.evaluate(() => window.updateCalls), ["download_update"]);

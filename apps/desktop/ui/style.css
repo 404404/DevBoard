@@ -927,9 +927,6 @@ nav button[data-tab="guide"] .nav-icon {
 nav button[data-tab="connections"] .nav-icon {
   --symbol: url("symbols/connections.png");
 }
-nav button[data-tab="ports"] .nav-icon {
-  --symbol: url("symbols/ports.png");
-}
 nav button[data-tab="settings"] .nav-icon {
   --symbol: url("symbols/settings.png");
 }
@@ -1032,4 +1029,45 @@ select:focus-visible {
   #ports-form {
     padding: 20px;
   }
+}
+
+.collapsible-card > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+.collapsible-card > summary::-webkit-details-marker {
+  display: none;
+}
+.collapsible-card > summary::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  flex-shrink: 0;
+}
+.collapsible-card[open] > summary::before {
+  transform: rotate(45deg);
+}
+.collapsible-card > summary h2 {
+  margin: 0;
+  font-size: 17px;
+}
+.collapsible-card > summary .skill-target-label {
+  margin-left: auto;
+}
+.collapsible-card > summary:focus-visible {
+  outline: 2px solid #486dd9;
+  outline-offset: 6px;
+  border-radius: 4px;
+}
+
+#update-release-link {
+  color: #486dd9;
+  font-size: 13px;
+  text-underline-offset: 3px;
 }

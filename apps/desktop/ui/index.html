@@ -20,9 +20,6 @@
         <button data-tab="connections">
           <span class="nav-icon" aria-hidden="true"></span><span>连接配置</span>
         </button>
-        <button data-tab="ports">
-          <span class="nav-icon" aria-hidden="true"></span><span>端口设置</span>
-        </button>
         <button data-tab="settings">
           <span class="nav-icon" aria-hidden="true"></span><span>应用设置</span>
         </button>
@@ -289,75 +286,78 @@
           <button id="save-connections" class="primary" type="submit">保存配置</button>
           <p id="connections-result" role="status" aria-live="polite"></p>
         </form>
-      </section>
-      <section id="ports" class="page" hidden>
-        <div class="eyebrow">服务连接</div>
-        <h1>端口设置</h1>
-        <p class="intro">修改后保存，重启服务后生效。</p>
-        <form id="ports-form">
-          <div class="port-fields">
-            <div>
-              <label for="port-api">后端服务</label>
-              <input
-                id="port-api"
-                type="number"
-                required
-                min="1"
-                max="65535"
-                step="1"
-                inputmode="numeric"
-              />
-              <p class="hint">看板与远程连接使用的本机端口。</p>
+        <details id="ports" class="update-card collapsible-card">
+          <summary><h2>端口设置</h2></summary>
+          <p class="update-help">修改后保存，重启服务后生效。</p>
+          <form id="ports-form">
+            <div class="port-fields">
+              <div>
+                <label for="port-api">后端服务</label>
+                <input
+                  id="port-api"
+                  type="number"
+                  required
+                  min="1"
+                  max="65535"
+                  step="1"
+                  inputmode="numeric"
+                />
+                <p class="hint">看板与远程连接使用的本机端口。</p>
+              </div>
+              <div>
+                <label for="port-admin">本机管理</label>
+                <input
+                  id="port-admin"
+                  type="number"
+                  required
+                  min="1"
+                  max="65535"
+                  step="1"
+                  inputmode="numeric"
+                />
+                <p class="hint">本机任务管理使用的端口。</p>
+              </div>
+              <div>
+                <label for="port-bridge">Codex 桥接</label>
+                <input
+                  id="port-bridge"
+                  type="number"
+                  required
+                  min="1"
+                  max="65535"
+                  step="1"
+                  inputmode="numeric"
+                />
+                <p class="hint">应用与 Codex 通信使用的本机端口。</p>
+              </div>
+              <div>
+                <label for="port-caddy">Caddy</label>
+                <input
+                  id="port-caddy"
+                  type="number"
+                  required
+                  min="1"
+                  max="65535"
+                  step="1"
+                  inputmode="numeric"
+                />
+                <p class="hint">本机 Caddy 监听端口，保存时同步更新 frpc 的 localPort。</p>
+              </div>
             </div>
-            <div>
-              <label for="port-admin">本机管理</label>
-              <input
-                id="port-admin"
-                type="number"
-                required
-                min="1"
-                max="65535"
-                step="1"
-                inputmode="numeric"
-              />
-              <p class="hint">本机任务管理使用的端口。</p>
-            </div>
-            <div>
-              <label for="port-bridge">Codex 桥接</label>
-              <input
-                id="port-bridge"
-                type="number"
-                required
-                min="1"
-                max="65535"
-                step="1"
-                inputmode="numeric"
-              />
-              <p class="hint">应用与 Codex 通信使用的本机端口。</p>
-            </div>
-            <div>
-              <label for="port-caddy">Caddy</label>
-              <input
-                id="port-caddy"
-                type="number"
-                required
-                min="1"
-                max="65535"
-                step="1"
-                inputmode="numeric"
-              />
-              <p class="hint">本机 Caddy 监听端口，保存时同步更新 frpc 的 localPort。</p>
-            </div>
-          </div>
-          <button id="save-ports" class="primary" type="submit">保存端口</button>
-          <p id="ports-result" role="status" aria-live="polite"></p>
-        </form>
+            <button id="save-ports" class="primary" type="submit">保存端口</button>
+            <p id="ports-result" role="status" aria-live="polite"></p>
+          </form>
+        </details>
       </section>
       <section id="settings" class="page" hidden>
         <div class="eyebrow">偏好设置</div>
         <h1>应用设置</h1>
-        <div class="update-card" aria-labelledby="web-accounts-title">
-          <h2 id="web-accounts-title">Web 账号</h2>
+        <details
+          id="web-accounts-card"
+          class="update-card collapsible-card"
+          aria-labelledby="web-accounts-title"
+        >
+          <summary><h2 id="web-accounts-title">Web 账号</h2></summary>
           <p class="update-help">
             用浏览器访问公网地址，以账号密码登录。公网需配置
             HTTPS；账号只能在本机创建，不提供公开注册。每个账号都能访问看板并执行项目任务，请仅分配给信任的人。
@@ -404,12 +404,12 @@
             <button type="submit">保存新密码</button>
             <button id="web-reset-cancel" type="button">取消</button>
           </form>
-        </div>
-        <div id="skill-card" class="update-card" aria-labelledby="skill-title">
-          <div class="update-heading">
+        </details>
+        <details id="skill-card" class="update-card collapsible-card" aria-labelledby="skill-title">
+          <summary>
             <h2 id="skill-title">Agent Skill</h2>
             <span class="skill-target-label">Codex</span>
-          </div>
+          </summary>
           <p class="update-help">
             让 Codex 查询和管理 CodexBoard 任务。Skill 随应用提供，无需下载源码。
           </p>
@@ -430,7 +430,7 @@
             安装后在 Codex 技能列表确认；未出现时，可使用“强制重新加载技能”或重新打开 Codex。安装
             Skill 不会授权它操作任务。
           </p>
-        </div>
+        </details>
         <div id="update-card" class="update-card" aria-labelledby="update-title">
           <div class="update-heading">
             <h2 id="update-title">应用更新</h2>
@@ -449,6 +449,13 @@
           <p id="update-error" class="update-error" role="alert" hidden></p>
           <div class="update-actions">
             <button id="update-check" type="button">检查更新</button>
+            <a
+              id="update-release-link"
+              href="https://github.com/RocYan98/CodexBoard/releases/latest"
+              target="_blank"
+              rel="noopener noreferrer"
+              >前往 Release 手动下载 ↗</a
+            >
             <button id="update-download" class="primary" type="button" hidden>下载更新</button>
             <button id="update-install" class="primary" type="button" hidden>安装并重启</button>
           </div>

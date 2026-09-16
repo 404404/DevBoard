@@ -85,6 +85,7 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
       await page.locator("#skill-offer-later").click();
       assert.equal(await page.locator("#skill-offer-dialog").isVisible(), false);
       await page.locator('[data-tab="settings"]').click();
+      await page.locator("#skill-card > summary").click();
       if (process.env.CODEXBOARD_SKILL_UI_ARTIFACT_DIR)
         await page.screenshot({
           path: `${process.env.CODEXBOARD_SKILL_UI_ARTIFACT_DIR}/${name}-settings.png`,
@@ -136,6 +137,7 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
         offerDismissed: true,
       });
       await page.locator('[data-tab="settings"]').click();
+      await page.locator("#skill-card > summary").click();
       await page.locator("#skill-replace").click();
       await page.locator("#skill-replace-dialog").waitFor({ state: "visible" });
       if (process.env.CODEXBOARD_SKILL_UI_ARTIFACT_DIR) {
@@ -198,6 +200,7 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
     try {
       const { page } = await fixture(browser, { offerDismissed: true });
       await page.locator('[data-tab="settings"]').click();
+      await page.locator("#skill-card > summary").click();
       await page.evaluate(() => {
         window.deferSkillRead = true;
         window.deferredSkillReads = [];

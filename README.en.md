@@ -10,7 +10,7 @@ Connect your projects to Codex and turn ideas into progress.
 
 CodexBoard connects your project task board to Codex running on your Mac. Organize projects and tasks, submit requests, track execution, and handle approvals or requests for more information. The Mac app starts and manages local services; you access the board through HTTPS with a locally created Web account, through Lark, or both.
 
-Current release: **0.1.3 preview**, for **Apple Silicon Macs running macOS 13 or later**.
+Current release: **0.1.6 preview**, for **Apple Silicon Macs running macOS 13 or later**.
 
 ## Access methods
 
@@ -81,10 +81,10 @@ The installer includes **Node.js, the board's frontend and backend, the Codex br
 3. Open the DMG and drag `CodexBoard.app` into **Applications**.
 4. Open CodexBoard from Applications, then eject the installer disk.
 
-To check download integrity, also download the corresponding `.dmg.sha256` file and run the following in the directory containing both files. For version 0.1.3:
+To check download integrity, also download the corresponding `.dmg.sha256` file and run the following in the directory containing both files. For version 0.1.6:
 
 ```sh
-shasum -a 256 -c CodexBoard-0.1.3-macos-arm64.dmg.sha256
+shasum -a 256 -c CodexBoard-0.1.6-macos-arm64.dmg.sha256
 ```
 
 An `OK` result means the file matches the publisher's checksum.
@@ -171,7 +171,7 @@ The agent guide covers the built-in `taskctl` entry point, identity pairing, rea
 
 ## Updates and data
 
-Check for a new version under **应用设置 → 应用更新 (App Settings → App Updates)**, or check manually from the menu bar. The app also checks automatically once a day and displays a notification and release notes when a new version is available. Once the download has been verified, click **安装并重启 (Install and Restart)**, handle running tasks as prompted, and confirm installation. Services keep running during checks and downloads; installation briefly stops the local services.
+Under **应用设置 → 应用更新 (App Settings → App Updates)**, use **前往 Release 手动下载 (Download from Release)** to open the latest release in your browser, or check for updates here or from the menu bar. The app also checks automatically once a day and displays a notification and release notes when a new version is available. Once the download has been verified, click **安装并重启 (Install and Restart)**, handle running tasks as prompted, and confirm installation. Services keep running during checks and downloads; installation briefly stops the local services.
 
 Update packages are verified with a separate signing key. If automatic updating is unavailable, quit the old version normally and replace `CodexBoard.app` in Applications using the new DMG. Configuration, the database, and attachments are stored in:
 
@@ -186,7 +186,7 @@ On the first launch after upgrading, if the new directory does not exist, the ap
 | Symptom                                                | What to check first                                                                                                                                                     |
 | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | macOS cannot verify the developer                      | The current release is not notarized. Verify the download source and follow the Apple instructions above.                                                               |
-| A port is in use and services cannot start             | Choose available ports in 端口设置 (Port Settings), save, and restart. Do not arbitrarily terminate other programs.                                                     |
+| A port is in use and services cannot start             | Choose available ports in 连接配置 → 端口设置 (Connection Settings → Port Settings), save, and restart. Do not arbitrarily terminate other programs.                    |
 | Local services work, but the app does not open in Lark | Check that the Mac is online, along with the frp service, DNS, Lark homepage settings, publication status, and availability scope.                                      |
 | The Lark credentials check passes, but sign-in fails   | Check the user ID permission, trusted domains, and redirect URL, then try signing in through Lark.                                                                      |
 | Codex checks fail or projects do not appear            | Confirm sign-in and projects in Codex, then check again in the app. A basic sign-in check does not guarantee that online requests will work or that quota is available. |

@@ -40,7 +40,27 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
         };
       });
       await page.addScriptTag({ content: readFileSync(new URL("app.js", ui), "utf8") });
+      await page.locator('[data-tab="connections"]').click();
+      assert.equal(await page.locator('[data-tab="ports"]').count(), 0);
+      assert.equal(await page.locator("#port-api").isVisible(), false);
+      await page.locator("#ports > summary").click();
+      await page.locator("#port-api").fill("60001");
+      await page.locator("#ports > summary").click();
+      assert.equal(await page.locator("#port-api").isVisible(), false);
+      await page.locator("#ports > summary").focus();
+      await page.keyboard.press("Enter");
+      assert.equal(await page.locator("#port-api").inputValue(), "60001");
+      assert.equal(await page.locator("#port-api").isVisible(), true);
       await page.locator('[data-tab="settings"]').click();
+      assert.equal(await page.locator("#web-username").isVisible(), false);
+      assert.equal(await page.locator("#skill-status").isVisible(), false);
+      await page.locator('[data-tab="connections"]').click();
+      await page.locator("#connections-web-accounts").click();
+      assert.equal(await page.locator("#web-username").isVisible(), true);
+      assert.equal(await page.evaluate(() => document.activeElement.id), "web-username");
+      await page.locator("#web-accounts-card > summary").click();
+      assert.equal(await page.locator("#web-username").isVisible(), false);
+      await page.locator("#web-accounts-card > summary").click();
       await page.locator("#web-username").fill("bob");
       await page.locator("#web-name").fill("Bob");
       await page.locator("#web-password").fill("a-long-test-password");
@@ -54,10 +74,10 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
       const calls = await page.evaluate(() => window.calls);
       assert.deepEqual(
         calls.map((c) => c.args.settings.operation),
-        ["create", "update", "update"],
+        ["list", "create", "update", "update"],
       );
-      assert.equal(calls[1].args.settings.active, false);
-      assert.equal(calls[2].args.settings.password, "another-test-password");
+      assert.equal(calls[2].args.settings.active, false);
+      assert.equal(calls[3].args.settings.password, "another-test-password");
       assert.deepEqual(errors, []);
       if (process.env.WEB_ACCESS_SCREENSHOTS)
         await page.screenshot({

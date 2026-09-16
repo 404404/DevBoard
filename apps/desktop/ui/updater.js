@@ -199,6 +199,17 @@
     schedulePoll(activeStates.has(state.status) || requestPending ? 750 : 15000);
   }
 
+  element("update-release-link").onclick = async (event) => {
+    if (!invokeUpdate) return;
+    event.preventDefault();
+    try {
+      await invokeUpdate("open_release_page");
+    } catch {
+      transportError = "无法打开默认浏览器，请复制 Release 链接后手动打开。";
+      renderUpdate();
+    }
+  };
+
   element("update-check").onclick = () => runUpdateCommand("check_updates", { automatic: false });
   element("update-download").onclick = () => runUpdateCommand("download_update");
   element("update-install").onclick = () => {

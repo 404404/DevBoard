@@ -140,6 +140,7 @@
         element("skill-offer-dialog").close();
         element("skill-replace-dialog").close();
         document.querySelector('[data-tab="settings"]').click();
+        element("skill-card").open = true;
         element("skill-card").scrollIntoView({ block: "nearest" });
       }
     } catch (cause) {
@@ -197,6 +198,7 @@
   });
   element("skill-notice-open").onclick = () => {
     document.querySelector('[data-tab="settings"]').click();
+    element("skill-card").open = true;
     element("skill-card").scrollIntoView({ block: "nearest" });
   };
   element("skill-notice-dismiss").onclick = () => {
