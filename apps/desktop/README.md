@@ -47,9 +47,9 @@ HTTPS 由 Caddy 自动签发和续期证书，需要域名解析正确且公网 
 
 ## 飞书身份
 
-任何通过飞书登录验证的账号都可以直接操作同一看板，无需管理员初始化、成员登记或项目授权。身份、姓名和头像从成功登录的飞书账号读取，应用和 CLI 不提供手工创建用户的入口。
+任何通过飞书登录验证的账号都可以直接操作同一看板，无需管理员初始化、成员登记或项目授权。飞书身份、姓名和头像从成功登录的飞书账号读取；独立 Web 账号由本机应用管理。CLI 不提供创建用户的入口。
 
-新任务负责人固定为当前登录用户，详情静态显示任务实际负责人；不能指定其他人或清空。评论只显示真实飞书用户或 Codex：用户请求 Codex 通过已授权的 CLI 会话代写时署用户，Codex 执行事件同步的结果署 Codex。CLI 登录与评论命令见 [taskctl 命令参考](../../docs/taskctl.md)。
+新任务负责人固定为当前登录用户，详情静态显示任务实际负责人；不能指定其他人或清空。评论区显示真实 Web / 飞书用户、Desktop 用户或 Codex：用户请求 Codex 通过已授权的 CLI 会话代写时署用户，Codex 执行事件同步的结果署 Codex。CLI 配对同时支持 Web 与飞书用户，所有业务查询和写入均需有效用户会话；Desktop 输入及 Codex 结果由绑定会话的执行事件独立同步，不要求 CLI 持续登录。CLI 登录与评论命令见 [taskctl 命令参考](../../docs/taskctl.md)。
 
 ## 构建
 
@@ -89,6 +89,8 @@ CARGO_ENCODED_RUSTFLAGS="--remap-path-prefix=$HOME=/build" npm run build:desktop
 主程序和 bundle identifier 已统一为 `codexboard-desktop`、`cn.rocyan.codexboard.desktop`。更新包保留旧名 `Contents/MacOS/lark-codex-desktop` 和 `Contents/MacOS/taskboard-desktop` 的小型转发启动器，仅用于兼容已发布版本的结构校验与更新后重启；更新公钥保持不变。
 
 随包 Skill 使用 `manage-codexboard`。检测到旧 `manage-lark-codex` 或 `manage-lark-taskboard` 目录时会提示交由原管理工具处理，不自动改名或覆盖；新目录内的旧安装凭据也需要按已修改内容重新确认。
+
+应用启动后及运行期间每 15 秒检查随包 Skill 与可信安装记录，版本增加或同版本内容变化都会显示顶部更新提示。关闭提示仅针对当前版本与内容；另一份更新仍会提醒。已修改的 Skill 保留替换确认，受管目录不跟随链接或直接覆盖。检查只比较本机随包内容，不查询第三方技能管理器的远端版本。
 
 桌面 `.cache/`、`staging/`、`src-tauri/target/` 和过时的 `dist/` 是可重建产物，不属于运行数据。删除这些目录会使下次构建重新下载或编译；应先保留计划分发的已验证应用。
 

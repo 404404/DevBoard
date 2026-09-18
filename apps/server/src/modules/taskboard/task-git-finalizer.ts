@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import { AppError } from "../../app-error.js";
@@ -23,7 +23,7 @@ export interface TaskGitSnapshot {
   readonly notes: readonly string[];
 }
 
-/** Completion only observes Git state. It never commits, removes files, or writes refs. */
+/** Task finalization only observes Git state. It never commits, removes files, or writes refs. */
 export class TaskGitFinalizer {
   readonly #allowedRoots: readonly string[];
   constructor(
@@ -44,15 +44,26 @@ export class TaskGitFinalizer {
     const present = existsSync(directory);
     if (!present && !projectDirectory)
       throw new AppError("INVALID_REQUEST", 409, "工作树已不存在，无法定位所属 Git 仓库");
-    const anchor = present ? cwd : this.#allowed(projectDirectory!);
+    let anchor = present ? cwd : this.#allowed(projectDirectory!);
+    let existingWorktree = present;
     let root: string;
     try {
       root = (await this.#git(anchor, "rev-parse", "--show-toplevel")).trim();
     } catch (error) {
-      if (error instanceof WorkspaceNotGitError && present) return null;
-      throw error;
+      if (!(error instanceof WorkspaceNotGitError) || !present) throw error;
+      if (!projectDirectory || this.#allowed(projectDirectory) === cwd) return null;
+      // A removed worktree may leave an ordinary directory containing temporary files.
+      // Inspect its owning repository so verification still rejects that residue.
+      anchor = this.#allowed(projectDirectory);
+      try {
+        root = (await this.#git(anchor, "rev-parse", "--show-toplevel")).trim();
+      } catch (projectError) {
+        if (projectError instanceof WorkspaceNotGitError) return null;
+        throw projectError;
+      }
+      existingWorktree = false;
     }
-    if (present && realpathSync(root) !== cwd)
+    if (existingWorktree && realpathSync(root) !== cwd)
       throw new AppError("INVALID_REQUEST", 409, "完成检查目录必须是 Git 工作树根目录");
     const fields = (await this.#git(anchor, "worktree", "list", "--porcelain", "-z")).split("\0");
     const mainPath = fields.find((field) => field.startsWith("worktree "))?.slice(9);
@@ -63,7 +74,7 @@ export class TaskGitFinalizer {
     );
     const branch =
       taskBranch ??
-      (present ? (await this.#git(cwd, "branch", "--show-current")).trim() || null : null);
+      (existingWorktree ? (await this.#git(cwd, "branch", "--show-current")).trim() || null : null);
     const mainTask = cwd === mainCwd && (!branch || ["main", "master", "trunk"].includes(branch));
     return {
       cwd,
@@ -77,7 +88,7 @@ export class TaskGitFinalizer {
     };
   }
 
-  async verify(snapshot: TaskGitSnapshot): Promise<TaskGitSnapshot> {
+  async verify(snapshot: TaskGitSnapshot, cancellationTaskId?: string): Promise<TaskGitSnapshot> {
     const { cwd, mainCwd, branch, mainTask } = snapshot;
     if (this.#allowed(mainCwd) !== mainCwd || this.#allowed(cwd) !== cwd)
       throw new AppError("VERSION_CONFLICT", 409, "工作树路径已变化");
@@ -86,6 +97,13 @@ export class TaskGitFinalizer {
     );
     if (common !== snapshot.commonDirectory)
       throw new AppError("VERSION_CONFLICT", 409, "Git 仓库已变化");
+    if (cancellationTaskId) {
+      for (const directory of new Set([cwd, mainCwd])) {
+        const temporary = resolve(directory, ".tmp", "taskboard", cancellationTaskId);
+        if (lstatSync(temporary, { throwIfNoEntry: false }))
+          throw new AppError("INVALID_REQUEST", 409, `任务临时目录尚未删除：${temporary}`);
+      }
+    }
     const status = await this.#git(mainCwd, "status", "--porcelain", "--untracked-files=all");
     if (status.trim())
       throw new AppError(

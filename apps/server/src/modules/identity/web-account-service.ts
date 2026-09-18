@@ -122,6 +122,11 @@ export class WebAccountService {
         this.database
           .prepare("UPDATE identities SET active = ?, updated_at = ? WHERE identity_key = ?")
           .run(Number(command.active), new Date(this.now()).toISOString(), key);
+      // Advance in the same transaction as password / active-state changes. Old CLI
+      // approvals and sessions must not revive when an account is enabled again.
+      this.database
+        .prepare("UPDATE web_accounts SET auth_version = auth_version + 1 WHERE id = ?")
+        .run(id);
       this.database
         .prepare("UPDATE sessions SET revoked_at = ? WHERE identity_key = ? AND revoked_at IS NULL")
         .run(new Date(this.now()).toISOString(), key);

@@ -1,6 +1,6 @@
 import { AppError } from "../../app-error.js";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { FeishuIdentityRefSchema, type FeishuIdentityRef } from "@codexboard/contracts";
+import { UserIdentityRefSchema, type UserIdentityRef } from "@codexboard/contracts";
 
 export class CliAuthError extends Error {
   constructor(
@@ -18,30 +18,38 @@ interface Challenge {
   secretHash: Buffer;
   expires: number;
   status: "pending" | "approved" | "claimed";
-  identity?: FeishuIdentityRef;
+  identity?: UserIdentityRef;
+  identityVersion?: string;
 }
 export interface CliAuthServiceOptions {
   now?: () => number;
   randomToken?: () => string;
   challengeTtlMs?: number;
   sessionTtlMs?: number;
+  /** Revalidates the principal and returns its current credential generation. */
+  identityVersion?: (identity: UserIdentityRef) => string;
 }
 const hash = (value: string) => createHash("sha256").update(value).digest();
 
 /** Ephemeral independent CLI credentials: restarting the process invalidates all of them. */
 export class CliAuthService {
   private readonly challenges = new Map<string, Challenge>();
-  private readonly sessions = new Map<string, { identity: FeishuIdentityRef; expires: number }>();
+  private readonly sessions = new Map<
+    string,
+    { identity: UserIdentityRef; identityVersion: string; expires: number }
+  >();
   private readonly now: () => number;
   private readonly randomToken: () => string;
   private readonly challengeTtlMs: number;
   private readonly sessionTtlMs: number;
+  private readonly identityVersion: (identity: UserIdentityRef) => string;
 
   constructor(options: CliAuthServiceOptions = {}) {
     this.now = options.now ?? Date.now;
     this.randomToken = options.randomToken ?? (() => randomBytes(32).toString("base64url"));
     this.challengeTtlMs = options.challengeTtlMs ?? 600_000;
     this.sessionTtlMs = options.sessionTtlMs ?? 28_800_000;
+    this.identityVersion = options.identityVersion ?? (() => "");
   }
 
   create(label: string) {
@@ -78,14 +86,16 @@ export class CliAuthService {
     };
   }
 
-  approve(requestId: string, identity: FeishuIdentityRef) {
-    const parsed = FeishuIdentityRefSchema.safeParse(identity);
+  approve(requestId: string, identity: UserIdentityRef) {
+    const parsed = UserIdentityRefSchema.safeParse(identity);
     if (!parsed.success)
-      throw new CliAuthError("CLI_AUTH_USER_REQUIRED", "必须由已认证飞书用户授权", 403);
+      throw new CliAuthError("CLI_AUTH_USER_REQUIRED", "必须由已登录的 Web 或飞书用户授权", 403);
     const request = this.getLive(requestId);
     if (request.status !== "pending")
       throw new CliAuthError("CLI_AUTH_ALREADY_APPROVED", "此请求已处理", 409);
+    const identityVersion = this.identityVersion(parsed.data);
     request.identity = { ...parsed.data };
+    request.identityVersion = identityVersion;
     request.status = "approved";
     return this.inspect(requestId);
   }
@@ -93,7 +103,7 @@ export class CliAuthService {
   complete(
     requestId: string,
     claimSecret: string,
-  ): { status: "pending" } | { token: string; identity: FeishuIdentityRef; expiresAt: string } {
+  ): { status: "pending" } | { token: string; identity: UserIdentityRef; expiresAt: string } {
     const request = this.getLive(requestId);
     if (typeof claimSecret !== "string" || !timingSafeEqual(request.secretHash, hash(claimSecret)))
       throw new CliAuthError("CLI_AUTH_INVALID_CLAIM", "领取凭据无效");
@@ -101,26 +111,43 @@ export class CliAuthService {
       throw new CliAuthError("CLI_AUTH_ALREADY_CLAIMED", "此请求已领取", 409);
     if (request.status === "pending") return { status: "pending" };
     const identity = { ...request.identity! };
+    this.assertCurrentIdentity(identity, request.identityVersion!);
     const token = this.randomToken();
     const expires = this.now() + this.sessionTtlMs;
     // No await between status transition and issuance: concurrent callers cannot claim twice.
     request.status = "claimed";
-    this.sessions.set(hash(token).toString("hex"), { identity, expires });
+    this.sessions.set(hash(token).toString("hex"), {
+      identity,
+      identityVersion: request.identityVersion!,
+      expires,
+    });
     return { token, identity: { ...identity }, expiresAt: new Date(expires).toISOString() };
   }
 
-  authenticate(token: string): FeishuIdentityRef {
+  authenticate(token: string): UserIdentityRef {
     const key = hash(token).toString("hex");
     const session = this.sessions.get(key);
     if (!session || session.expires <= this.now()) {
       this.sessions.delete(key);
       throw new CliAuthError("CLI_AUTH_SESSION_INVALID", "CLI 用户会话失效，请重新登录");
     }
+    try {
+      this.assertCurrentIdentity(session.identity, session.identityVersion);
+    } catch (error) {
+      if (error instanceof CliAuthError || (error instanceof AppError && error.statusCode === 401))
+        this.sessions.delete(key);
+      throw error;
+    }
     return { ...session.identity };
   }
 
   revoke(token: string): void {
     this.sessions.delete(hash(token).toString("hex"));
+  }
+
+  private assertCurrentIdentity(identity: UserIdentityRef, expectedVersion: string): void {
+    if (this.identityVersion(identity) !== expectedVersion)
+      throw new CliAuthError("CLI_AUTH_SESSION_INVALID", "CLI 用户授权已撤销，请重新登录");
   }
 
   private get(requestId: string): Challenge {

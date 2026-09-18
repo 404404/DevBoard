@@ -166,7 +166,7 @@ export class TaskLifecycleService {
     this.#options.database
       .prepare(
         `DELETE FROM task_lifecycle_resources WHERE operation_id IN (
-      SELECT id FROM task_lifecycle_operations WHERE target_status = 'done' AND status = 'failed'
+      SELECT id FROM task_lifecycle_operations WHERE status = 'failed'
     )`,
       )
       .run();
@@ -208,7 +208,7 @@ export class TaskLifecycleService {
           .get(task.projectId)
       )
         throw new AppError("INVALID_REQUEST", 409, "任务或项目已归档或权限已变化，无法执行操作");
-      if (operation.targetStatus === "done" && operation.snapshotJson) {
+      if (operation.snapshotJson) {
         // Preserve branch identity across transient inspection failures, but do
         // not reuse an old commit/cleanup checkpoint as proof of completion.
         const previous = JSON.parse(operation.snapshotJson) as TaskGitSnapshot;
@@ -222,37 +222,41 @@ export class TaskLifecycleService {
         await this.#cancelExecutions(operation);
       } else {
         this.#assertReadyToComplete(operation.taskId);
-        // Reinspect on every retry, including operations persisted by the old
-        // automatic commit/cleanup flow. Historical delivery refs are irrelevant.
-        const directory = this.#taskDirectory(operation.taskId);
-        if (directory) {
-          const project = this.#options.database
-            .prepare("SELECT workspace_realpath AS cwd FROM projects WHERE id = ?")
-            .get(task.projectId) as { cwd: string | null };
-          let snapshot = await this.#options.gitFinalizer.inspect(
-            directory,
-            operation.taskId,
-            operation.id,
-            project.cwd,
-            this.#taskBranch(operation.taskId, directory, operation.snapshotJson),
+      }
+      this.#update(id, "running", "checking");
+      // Reinspect on every retry, including operations persisted by the old
+      // automatic commit/cleanup flow. Historical delivery refs are irrelevant.
+      const directory = this.#taskDirectory(operation.taskId);
+      if (directory) {
+        const project = this.#options.database
+          .prepare("SELECT workspace_realpath AS cwd FROM projects WHERE id = ?")
+          .get(task.projectId) as { cwd: string | null };
+        let snapshot = await this.#options.gitFinalizer.inspect(
+          directory,
+          operation.taskId,
+          operation.id,
+          project.cwd,
+          this.#taskBranch(operation.taskId, directory, operation.snapshotJson),
+        );
+        if (snapshot) {
+          this.#lockResources(operation, snapshot);
+          this.#update(id, "running", "checking", snapshot);
+          snapshot = await this.#options.gitFinalizer.verify(
+            snapshot,
+            operation.targetStatus === "canceled" ? operation.taskId : undefined,
           );
-          if (snapshot) {
-            this.#lockResources(operation, snapshot);
-            this.#update(id, "running", "checking", snapshot);
-            snapshot = await this.#options.gitFinalizer.verify(snapshot);
-            this.#update(id, "running", "checking", snapshot);
-          }
+          this.#update(id, "running", "checking", snapshot);
         }
       }
       operation = this.#operation(id);
       return this.#finish(operation);
     } catch (cause) {
-      const message =
+      const prefix = operation.targetStatus === "canceled" ? "任务未取消" : "任务未完成";
+      const detail =
         cause instanceof AppError
-          ? cause.message.startsWith("任务未完成")
-            ? cause.message
-            : `任务未完成：${cause.message}`
-          : "任务未完成：收尾失败，请检查工作目录后重试";
+          ? cause.message.replace(/^任务未完成：/, "")
+          : "检查失败，请检查工作目录后重试";
+      const message = `${prefix}：${detail}${operation.targetStatus === "canceled" ? "。请处理后重试；系统不会自动删除分支、工作树或文件。" : ""}`;
       this.#options.database
         .prepare(
           "UPDATE task_lifecycle_operations SET status = 'failed', error_summary = ?, updated_at = ? WHERE id = ? AND status <> 'succeeded'",

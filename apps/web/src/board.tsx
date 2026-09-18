@@ -84,7 +84,7 @@ import {
   reassignableProjects,
   visibleProjectKey,
 } from "./project-sync";
-import { TaskArchiveDrawer } from "./task-archive-drawer";
+import { TaskArchiveDrawer, type ArchiveTab } from "./task-archive-drawer";
 import { TaskCreateDialog } from "./task-create-dialog";
 import { TaskDeleteDialog } from "./task-delete-dialog";
 import {
@@ -190,6 +190,7 @@ export function BoardPage({
   };
   const [view, setView] = useState<WorkspaceViewMode>("board");
   const [filters, setFilters] = useState<TaskFilters>(EMPTY_FILTERS);
+  const [archiveTab, setArchiveTab] = useState<ArchiveTab>("done");
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [archiveClosing, setArchiveClosing] = useState(false);
   const [deleteCandidate, setDeleteCandidate] = useState<TaskView>();
@@ -467,6 +468,8 @@ export function BoardPage({
             <WorkspaceViewContent
               archive={
                 <TaskArchiveDrawer
+                  tab={archiveTab}
+                  onTabChange={setArchiveTab}
                   csrfToken={session.csrfToken}
                   mutationsEnabled={realtime !== "offline"}
                   tasks={visibleTasks}

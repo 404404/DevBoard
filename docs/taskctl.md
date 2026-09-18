@@ -3,7 +3,7 @@
 `node packages/taskctl/dist/cli.js --help` 可以在服务未运行时查看全部命令。
 构建：`npm run build -w @codexboard/taskctl`。运行时从
 `CODEXBOARD_DATA_DIR/run/runtime.json` 读取本机管理地址和能力令牌；源码 CLI 默认使用当前目录下的 `.data`。安装版 Skill 包装器使用 `~/Library/Application Support/CodexBoard/data`，入口见 [Agent 操作指南](../AGENTS.md#5-安装-skill-并调用内置-taskctl)。新变量未设置时兼容旧 `CODEXBOARD_DATA_DIR`，显式新值优先；开发时应指定独立的数据目录。
-所有业务操作通过受保护的本机 HTTP 接口执行，结果保持 JSON 格式。退出码：0 成功、1 服务或运行错误、2 用法错误。
+所有业务查询与写入都需要真实 Web 或飞书用户会话，通过受保护的本机 HTTP 接口执行，结果保持 JSON 格式。退出码：0 成功、1 服务或运行错误、2 用法错误。
 
 | 功能                   | 命令                                                                                     |
 | ---------------------- | ---------------------------------------------------------------------------------------- |
@@ -25,7 +25,7 @@
 
 具体必填参数以 `--help` 为准。项目由 Codex 同步，CLI 不提供项目创建、注册、更新和归档。
 `issue get` 返回任务工作区，包含评论、附件、关联、活动和执行信息。
-`issue read` 标记当前已登录飞书用户的已读状态。
+`issue read` 标记当前已登录用户的已读状态。
 
 ## 任务与版本
 
@@ -47,11 +47,13 @@ node packages/taskctl/dist/cli.js issue restore TASK_ID --version 5
 Git 任务完成只做检查，不自动提交或清理。main 主工作树任务只需 Git 干净；独立工作树或分支任务还需任务工作树目录、Git worktree 登记及分支均已删除。存在未提交或未跟踪改动、工作树或分支残留时，保留任务原状态并通过 `errorSummary` 返回具体原因；处理后可重试。非 Git 任务不执行 Git 清理。
 
 绑定主会话中 Desktop 用户发送的消息与 Codex 最终回复都会显示在任务对话中；Desktop 用户消息使用 `source: desktop`，是不可修改、删除的历史投影，不会再次作为待执行评论提交。同步只读历史，不恢复或抢占 Desktop 写会话。
-归档隐藏任务；恢复也适用于恢复已取消任务；删除不可由 `restore` 撤销。
+取消任务先停止活动执行，再做只读清理检查：Git 主工作区须干净；独立任务的工作树目录、Git 登记及任务分支须已删除，任务专属 `.tmp/taskboard/<任务UUID>/` 临时目录也须已清理。检查失败保留任务状态，返回残留项，用户处理后可重试；系统不会自动提交或删除文件、分支及工作树。无法确定归属的其他忽略目录不作为自动清理目标。
+
+归档隐藏任务；恢复也适用于恢复已取消任务，回到取消前的状态。旧开发上下文因工作树删除而失效不会阻止恢复；恢复保留历史绑定，不重建工作树或启动执行。删除不可由 `restore` 撤销。
 
 ## 评论
 
-用户可以要求 Codex 通过已经配对授权的 CLI 会话代写评论，作者固定为该会话的飞书用户：
+用户可以要求 Codex 通过已经配对授权的 CLI 会话代写评论，作者固定为该会话的 Web 或飞书用户：
 
 ```bash
 node packages/taskctl/dist/cli.js comment add --task TASK_ID --body "补充这项需求"
@@ -89,9 +91,9 @@ node packages/taskctl/dist/cli.js events list --project PROJECT_ID --after 0 --l
 
 ## 身份与只读审计
 
-真实用户统一表示为 `{ "kind": "feishu", "tenantKey": "企业标识", "userId": "用户标识" }`；任务返回 `assigneeIdentity` / `creatorIdentity`，人员摘要返回 `identity`。人类身份不再使用 actor UUID 或应用级 open_id。
+飞书用户表示为 `{ "kind": "feishu", "tenantKey": "企业标识", "userId": "用户标识" }`，Web 用户表示为 `{ "kind": "web", "accountId": "账号 UUID" }`；任务返回 `assigneeIdentity` / `creatorIdentity`，人员摘要返回 `identity`。人类身份不再使用 actor UUID 或应用级 open_id。
 
-创建任务前，在 CLI 发起配对并由飞书看板中的当前用户确认：
+查询或修改看板前，在 CLI 发起配对：Web 用户在浏览器授权页登录并确认，飞书用户在飞书看板授权页确认。浏览器会话不会自动转交给 CLI：
 
 ```bash
 node packages/taskctl/dist/cli.js auth login --label "我的 Codex"
@@ -102,13 +104,13 @@ node packages/taskctl/dist/cli.js issue create --project PROJECT_ID --title "待
 node packages/taskctl/dist/cli.js auth logout
 ```
 
-任何通过飞书登录验证的账号均可直接操作同一看板，不需要管理员初始化或成员登记。新任务负责人固定为当前会话的飞书用户；可以省略负责人参数，显式使用 `--assignee USER_ID --tenant TENANT_KEY` 时只能提交当前登录用户。不能指定其他用户或使用 `--assignee null` 清空负责人。更新其他字段时省略负责人，原有真实负责人保持不变。
+任何通过飞书登录验证的账号均可直接操作同一看板，不需要管理员初始化或成员登记。新任务负责人固定为当前会话的 Web 或飞书用户；推荐省略负责人参数。飞书用户显式使用 `--assignee USER_ID --tenant TENANT_KEY` 时只能提交当前登录用户。不能指定其他用户或使用 `--assignee null` 清空负责人。更新其他字段时省略负责人，原有真实负责人保持不变。
 
-CLI 凭据独立保存在当前用户私有目录中，权限为 0600；不会读取或复制飞书客户端 token。登录请求 10 分钟过期，会话 8 小时过期，服务重启后需重新登录。失效凭据不会降级为管理身份；可 `auth logout` 清除。每次请求重新检查会话和真实飞书登录证据。能力令牌保留为本机连接认证，不能代替用户登录。
+CLI 凭据独立保存在当前用户私有目录中，权限为 0600；不会读取或复制飞书客户端 token。登录请求 10 分钟过期，会话 8 小时过期，服务重启后需重新登录。失效凭据不会降级为管理身份；可 `auth logout` 清除。每次业务请求重新检查用户会话和身份有效性，飞书身份还需有效登录证据。Web 账号密码或启用状态更新时递增认证版本，撤销旧 CLI 会话及已批准待领取的配对；重新启用不会恢复旧授权。能力令牌保留为本机连接认证，不能代替用户登录。
 
-任务写操作（包括评论、依赖关系、附件、执行、审批和标签）必须携带有效飞书会话。凭据缺失时服务端返回 401，不会回退为本机服务身份；运行环境重新部署导致凭据文件消失时同样拒绝写入。本机健康查询等运维操作仍可使用能力令牌。
+所有看板查询和写入（包括 context、项目、任务、评论、依赖关系、附件、执行、审批、标签、事件、成员审计、生命周期和 Git）必须携带有效用户会话。凭据缺失时服务端返回 401，不会回退为本机服务身份；运行环境重新部署导致凭据文件消失时同样拒绝写入。健康检查、在线备份、桌面 Web 账号管理与登录申请/领取属于明确本机运维或认证引导，仍使用能力令牌。后台读取已绑定 Desktop 会话的执行事件并投影为对话及状态，与 CLI 用户会话独立；Desktop 输入标为“Desktop 用户”、最终回复标为“Codex”，不冒充任务发起人。
 
-负责人候选只包含当前已登录的飞书用户。用户身份、姓名和头像只能来自服务端成功验证的飞书登录，CLI 不提供创建或预登记用户的命令。旧 `member bootstrap` 命令和成员初始化接口已移除。`member audit` 仅只读返回 `identities`，包含身份来源、验证证据及历史引用数量，不输出凭证，也不会创建或修改用户。
+负责人候选只包含当前已登录用户。飞书身份、姓名和头像来自服务端验证的飞书登录；Web 身份来自本机创建的启用账号及密码登录。CLI 不提供创建或预登记用户的命令。旧 `member bootstrap` 命令和成员初始化接口已移除。`member audit` 仅只读返回 `identities`，包含身份来源、验证证据及历史引用数量，不输出凭证，也不会创建或修改用户。
 
 飞书应用需开通「获取用户 user ID」（`contact:user.employee_id:readonly`）；迁移还需以原应用身份读取通讯录，并确保数据权限覆盖旧用户。参考[飞书应用配置文档](https://open.larkenterprise.com/document/quick-start-of-personnel-and-attendance-management-system/step-1-create-and-configure-an-application)和[获取单个用户信息](https://open.feishu.cn/document/server-docs/contact-v3/user/get)。
 

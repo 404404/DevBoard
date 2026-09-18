@@ -5,7 +5,7 @@ import type { RuntimeDescriptor } from "@codexboard/contracts";
 import { describe, expect, it } from "vitest";
 
 import { defaultTaskctlDependencies, runTaskctl, type TaskctlDependencies } from "./index";
-import { runtimeScope } from "./auth.js";
+import { credentialPaths, runtimeScope } from "./auth.js";
 
 const descriptor: RuntimeDescriptor = {
   descriptorVersion: 1,
@@ -23,7 +23,13 @@ function harness(response: Response = Response.json({ data: { ok: true } })) {
   const dependencies: TaskctlDependencies = {
     readRuntimeDescriptor: async () => descriptor,
     credentials: {
-      read: async () => null,
+      read: async () =>
+        JSON.stringify({
+          scope: runtimeScope(descriptor),
+          token: "paired-session",
+          identity: { kind: "feishu", tenantKey: "tenant", userId: "user" },
+          expiresAt: "2099-01-01T00:00:00Z",
+        }),
       write: async () => undefined,
       remove: async () => undefined,
     },
@@ -43,6 +49,82 @@ function harness(response: Response = Response.json({ data: { ok: true } })) {
 }
 
 describe("runTaskctl", () => {
+  it.each([
+    ["context"],
+    ["project", "list"],
+    ["project", "scan", "p"],
+    ["project", "dashboard", "p"],
+    ["project", "options", "p"],
+    ["issue", "list", "--project", "p"],
+    ["issue", "get", "t"],
+    ["issue", "create", "--project", "p", "--title", "Task"],
+    ["issue", "read", "t"],
+    ["issue", "delete", "t", "--version", "1"],
+    ["job", "get", "j"],
+    ["job", "start", "--task", "t"],
+    ["job", "continue", "--task", "t"],
+    ["job", "cancel", "j"],
+    ["interaction", "list", "--job", "j"],
+    ["interaction", "respond", "i", "--decision", "accept"],
+    ["attachment", "upload", "--task", "t", "--file", "evidence.txt"],
+    ["attachment", "download", "a", "--output", "evidence.txt"],
+    ["lifecycle", "get", "t"],
+    ["lifecycle", "request", "t", "--version", "1", "--status", "done"],
+    ["label", "list"],
+    ["events", "list", "--project", "p"],
+    ["member", "audit"],
+    ["git", "list", "--project", "p"],
+    ["git", "create", "--project", "p", "--kind", "branch", "--branch", "feature/test"],
+  ])("requires a user session before a board request: %j", async (...argv) => {
+    const test = harness();
+    test.dependencies.credentials.read = async () => null;
+    let touchedFiles = false;
+    test.dependencies = {
+      ...test.dependencies,
+      readFile: async () => {
+        touchedFiles = true;
+        return new Uint8Array();
+      },
+      writeFile: async () => {
+        touchedFiles = true;
+      },
+    };
+    expect(await runTaskctl(argv, test.dependencies)).toBe(1);
+    expect(JSON.parse(test.stderr.join(""))).toMatchObject({
+      error: { code: "CLI_AUTH_NO_SESSION" },
+    });
+    expect(test.calls).toHaveLength(0);
+    expect(touchedFiles).toBe(false);
+  });
+
+  it.each([["health"], ["backup", "create"]])(
+    "keeps local maintenance available without accessing user credentials: %j",
+    async (...argv) => {
+      const test = harness();
+      test.dependencies.credentials.read = async () => {
+        throw new Error("expired or inaccessible user credentials");
+      };
+      expect(await runTaskctl(argv, test.dependencies)).toBe(0);
+      expect(test.calls).toHaveLength(1);
+      expect(new Headers(test.calls[0]?.init?.headers).has("x-taskctl-session")).toBe(false);
+    },
+  );
+
+  it("rejects a service identity saved as a CLI session", async () => {
+    const test = harness();
+    test.dependencies.credentials.read = async () =>
+      JSON.stringify({
+        scope: runtimeScope(descriptor),
+        token: "service-secret",
+        identity: { kind: "service", serviceId: "local-admin" },
+        expiresAt: "2099-01-01T00:00:00Z",
+      });
+    expect(await runTaskctl(["project", "list"], test.dependencies)).toBe(1);
+    expect(test.calls).toHaveLength(0);
+    expect(test.stderr.join("")).toContain("CLI_AUTH_FILE_INVALID");
+    expect(test.stderr.join("")).not.toContain("service-secret");
+  });
+
   it.each([
     [
       ["comment", "add", "--task", "task-id", "--body", "进度"],
@@ -66,6 +148,7 @@ describe("runTaskctl", () => {
     "attributes requested comment operations to the paired session: %j",
     async (args, method, path, body) => {
       const test = harness();
+      test.dependencies.credentials.read = async () => null;
       expect(await runTaskctl(args, test.dependencies)).toBe(1);
       expect(test.calls).toHaveLength(0);
       test.dependencies.credentials.read = async () =>
@@ -462,7 +545,7 @@ it("creates the task-owned download directory before writing attachment bytes", 
 describe("CLI user authentication", () => {
   const identity = { kind: "feishu", tenantKey: "tenant", userId: "user" };
   const expiresAt = "2026-09-09T08:00:00Z";
-  function authHarness() {
+  function authHarness(currentIdentity: unknown = identity) {
     const test = harness();
     const files = new Map<string, string>();
     const responses: Response[] = [];
@@ -479,54 +562,59 @@ describe("CLI user authentication", () => {
       },
       fetch: async (url, init) => {
         test.calls.push({ url: String(url), init });
-        return responses.shift() ?? Response.json({ data: { identity } });
+        return responses.shift() ?? Response.json({ data: { identity: currentIdentity } });
       },
     };
     return { ...test, files, responses };
   }
-  it("pairs, saves secrets privately, authenticates ordinary requests and revokes on logout", async () => {
-    const test = authHarness();
-    const verificationUrl = "http://127.0.0.1:47823/?taskctlLogin=request";
-    test.responses.push(
-      Response.json({
-        data: {
-          requestId: "request",
-          claimSecret: "private-claim",
-          verificationCode: "1234ABCD",
-          verificationUrl,
-          expiresAt,
-        },
-      }),
-    );
-    expect(await runTaskctl(["auth", "login", "--label", "My terminal"], test.dependencies)).toBe(
-      0,
-    );
-    expect(JSON.parse(String(test.calls[0]?.init?.body))).toEqual({ label: "My terminal" });
-    expect(test.stdout.join("")).not.toContain("private-claim");
-    expect(test.files.size).toBe(1);
-    expect([...test.files.values()][0]).toContain("private-claim");
-    test.responses.push(Response.json({ data: { token: "private-session", identity, expiresAt } }));
-    expect(await runTaskctl(["auth", "complete"], test.dependencies)).toBe(0);
-    expect(JSON.parse(String(test.calls[1]?.init?.body))).toEqual({
-      requestId: "request",
-      claimSecret: "private-claim",
-    });
-    expect(test.files.size).toBe(1);
-    expect([...test.files.values()][0]).toContain("private-session");
-    expect(test.stdout.join("")).not.toContain("private-session");
-    expect(await runTaskctl(["context"], test.dependencies)).toBe(0);
-    expect(new Headers(test.calls[2]?.init?.headers).get("x-taskctl-session")).toBe(
-      "private-session",
-    );
-    expect(test.calls[2]?.init?.redirect).toBe("error");
-    expect(await runTaskctl(["auth", "status"], test.dependencies)).toBe(0);
-    expect(JSON.parse(test.stdout.at(-1)!)).toEqual({ data: { identity } });
-    expect(await runTaskctl(["auth", "logout"], test.dependencies)).toBe(0);
-    expect(new Headers(test.calls[4]?.init?.headers).get("x-taskctl-session")).toBe(
-      "private-session",
-    );
-    expect(test.files.size).toBe(0);
-  });
+  it.each([identity, { kind: "web", accountId: "11111111-1111-4111-8111-111111111111" }])(
+    "pairs %j, saves secrets privately, authenticates requests and revokes on logout",
+    async (identity) => {
+      const test = authHarness(identity);
+      const verificationUrl = "http://127.0.0.1:47823/?taskctlLogin=request";
+      test.responses.push(
+        Response.json({
+          data: {
+            requestId: "request",
+            claimSecret: "private-claim",
+            verificationCode: "1234ABCD",
+            verificationUrl,
+            expiresAt,
+          },
+        }),
+      );
+      expect(await runTaskctl(["auth", "login", "--label", "My terminal"], test.dependencies)).toBe(
+        0,
+      );
+      expect(JSON.parse(String(test.calls[0]?.init?.body))).toEqual({ label: "My terminal" });
+      expect(test.stdout.join("")).not.toContain("private-claim");
+      expect(test.files.size).toBe(1);
+      expect([...test.files.values()][0]).toContain("private-claim");
+      test.responses.push(
+        Response.json({ data: { token: "private-session", identity, expiresAt } }),
+      );
+      expect(await runTaskctl(["auth", "complete"], test.dependencies)).toBe(0);
+      expect(JSON.parse(String(test.calls[1]?.init?.body))).toEqual({
+        requestId: "request",
+        claimSecret: "private-claim",
+      });
+      expect(test.files.size).toBe(1);
+      expect([...test.files.values()][0]).toContain("private-session");
+      expect(test.stdout.join("")).not.toContain("private-session");
+      expect(await runTaskctl(["context"], test.dependencies)).toBe(0);
+      expect(new Headers(test.calls[2]?.init?.headers).get("x-taskctl-session")).toBe(
+        "private-session",
+      );
+      expect(test.calls[2]?.init?.redirect).toBe("error");
+      expect(await runTaskctl(["auth", "status"], test.dependencies)).toBe(0);
+      expect(JSON.parse(test.stdout.at(-1)!)).toEqual({ data: { identity } });
+      expect(await runTaskctl(["auth", "logout"], test.dependencies)).toBe(0);
+      expect(new Headers(test.calls[4]?.init?.headers).get("x-taskctl-session")).toBe(
+        "private-session",
+      );
+      expect(test.files.size).toBe(0);
+    },
+  );
   it("keeps a session when server revocation fails and refuses silent fallback on server expiry", async () => {
     const test = authHarness();
     test.responses.push(
@@ -707,6 +795,15 @@ describe("CLI user authentication", () => {
   );
   it("sends natural-key assignees, requires tenant and omits unset creation assignee", async () => {
     const test = authHarness();
+    test.files.set(
+      credentialPaths(descriptor, test.dependencies.authFile()).session,
+      JSON.stringify({
+        scope: runtimeScope(descriptor),
+        token: "paired-session",
+        identity,
+        expiresAt,
+      }),
+    );
     expect(
       await runTaskctl(
         [

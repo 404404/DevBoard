@@ -15,8 +15,6 @@ description: 通过已安装的 CodexBoard 应用查询和管理飞书任务看�
 TASKCTL="/实际安装目录/manage-codexboard/scripts/taskctl.sh"
 "$TASKCTL" --help
 "$TASKCTL" health
-"$TASKCTL" context
-"$TASKCTL" project list
 ```
 
 包装器依次寻找 `/Applications/CodexBoard.app`、`~/Applications/CodexBoard.app`，只调用所选应用内的 Node 和 taskctl。自定义安装位置可通过 `CODEXBOARD_APP_PATH` 指定；显式路径无效就报错，不回退到其他应用。默认数据目录是 `~/Library/Application Support/CodexBoard/data`，显式 `CODEXBOARD_DATA_DIR` 覆盖该目录；仅未设置新变量时兼容旧版数据目录覆盖。覆盖变量不接受空值。旧版数据迁移由应用启动时处理，包装器不移动数据。
@@ -33,7 +31,9 @@ CLI 自动读取私有运行时描述，不要读取或展示 `runtime.json`、�
 
 ## 身份与操作范围
 
-先按用户请求区分查询、任务修改、执行和收尾。已有授权可复用；安装技能或登录 Codex 不等于已授权 CLI 写入看板。用户请求写操作时，先检查真实飞书会话：
+先按用户请求区分代码开发、查询、任务修改、执行和收尾。仅需在现有对话中开发代码时，不要发起 CLI 配对；已绑定任务的 Desktop 对话和结果由后台事件同步，不依赖 CLI 会话。
+
+需要通过 CLI 查询或操作看板时，先检查真实 Web 或飞书用户会话。所有业务读写均需用户登录，不能以本机服务身份执行；`health`、`backup create` 和登录引导是明确例外。已有有效且身份正确的授权可复用；安装技能、登录浏览器或 Codex 不等于已授权 CLI：
 
 ```sh
 "$TASKCTL" auth status
@@ -45,20 +45,20 @@ CLI 自动读取私有运行时描述，不要读取或展示 `runtime.json`、�
 "$TASKCTL" auth login --label "Codex"
 ```
 
-将返回的 `verificationUrl` 与 `verificationCode` 交给用户，等待用户在飞书核对身份并真实确认后，再完成配对：
+将返回的 `verificationUrl` 与 `verificationCode` 交给用户。Web 用户在浏览器登录授权页，飞书用户在飞书打开授权页；等待用户核对账号、CLI 名称与验证码并点击确认后，再完成配对。不要要求 Web 用户改用飞书：
 
 ```sh
 "$TASKCTL" auth complete
 "$TASKCTL" auth status
 ```
 
-`auth complete` 只能在用户真实确认后运行；`CLI_AUTH_PENDING` 表示仍需等待。不能替用户确认、伪造身份或生成 token。服务重启后可能需要重新配对；未登录不是安装失败。
+`auth complete` 只能在用户真实确认后运行；`CLI_AUTH_PENDING` 表示仍需等待。不能替用户确认、伪造身份或生成 token。服务重启、会话过期或 Web 账号停用/重置密码后需重新配对；未登录不是安装失败。配对只暂停需要 CLI 的业务操作，不阻塞已授权的代码开发。
 
-新任务默认负责人为已授权的飞书用户，不指定其他人或清空负责人。用户委托发布的评论署真实飞书用户；不能以本机管理身份冒充作者。任务执行结果由系统以 Codex 来源同步。
+新任务默认负责人为已授权的 Web 或飞书用户，不指定其他人或清空负责人。用户委托发布的评论署当前真实用户；不能以本机管理身份冒充作者。任务执行结果由系统以 Codex 来源同步。
 
 ## 定位与修改任务
 
-使用查询结果中的真实项目 ID、任务 UUID、job ID 和最新版本。`TEMP-004` 等显示编号不是任务 UUID；先在项目列表和任务列表中匹配，再读取详情。以下大写 ID、`N` 均需替换，不能原样执行。
+完成配对后，可先运行 `"$TASKCTL" context` 与 `"$TASKCTL" project list` 定位项目。使用查询结果中的真实项目 ID、任务 UUID、job ID 和最新版本。`TEMP-004` 等显示编号不是任务 UUID；先在项目列表和任务列表中匹配，再读取详情。以下大写 ID、`N` 均需替换，不能原样执行。
 
 ```sh
 "$TASKCTL" project options PROJECT_ID
@@ -104,7 +104,7 @@ CLI 自动读取私有运行时描述，不要读取或展示 `runtime.json`、�
 
 与任务绑定的 Codex 主会话最终回复会由原执行事件显示为 Codex 评论；中途 commentary 不同步为评论。只报告实际结果与证据。没有绑定主会话时，不声称当前回复会自动同步。同步延迟先检查原 job 和连接，不用手工评论伪造 Codex 结果，也不重复启动任务。
 
-用户要求代发评论或保存文件到任务时，可使用真实飞书会话执行：
+用户要求代发评论或保存文件到任务时，可使用已授权的 Web 或飞书用户会话执行：
 
 ```sh
 "$TASKCTL" comment add --task TASK_ID --body "用户要求发布的评论"
@@ -140,7 +140,7 @@ CLI 自动读取私有运行时描述，不要读取或展示 `runtime.json`、�
 "$TASKCTL" issue delete TASK_ID --version N
 ```
 
-- 取消 job 只停止一次执行；取消任务使用生命周期并查询结束状态。
+- 取消 job 只停止一次执行；取消任务使用生命周期并查询结束状态。取消任务会先停止执行，再只读检查主工作区 Git、任务分支与工作树以及任务专属临时目录；残留未清理时保持任务状态并提示，不自动删除，按用户授权处理后重试。
 - 归档隐藏记录；恢复可用于归档或已取消的任务。
 - 永久删除需明确删除意图，不能通过恢复撤销。服务要求任务已完成或已取消、未归档、无活跃执行，删除时会归档关联会话。不要为了删除而虚称任务已验收；在授权范围内采用取消流程，再读取最新版本删除。
 

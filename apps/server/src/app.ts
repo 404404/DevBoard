@@ -154,7 +154,9 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
   if (options.config.CODEXBOARD_AUTH_MODE === "development") {
     identityService.ensureDevelopmentActor(DEVELOPMENT_IDENTITY);
   }
-  const cliAuth = new CliAuthService();
+  const cliAuth = new CliAuthService({
+    identityVersion: (identity) => identityService.cliIdentityVersion(identity),
+  });
   registerIdentityRoutes(app, {
     webAccounts: new WebAccountService(options.database),
     config: options.config,

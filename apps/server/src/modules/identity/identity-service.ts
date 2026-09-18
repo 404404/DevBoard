@@ -3,7 +3,9 @@ import {
   identityFromKey,
   IdentityKeySchema,
   IdentityRefSchema,
+  UserIdentityRefSchema,
   type IdentityRef,
+  type UserIdentityRef,
 } from "@codexboard/contracts";
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 
@@ -181,6 +183,14 @@ export class IdentityService {
   /** Revalidates an authenticated CLI session against current membership and login evidence. */
   authenticatedFeishuPrincipal(identity: IdentityRef): PrincipalView {
     if (identity.kind !== "feishu") throw new AppError("UNAUTHENTICATED", 401, "需要飞书用户身份");
+    return this.authenticatedUserPrincipal(identity);
+  }
+
+  /** CLI credentials only represent real, currently active users, never a local service. */
+  authenticatedUserPrincipal(identity: IdentityRef): PrincipalView & { identity: UserIdentityRef } {
+    const user = UserIdentityRefSchema.safeParse(identity);
+    if (!user.success)
+      throw new AppError("UNAUTHENTICATED", 401, "需要已登录的 Web 或飞书用户身份");
     const key = identityKey(identity);
     const parsed = PrincipalRowSchema.safeParse(
       this.#database
@@ -190,15 +200,39 @@ export class IdentityService {
         )
         .get(key),
     );
-    if (!parsed.success || parsed.data.active !== 1 || !hasFeishuIdentity(this.#database, key)) {
-      throw new AppError("UNAUTHENTICATED", 401, "用户已停用或需要重新从飞书登录");
+    const verified =
+      user.data.kind === "feishu"
+        ? hasFeishuIdentity(this.#database, key)
+        : hasWebIdentity(this.#database, key);
+    if (!parsed.success || parsed.data.active !== 1 || !verified) {
+      throw new AppError("UNAUTHENTICATED", 401, "用户已停用或需要重新登录");
     }
-    return PrincipalViewSchema.parse({
-      identity,
-      name: parsed.data.name,
-      avatarUrl: parsed.data.avatarUrl,
-      role: parsed.data.role,
-    });
+    return {
+      ...PrincipalViewSchema.parse({
+        identity: user.data,
+        name: parsed.data.name,
+        avatarUrl: parsed.data.avatarUrl,
+        role: parsed.data.role,
+      }),
+      identity: user.data,
+    };
+  }
+
+  cliIdentityVersion(identity: IdentityRef): string {
+    this.authenticatedUserPrincipal(identity);
+    const key = identityKey(identity);
+    if (identity.kind !== "web") return key;
+    const version = z
+      .number()
+      .int()
+      .nonnegative()
+      .parse(
+        this.#database
+          .prepare("SELECT auth_version FROM web_accounts WHERE id = ?")
+          .pluck()
+          .get(identity.accountId),
+      );
+    return `${key}:${version}`;
   }
 
   async exchangeCode(code: string): Promise<SessionGrant> {

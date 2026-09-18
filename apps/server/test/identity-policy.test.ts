@@ -97,7 +97,27 @@ function setup() {
       "idempotency-key": `policy-${code}`,
     };
   }
-  return { database, publicApp, localApp, localHeaders, login, alice, bob, unverified, member };
+  async function loginCli(code: string) {
+    await login(code);
+    const cliAuth = appControl(publicApp).services.cliAuth;
+    const request = cliAuth.create("identity-policy-test");
+    cliAuth.approve(request.requestId, code === "alice-auth-code" ? alice.identity : bob.identity);
+    const session = cliAuth.complete(request.requestId, request.claimSecret);
+    if (!("token" in session)) throw new Error("missing CLI session");
+    return { ...localHeaders, "x-taskctl-session": session.token };
+  }
+  return {
+    database,
+    publicApp,
+    localApp,
+    localHeaders,
+    login,
+    loginCli,
+    alice,
+    bob,
+    unverified,
+    member,
+  };
 }
 
 describe("Feishu owner and comment identity policy", () => {
@@ -168,12 +188,15 @@ describe("Feishu owner and comment identity policy", () => {
     ).toEqual(["飞书用户原文"]);
   });
 
-  it("audits local, verified and unverified identities without treating registration as verification", async () => {
-    const { localApp, localHeaders, login, alice, unverified } = setup();
-    await login("alice-auth-code");
+  it("audits verified and unverified identities as the paired user without creating a local service identity", async () => {
+    const { localApp, localHeaders, loginCli, alice, unverified } = setup();
+    const userHeaders = await loginCli("alice-auth-code");
     const url = "/api/v1/local/members/audit";
     expect((await localApp.inject({ method: "GET", url })).statusCode).toBe(403);
-    const response = await localApp.inject({ method: "GET", url, headers: localHeaders });
+    expect((await localApp.inject({ method: "GET", url, headers: localHeaders })).statusCode).toBe(
+      401,
+    );
+    const response = await localApp.inject({ method: "GET", url, headers: userHeaders });
     expect(response.statusCode, response.body).toBe(200);
     expect(response.json().data.identities).toEqual(
       expect.arrayContaining([
@@ -187,13 +210,9 @@ describe("Feishu owner and comment identity policy", () => {
           identityKind: "unverified",
           eligibleAssignee: false,
         }),
-        expect.objectContaining({
-          name: "本地开发管理员",
-          identityKind: "local_service",
-          eligibleAssignee: false,
-        }),
       ]),
     );
+    expect(response.json().data.summary.localService).toBe(0);
     expect(response.body).not.toContain("capabilityToken");
   });
 

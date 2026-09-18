@@ -117,6 +117,8 @@ test("status is read-only and explicit install writes verified files with requir
   const f = fixture(t);
   const initial = f.manager.status();
   assert.equal(initial.status, "notInstalled");
+  assert.equal(initial.updateAvailable, false);
+  assert.match(initial.bundledRevision, /^[a-f0-9]{64}$/);
   assert.equal(initial.canInstall, true);
   assert.match(initial.fingerprint, /^[a-f0-9]{64}$/);
   assert.deepEqual(f.manager.status(), initial);
@@ -125,6 +127,8 @@ test("status is read-only and explicit install writes verified files with requir
   assert.equal(installed.status, "current");
   assert.equal(installed.installedVersion, "0.1.1");
   assert.equal(installed.canInstall, false);
+  assert.equal(installed.updateAvailable, false);
+  assert.equal(installed.bundledRevision, initial.bundledRevision);
   assert.match(installed.message, /Codex 技能列表/);
   assert.equal(readFileSync(join(f.target, "SKILL.md"), "utf8"), "# Test Skill\n");
   assert.equal(lstatSync(join(f.target, "scripts/taskctl.sh")).mode & 0o777, 0o755);
@@ -230,15 +234,144 @@ test("new bundled versions are offered without writing and update only after a f
   assert.equal(status.status, "updateAvailable");
   assert.equal(status.installedVersion, "0.1.1");
   assert.equal(status.bundledVersion, "0.1.2");
+  assert.equal(status.updateAvailable, true);
   assert.equal(readFileSync(join(f.target, "SKILL.md"), "utf8"), "# Test Skill\n");
   assert.equal((await f.manager.install()).status, "error");
   const result = await f.manager.install({ expectedFingerprint: status.fingerprint });
   assert.equal(result.status, "current");
   assert.equal(result.installedVersion, "0.1.2");
+  assert.equal(result.updateAvailable, false);
   f.bundled("0.1.1");
   assert.equal(f.manager.status().status, "current");
+  assert.equal(f.manager.status().updateAvailable, false);
+  assert.equal(f.manager.status().canInstall, false);
   assert.equal((await f.manager.install()).installedVersion, "0.1.2");
   assert.equal(readFileSync(join(f.target, "SKILL.md"), "utf8"), "new version\n");
+});
+
+test("same-version bundle changes are updates to untouched installations and require an explicit fresh install", async (t) => {
+  const f = fixture(t);
+  const installed = await f.manager.install();
+  const previousState = readFileSync(f.stateFile);
+  f.bundled("0.1.1", "same version with revised instructions\n");
+  const status = f.manager.status();
+  assert.equal(status.status, "updateAvailable");
+  assert.equal(status.updateAvailable, true);
+  assert.equal(status.canInstall, true);
+  assert.equal(status.canReplace, false);
+  assert.equal(status.installedVersion, "0.1.1");
+  assert.notEqual(status.bundledRevision, installed.bundledRevision);
+  assert.equal(status.fingerprint, installed.fingerprint);
+  assert.deepEqual(readFileSync(f.stateFile), previousState);
+  assert.equal(readFileSync(join(f.target, "SKILL.md"), "utf8"), "# Test Skill\n");
+  assert.equal((await f.manager.install()).status, "error");
+  const result = await f.manager.install({ expectedFingerprint: status.fingerprint });
+  assert.equal(result.status, "current");
+  assert.equal(result.updateAvailable, false);
+  assert.equal(result.bundledRevision, status.bundledRevision);
+  assert.equal(
+    readFileSync(join(f.target, "SKILL.md"), "utf8"),
+    "same version with revised instructions\n",
+  );
+});
+
+test("trusted receipts announce updated bundles while protecting locally modified files until replacement is confirmed", async (t) => {
+  for (const version of ["0.1.1", "0.1.2"]) {
+    const f = fixture(t);
+    await f.manager.install();
+    write(join(f.target, "SKILL.md"), "personal instructions\n");
+    f.bundled(version, "new bundled instructions\n");
+    const status = f.manager.status();
+    assert.equal(status.status, "modified");
+    assert.equal(status.installedVersion, "0.1.1");
+    assert.equal(status.updateAvailable, true);
+    assert.equal(status.canInstall, false);
+    assert.equal(status.canReplace, true);
+    assert.equal(
+      (await f.manager.install({ expectedFingerprint: status.fingerprint })).status,
+      "error",
+    );
+    assert.equal(readFileSync(join(f.target, "SKILL.md"), "utf8"), "personal instructions\n");
+    const result = await f.manager.install({
+      expectedFingerprint: status.fingerprint,
+      replaceModified: true,
+    });
+    assert.equal(result.status, "current");
+    assert.equal(result.updateAvailable, false);
+    assert.equal(readFileSync(join(f.target, "SKILL.md"), "utf8"), "new bundled instructions\n");
+  }
+});
+
+test("untrusted installation metadata never announces an update even when the bundled version is higher", async (t) => {
+  for (const mutate of [
+    (f) => {
+      const path = join(f.target, ".codexboard-skill.json");
+      const receipt = JSON.parse(readFileSync(path));
+      receipt.version = "0.0.1";
+      write(path, JSON.stringify(receipt));
+    },
+    (f) => {
+      const state = JSON.parse(readFileSync(f.stateFile));
+      state.installed.files[0].sha256 = "0".repeat(64);
+      write(f.stateFile, JSON.stringify(state), 0o600);
+    },
+    (f) => rmSync(f.stateFile),
+  ]) {
+    const f = fixture(t);
+    await f.manager.install();
+    mutate(f);
+    f.bundled("0.1.2", "new bundle\n");
+    const status = f.manager.status();
+    assert.equal(status.status, "modified");
+    assert.equal(status.installedVersion, null);
+    assert.equal(status.updateAvailable, false);
+    assert.equal(status.canInstall, false);
+    assert.equal(
+      (await f.manager.install({ expectedFingerprint: status.fingerprint })).status,
+      "error",
+    );
+    assert.equal(readFileSync(join(f.target, "SKILL.md"), "utf8"), "# Test Skill\n");
+  }
+});
+
+test("bundle revisions depend on normalized file content and modes, not filesystem identity, manifest order or version", async (t) => {
+  const first = fixture(t);
+  const second = fixture(t);
+  assert.notEqual(lstatSync(first.source).ino, lstatSync(second.source).ino);
+  const original = first.manager.status().bundledRevision;
+  assert.equal(second.manager.status().bundledRevision, original);
+  const manifest = JSON.parse(readFileSync(second.manifestFile));
+  manifest.version = "0.1.2";
+  manifest.files.reverse();
+  write(second.manifestFile, JSON.stringify(manifest, null, 2));
+  assert.equal(second.manager.status().bundledRevision, original);
+  chmodSync(join(second.source, "scripts/taskctl.sh"), 0o644);
+  manifest.files.find((file) => file.path === "scripts/taskctl.sh").mode = 0o644;
+  write(second.manifestFile, JSON.stringify(manifest));
+  assert.notEqual(second.manager.status().bundledRevision, original);
+  second.bundled("0.1.1", "changed content\n");
+  assert.notEqual(second.manager.status().bundledRevision, original);
+});
+
+test("a managed installed tree cannot claim an available update or be followed after a bundle change", async (t) => {
+  const f = fixture(t);
+  await f.manager.install();
+  const outside = join(f.directory, "outside-skill.md");
+  write(outside, "managed personal contents\n");
+  rmSync(join(f.target, "SKILL.md"));
+  symlinkSync(outside, join(f.target, "SKILL.md"));
+  f.bundled("0.1.2", "new bundle\n");
+  const status = f.manager.status();
+  assert.equal(status.status, "managed");
+  assert.equal(status.updateAvailable, false);
+  assert.equal(status.canInstall, false);
+  assert.equal(status.canReplace, false);
+  assert.equal(
+    (await f.manager.install({ replaceModified: true, expectedFingerprint: status.fingerprint }))
+      .status,
+    "error",
+  );
+  assert.equal(readFileSync(outside, "utf8"), "managed personal contents\n");
 });
 
 test("links, special paths and manager markers cannot be replaced even with confirmation", async (t) => {

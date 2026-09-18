@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { z } from "zod";
 import {
-  FeishuIdentityRefSchema,
+  UserIdentityRefSchema,
   normalizeCodexBoardEnvironment,
   type RuntimeDescriptor,
 } from "@codexboard/contracts";
@@ -161,7 +161,7 @@ export const PendingCredentialSchema = z
   .object({ ...Shared, requestId: z.string().min(1), claimSecret: z.string().min(1) })
   .strict();
 export const SessionCredentialSchema = z
-  .object({ ...Shared, token: z.string().min(1), identity: FeishuIdentityRefSchema })
+  .object({ ...Shared, token: z.string().min(1), identity: UserIdentityRefSchema })
   .strict();
 export async function readCredential<T>(
   store: CredentialStore,

@@ -156,3 +156,32 @@ it("uses only read-only Git commands with optional writes disabled", async () =>
   await checker.verify(snapshot);
   expect(commands.every((c) => ["rev-parse", "status", "worktree"].includes(c[4]!))).toBe(true);
 });
+
+it("blocks cancellation on task-scoped ignored temporary files without touching unrelated caches", async () => {
+  const { main, finalizer } = setup();
+  writeFileSync(join(main, ".gitignore"), ".tmp/\n");
+  git(main, "add", ".");
+  git(main, "commit", "-m", "ignore temporary files");
+  const temporary = join(main, ".tmp", "taskboard", "task");
+  const unrelated = join(main, ".tmp", "taskboard", "other-task");
+  mkdirSync(temporary, { recursive: true });
+  mkdirSync(unrelated);
+  writeFileSync(join(temporary, "evidence.txt"), "keep until user cleanup");
+  const snapshot = (await finalizer.inspect(main, "task", "operation", main, "main"))!;
+  await expect(finalizer.verify(snapshot, "task")).rejects.toThrow("任务临时目录尚未删除");
+  expect(existsSync(join(temporary, "evidence.txt"))).toBe(true);
+  rmSync(temporary, { recursive: true });
+  await expect(finalizer.verify(snapshot, "task")).resolves.toMatchObject({ mainTask: true });
+  expect(existsSync(unrelated)).toBe(true);
+});
+
+it("rejects a leftover plain directory after Git worktree removal", async () => {
+  const { main, worktree, check } = setup();
+  git(main, "worktree", "add", "-b", "feature/task", worktree);
+  git(main, "worktree", "remove", worktree);
+  git(main, "branch", "-d", "feature/task");
+  mkdirSync(worktree);
+  writeFileSync(join(worktree, "temporary.log"), "keep");
+  await expect(check(worktree, "feature/task")).rejects.toThrow("工作树尚未删除");
+  expect(existsSync(join(worktree, "temporary.log"))).toBe(true);
+});

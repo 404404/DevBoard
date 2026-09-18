@@ -15,7 +15,11 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { initializeDatabase, type SqliteDatabase } from "../src/modules/database/index.js";
+import {
+  CORE_MIGRATIONS,
+  initializeDatabase,
+  type SqliteDatabase,
+} from "../src/modules/database/index.js";
 import {
   acquireDataDirectoryLock,
   BackupService,
@@ -102,7 +106,7 @@ describe("BackupService", () => {
     const verified = BackupService.verify(destination);
 
     expect(verified).toEqual(manifest);
-    expect(manifest.schemaVersion).toBe(26);
+    expect(manifest.schemaVersion).toBe(CORE_MIGRATIONS.at(-1)!.version);
     expect(manifest.attachments).toEqual([
       expect.objectContaining({ path: "aa/file.bin", size: 19 }),
     ]);

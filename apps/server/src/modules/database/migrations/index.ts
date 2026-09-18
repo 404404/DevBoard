@@ -1,4 +1,5 @@
 import { DESKTOP_OUTCOME_CORRECTION_SQL } from "./0026-desktop-outcome-correction.js";
+import { WEB_CLI_AUTH_VERSION_SQL } from "./0027-web-cli-auth-version.js";
 import { EXECUTION_RESULT_RECOVERY_SQL } from "./0025-execution-result-recovery.js";
 import { TASK_MODEL_OPTIONS_SQL } from "./0024-task-model-options.js";
 import { webAccountsMigration } from "./0023-web-accounts.js";
@@ -132,6 +133,7 @@ export function identityMigrations(
     { version: 24, name: "task_model_options", sql: TASK_MODEL_OPTIONS_SQL },
     { version: 25, name: "execution_result_recovery", sql: EXECUTION_RESULT_RECOVERY_SQL },
     { version: 26, name: "desktop_outcome_correction", sql: DESKTOP_OUTCOME_CORRECTION_SQL },
+    { version: 27, name: "web_cli_auth_version", sql: WEB_CLI_AUTH_VERSION_SQL },
   ];
 }
 

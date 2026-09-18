@@ -143,13 +143,15 @@ it("retains a failed completion for retry rather than marking the task done", as
   await expect(service.wait(operation.id)).rejects.toThrow();
   expect(service.readLatest(task.id, actor)?.status).toBe("failed");
   expect(taskboard.readTask(task.id, actor).status).toBe(task.status);
-  // A task cancellation can explicitly abandon failed completion and release its locks.
+  // Cancellation abandons failed completion, but cannot bypass the workspace check.
   const canceled = service.request(
     task.id,
     { targetStatus: "canceled", expectedVersion: task.version },
     context(),
   );
-  expect((await service.wait(canceled.id)).task.status).toBe("canceled");
+  await expect(service.wait(canceled.id)).rejects.toThrow();
+  expect(taskboard.readTask(task.id, actor).status).toBe(task.status);
+  expect(service.readLatest(task.id, actor)?.errorSummary).toContain("任务未取消");
 });
 
 it.each(["backlog", "todo", "in_progress", "in_review", "blocked"] as const)(
@@ -419,9 +421,13 @@ it("keeps description locked after an earlier success even when the latest run f
   ).toThrow("任务描述已锁定");
 });
 
-it.each(["legacy", "context"])(
-  "checks externally deleted worktrees using %s metadata without a receipt",
-  async (source) => {
+it.each(
+  ["legacy", "context"].flatMap((source) =>
+    (["done", "canceled"] as const).map((targetStatus) => ({ source, targetStatus })),
+  ),
+)(
+  "checks externally deleted worktrees using $source metadata for $targetStatus without a receipt",
+  async ({ source, targetStatus }) => {
     const { database, taskboard, task, queue } = setup();
     const root = mkdtempSync(join(tmpdir(), "lifecycle-check-only-"));
     roots.push(root);
@@ -452,11 +458,12 @@ it.each(["legacy", "context"])(
     });
     const operation = service.request(
       task.id,
-      { expectedVersion: task.version, targetStatus: "done" },
+      { expectedVersion: task.version, targetStatus },
       context(),
     );
     await expect(service.wait(operation.id)).rejects.toThrow("工作树尚未删除");
     expect(existsSync(worktree)).toBe(true);
+    expect(taskboard.readTask(task.id, actor).status).toBe(task.status);
     expect(
       database
         .prepare("SELECT COUNT(*) FROM task_lifecycle_resources WHERE operation_id = ?")
@@ -491,47 +498,61 @@ it.each(["legacy", "context"])(
         operation.id,
       );
     git("worktree", "remove", worktree);
-    service.request(task.id, { expectedVersion: task.version, targetStatus: "done" }, context());
+    service.request(task.id, { expectedVersion: task.version, targetStatus }, context());
     await expect(service.wait(operation.id)).rejects.toThrow("分支尚未删除");
     git("branch", "-d", "feature/task");
     if (source === "context")
       database
         .prepare("UPDATE task_lifecycle_operations SET snapshot_json = NULL WHERE id = ?")
         .run(operation.id);
-    service.request(task.id, { expectedVersion: task.version, targetStatus: "done" }, context());
-    expect((await service.wait(operation.id)).task.status).toBe("done");
+    service.request(task.id, { expectedVersion: task.version, targetStatus }, context());
+    expect((await service.wait(operation.id)).task.status).toBe(targetStatus);
     expect(service.readLatest(task.id, actor)).toMatchObject({
       status: "succeeded",
       phase: "completed",
       commitSha: null,
       archiveRef: null,
     });
+    if (targetStatus === "canceled") {
+      const canceled = taskboard.readTask(task.id, actor);
+      const restored = taskboard.restoreTask(
+        task.id,
+        { expectedVersion: canceled.version },
+        context(),
+      ).task;
+      expect(restored.status).toBe(task.status);
+      expect(restored.developmentContextId).toBe(canceled.developmentContextId);
+      expect(existsSync(worktree)).toBe(false);
+    }
     expect(git("for-each-ref", "--format=%(refname)", "refs/taskboard")).toBe("");
   },
 );
 
-it("releases legacy failed completion locks on restart so Git cleanup remains available", async () => {
-  const { database, task, service } = setup();
-  database
-    .prepare("UPDATE projects SET workspace_realpath = '/missing-worktree' WHERE id = ?")
-    .run(task.projectId);
-  const operation = service.request(
-    task.id,
-    { targetStatus: "done", expectedVersion: task.version },
-    context(),
-  );
-  await expect(service.wait(operation.id)).rejects.toThrow();
-  database
-    .prepare(
-      "INSERT INTO task_lifecycle_resources (resource_key, operation_id) VALUES ('repo:/old', ?)",
-    )
-    .run(operation.id);
-  await service.resumePending();
-  expect(
+it.each(["done", "canceled"] as const)(
+  "releases failed %s locks on restart so Git cleanup remains available",
+  async (targetStatus) => {
+    const { database, task, service } = setup();
     database
-      .prepare("SELECT COUNT(*) FROM task_lifecycle_resources WHERE operation_id = ?")
-      .pluck()
-      .get(operation.id),
-  ).toBe(0);
-  expect(service.readLatest(task.id, actor)?.status).toBe("failed");
-});
+      .prepare("UPDATE projects SET workspace_realpath = '/missing-worktree' WHERE id = ?")
+      .run(task.projectId);
+    const operation = service.request(
+      task.id,
+      { targetStatus, expectedVersion: task.version },
+      context(),
+    );
+    await expect(service.wait(operation.id)).rejects.toThrow();
+    database
+      .prepare(
+        "INSERT INTO task_lifecycle_resources (resource_key, operation_id) VALUES ('repo:/old', ?)",
+      )
+      .run(operation.id);
+    await service.resumePending();
+    expect(
+      database
+        .prepare("SELECT COUNT(*) FROM task_lifecycle_resources WHERE operation_id = ?")
+        .pluck()
+        .get(operation.id),
+    ).toBe(0);
+    expect(service.readLatest(task.id, actor)?.status).toBe("failed");
+  },
+);

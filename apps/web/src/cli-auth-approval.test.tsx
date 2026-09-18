@@ -58,6 +58,25 @@ describe("explicit CLI pairing approval", () => {
     };
     expect(render("pending", service)).not.toContain("确认授权此 CLI");
   });
+  it("lets the logged-in Web account approve without a Feishu identity", () => {
+    const webSession: SessionView = {
+      ...session,
+      actor: {
+        ...session.actor,
+        name: "Alice Web",
+        identity: { kind: "web", accountId: "11111111-1111-4111-8111-111111111111" },
+      },
+    };
+    const html = render("pending", webSession);
+    expect(html).toContain("Alice Web");
+    expect(html).toContain("Web 账号");
+    expect(html).toContain("11111111-1111-4111-8111-111111111111");
+    expect(html).toContain("A1B2C3D4");
+    expect(html).toContain("确认授权此 CLI");
+    expect(html).not.toContain("tenant-a");
+    expect(render("expired", webSession)).not.toContain("确认授权此 CLI");
+    expect(render("approved", webSession)).not.toContain("确认授权此 CLI");
+  });
   it("only sends CSRF and an empty approval payload, never a claimed identity", async () => {
     let sent: RequestInit | undefined;
     vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {

@@ -194,7 +194,7 @@ function release() {
     symlinkSync("/Applications", join(staging, "Applications"));
     writeFileSync(
       join(staging, "安装说明.txt"),
-      `CodexBoard ${version}\n\n适用于 Apple Silicon Mac，macOS 13 或更新版本。\n\n1. 更新旧版前，请先处理执行中的任务并正常退出 CodexBoard。\n2. 将 CodexBoard.app 拖入 Applications（应用程序）。\n3. 打开应用，按“使用引导”完成配置，然后推出本安装磁盘。\n\n当前未完成 Apple Developer ID 签名和公证。确认来源可信后，首次打开方法见：\nhttps://support.apple.com/en-mo/102445\n无需关闭系统整体安全检查。\n\n已安装版本可在“应用设置 → 应用更新”中检查、下载并确认安装更新。\n更新包通过独立签名校验；更新不会覆盖应用的数据目录。\n\n安装包包含 Node.js、前后端、Codex 桥接、SQLite、Caddy、frp 客户端。\nCodex、公网 frp 服务端需自行准备；使用飞书入口或 CLI 配对时另需飞书客户端与自建应用。Web 账号登录需要 HTTPS。\n\n用户指南：https://github.com/${repository}\nAgent 指南：https://github.com/${repository}/blob/main/AGENTS.md\n`,
+      `CodexBoard ${version}\n\n适用于 Apple Silicon Mac，macOS 13 或更新版本。\n\n1. 更新旧版前，请先处理执行中的任务并正常退出 CodexBoard。\n2. 将 CodexBoard.app 拖入 Applications（应用程序）。\n3. 打开应用，按“使用引导”完成配置，然后推出本安装磁盘。\n\n当前未完成 Apple Developer ID 签名和公证。确认来源可信后，首次打开方法见：\nhttps://support.apple.com/en-mo/102445\n无需关闭系统整体安全检查。\n\n已安装版本可在“应用设置 → 应用更新”中检查、下载并确认安装更新。\n更新包通过独立签名校验；更新不会覆盖应用的数据目录。\n\n安装包包含 Node.js、前后端、Codex 桥接、SQLite、Caddy、frp 客户端。\nCodex、公网 frp 服务端需自行准备；使用飞书入口或飞书 CLI 配对时另需飞书客户端与自建应用。Web 账号登录及 CLI 配对需要 HTTPS。\n\n用户指南：https://github.com/${repository}\nAgent 指南：https://github.com/${repository}/blob/main/AGENTS.md\n`,
     );
     const dmg = join(output, `${stem}.dmg`);
     run("hdiutil", [

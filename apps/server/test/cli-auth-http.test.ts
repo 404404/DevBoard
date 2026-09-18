@@ -214,11 +214,7 @@ describe("CLI pairing HTTP boundary", () => {
     test.database
       .prepare("UPDATE identities SET active = 0 WHERE identity_key = ?")
       .run(identityKey(user));
-    for (const url of [
-      "/api/v1/local/health",
-      "/api/v1/local/projects",
-      "/api/v1/local/auth/session",
-    ])
+    for (const url of ["/api/v1/local/projects", "/api/v1/local/auth/session"])
       expect((await local.inject({ method: "GET", url, headers })).statusCode).toBe(401);
     expect(
       (

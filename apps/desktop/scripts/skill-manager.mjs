@@ -262,7 +262,12 @@ export function createSkillManager({
       if (!files.some((file) => file.path === "SKILL.md")) throw new SkillError("bundle");
       const tree = scanTree(source);
       if (!tree.exists || !matchesFiles(tree, files)) throw new SkillError("bundle");
-      return { version: manifest.version, files, fingerprint: tree.fingerprint };
+      return {
+        version: manifest.version,
+        files,
+        revision: sha256(encoded(files)),
+        fingerprint: tree.fingerprint,
+      };
     } catch {
       throw new SkillError("bundle");
     }
@@ -282,6 +287,8 @@ export function createSkillManager({
   function inspect() {
     const result = {
       bundledVersion: null,
+      bundledRevision: null,
+      updateAvailable: false,
       offerDismissed: false,
       status: "unavailable",
       installedVersion: null,
@@ -294,6 +301,7 @@ export function createSkillManager({
     try {
       const bundled = bundle();
       result.bundledVersion = bundled.version;
+      result.bundledRevision = bundled.revision;
       const stored = readState();
       result.offerDismissed = stored?.offerDismissed === true;
       if (legacyConflict()) throw new SkillError("managed", messages.legacy);
@@ -324,20 +332,27 @@ export function createSkillManager({
           receipt.name !== NAME ||
           stored?.installed?.receiptSha256 !== sha256(raw) ||
           stored.installed.version !== receipt.version ||
-          JSON.stringify(stored.installed.files) !== JSON.stringify(files) ||
-          !matchesFiles(tree, files, true) ||
-          (receipt.version === bundled.version &&
-            JSON.stringify(files) !== JSON.stringify(bundled.files))
+          JSON.stringify(stored.installed.files) !== JSON.stringify(files)
         )
           return result;
         result.installedVersion = receipt.version;
-        const newer = compareVersions(bundled.version, receipt.version) > 0;
+        const comparison = compareVersions(bundled.version, receipt.version);
+        result.updateAvailable =
+          comparison > 0 ||
+          (comparison === 0 && JSON.stringify(files) !== JSON.stringify(bundled.files));
+        // The receipt establishes the installed release independently of the
+        // current files. A new bundle must not erase a user's local edits, and
+        // unchanged installed files must not become "modified" merely because
+        // the same release number was bundled with revised contents.
+        if (!matchesFiles(tree, files, true)) return result;
         return {
           ...result,
-          status: newer ? "updateAvailable" : "current",
-          canInstall: newer,
+          status: result.updateAvailable ? "updateAvailable" : "current",
+          canInstall: result.updateAvailable,
           canReplace: false,
-          message: newer ? "随包 Skill 有新版本；点击更新后才会替换文件。" : messages.installed,
+          message: result.updateAvailable
+            ? "随包 Skill 有更新；点击更新后才会替换文件。"
+            : messages.installed,
         };
       } catch {
         return result;

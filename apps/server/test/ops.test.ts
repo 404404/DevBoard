@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { initializeDatabase } from "../src/modules/database/index.js";
+import { CORE_MIGRATIONS, initializeDatabase } from "../src/modules/database/index.js";
 import { acquireDataDirectoryLock } from "../src/modules/operations/index.js";
 import { runOperations } from "../src/ops.js";
 
@@ -273,7 +273,7 @@ describe("operations CLI", () => {
     expect(JSON.parse(lines[0] as string)).toMatchObject({
       ok: true,
       command: "backup",
-      schemaVersion: 26,
+      schemaVersion: CORE_MIGRATIONS.at(-1)!.version,
     });
   });
 });

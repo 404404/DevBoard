@@ -28,11 +28,17 @@
     return busy || readingFailed || Boolean(window.codexBoardAppUpdateInstalling);
   }
 
+  function updateKey() {
+    return state?.updateAvailable || state?.status === "updateAvailable"
+      ? `${state.bundledVersion}:${state.bundledRevision ?? ""}`
+      : null;
+  }
+
   function render() {
     const labels = {
       notInstalled: "尚未安装配套 Skill。",
       current: "Skill 文件已安装，无需更新。",
-      updateAvailable: "有新版 Skill，可以更新。",
+      updateAvailable: "Skill 有更新，可以安装。",
       modified: "现有 Skill 包含修改，需要你决定如何处理。",
       managed: "已有 Skill 或安装位置由其他方式管理。",
       error: "Skill 操作未完成。",
@@ -59,8 +65,14 @@
     element("skill-replace-confirm").disabled =
       blocked() || !state?.canReplace || state.fingerprint !== replaceFingerprint;
     element("skill-replace-cancel").disabled = busy;
-    element("skill-notice").hidden =
-      state?.status !== "updateAvailable" || dismissedUpdate === state?.bundledVersion;
+    text(
+      "skill-notice-text",
+      state?.status === "modified"
+        ? "配套 Agent Skill 有更新；现有 Skill 包含修改，请检查后选择更新方式。"
+        : "配套 Agent Skill 有更新。",
+    );
+    const noticeKey = updateKey();
+    element("skill-notice").hidden = !noticeKey || dismissedUpdate === noticeKey;
     if (element("skill-replace-dialog").open && state?.fingerprint !== replaceFingerprint)
       message("skill-replace-error", "Skill 内容已变化，请关闭此窗口并重新检查后再决定。");
   }
@@ -202,7 +214,7 @@
     element("skill-card").scrollIntoView({ block: "nearest" });
   };
   element("skill-notice-dismiss").onclick = () => {
-    dismissedUpdate = state?.bundledVersion;
+    dismissedUpdate = updateKey();
     render();
   };
   if (invoke) void refresh();

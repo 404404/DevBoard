@@ -1,4 +1,5 @@
 import { identityKey } from "@codexboard/contracts";
+import { credentialPaths, defaultCredentialStore } from "../../../packages/taskctl/src/auth.js";
 import { TEST_FEISHU_ACTOR, seedFeishuTestActor } from "./helpers/identity.js";
 import { exec } from "node:child_process";
 import { createServer } from "node:http";
@@ -11,6 +12,7 @@ import {
   CreateCommentCommandSchema,
   CreateTaskCommandSchema,
   type PrincipalView,
+  type RuntimeDescriptor,
 } from "@codexboard/contracts";
 import { afterEach, expect, it, vi } from "vitest";
 import { AttachmentService, AttachmentVault } from "../src/modules/attachments/index.js";
@@ -23,6 +25,7 @@ import {
 } from "../src/modules/identity/index.js";
 import { ProjectAdministration } from "../src/modules/project-registry/index.js";
 import { Taskboard, TaskWorkspace } from "../src/modules/taskboard/index.js";
+import { CliAuthService } from "../src/modules/identity/cli-auth-service.js";
 
 const actor: PrincipalView = TEST_FEISHU_ACTOR;
 const cleanup: (() => void)[] = [];
@@ -90,6 +93,7 @@ function setup() {
     );
   return {
     database,
+    identityService,
     root,
     workspace,
     vault,
@@ -370,7 +374,7 @@ it("hides pending drafts from workspace and execution, protects ownership and cl
   ).toBe(0);
 });
 
-it("runs the snapshotted CLI from another cwd with runtime auth and no global taskctl", async () => {
+it("runs the snapshotted CLI from another cwd only with paired user auth and no global taskctl", async () => {
   const s = setup();
   const file = s.upload();
   s.submit();
@@ -384,9 +388,22 @@ it("runs the snapshotted CLI from another cwd with runtime auth and no global ta
   expect(command).toContain("/packages/taskctl/dist/cli.js'");
   expect(command).toContain(`CODEXBOARD_DATA_DIR='${s.root}'`);
   const capabilityToken = "a".repeat(64);
+  const cliAuth = new CliAuthService({
+    identityVersion: (identity) => s.identityService.cliIdentityVersion(identity),
+  });
   let authorized = false;
   const server = createServer((request, response) => {
+    let userAuthorized = false;
+    try {
+      const token = request.headers["x-taskctl-session"];
+      userAuthorized =
+        typeof token === "string" &&
+        identityKey(cliAuth.authenticate(token)) === identityKey(actor.identity);
+    } catch {
+      // The synthetic endpoint enforces the same independent user session boundary.
+    }
     authorized =
+      userAuthorized &&
       request.headers.authorization === `Bearer ${capabilityToken}` &&
       request.url === `/api/v1/local/attachments/${snapshot[0]!.id}`;
     response.statusCode = authorized ? 200 : 403;
@@ -395,27 +412,47 @@ it("runs the snapshotted CLI from another cwd with runtime auth and no global ta
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address() as { port: number };
   mkdirSync(join(s.root, "run"));
-  writeFileSync(
-    join(s.root, "run", "runtime.json"),
-    JSON.stringify({
-      descriptorVersion: 1,
-      pid: process.pid,
-      generatedAt: new Date().toISOString(),
-      publicBaseUrl: "http://localhost",
-      localAdminBaseUrl: `http://127.0.0.1:${address.port}`,
-      capabilityToken,
-    }),
-  );
+  const runtime: RuntimeDescriptor = {
+    descriptorVersion: 1,
+    pid: process.pid,
+    generatedAt: new Date().toISOString(),
+    publicBaseUrl: "http://localhost",
+    localAdminBaseUrl: `http://127.0.0.1:${address.port}`,
+    capabilityToken,
+  };
+  writeFileSync(join(s.root, "run", "runtime.json"), JSON.stringify(runtime));
+  const authFile = join(s.root, "run", "synthetic-taskctl-auth");
+  const paths = credentialPaths(runtime, authFile);
   s.database
     .prepare("UPDATE jobs SET status = 'failed' WHERE task_id = ? AND status = 'running'")
     .run(s.task.id);
   s.service.delete(file.id, s.context());
   const outputPath = snapshot[0]!.downloadPath;
   try {
-    await promisify(exec)(command, {
-      cwd: tmpdir(),
-      env: { ...process.env, PATH: "/nonexistent" },
-    });
+    const execute = () =>
+      promisify(exec)(command, {
+        cwd: tmpdir(),
+        env: { ...process.env, PATH: "/nonexistent", CODEXBOARD_AUTH_FILE: authFile },
+      });
+    await expect(execute()).rejects.toMatchObject({ code: 1 });
+    expect(authorized).toBe(false);
+    const request = cliAuth.create("attachment-cli-test");
+    cliAuth.approve(
+      request.requestId,
+      s.identityService.authenticatedUserPrincipal(actor.identity).identity,
+    );
+    const session = cliAuth.complete(request.requestId, request.claimSecret);
+    if (!("token" in session)) throw new Error("missing CLI session");
+    await defaultCredentialStore.write(
+      paths.session,
+      JSON.stringify({
+        scope: paths.scope,
+        token: session.token,
+        identity: session.identity,
+        expiresAt: session.expiresAt,
+      }),
+    );
+    await execute();
     expect(authorized).toBe(true);
     expect(readFileSync(outputPath, "utf8")).toBe("attachment content");
   } finally {

@@ -10,16 +10,16 @@ Connect your projects to Codex and turn ideas into progress.
 
 CodexBoard connects your project task board to Codex running on your Mac. Organize projects and tasks, submit requests, track execution, and handle approvals or requests for more information. The Mac app starts and manages local services; you access the board through HTTPS with a locally created Web account, through Lark, or both.
 
-Current release: **0.1.6 preview**, for **Apple Silicon Macs running macOS 13 or later**.
+Current release: **0.1.10 preview**, for **Apple Silicon Macs running macOS 13 or later**.
 
 ## Access methods
 
-|            | Web                                            | Lark                                                 |
-| ---------- | ---------------------------------------------- | ---------------------------------------------------- |
-| Open in    | Desktop or mobile browser                      | Lark desktop or mobile client                        |
-| Identity   | Web account created locally                    | Lark user within the custom app's availability scope |
-| Setup      | HTTPS public entry point; no Lark app required | Lark custom app and public tunnel                    |
-| CLI writes | Web sign-in does not authorize CLI writes      | Pair with a real Lark user                           |
+|                        | Web                                                  | Lark                                                  |
+| ---------------------- | ---------------------------------------------------- | ----------------------------------------------------- |
+| Open in                | Desktop or mobile browser                            | Lark desktop or mobile client                         |
+| Identity               | Web account created locally                          | Lark user within the custom app's availability scope  |
+| Setup                  | HTTPS public entry point; no Lark app required       | Lark custom app and public tunnel                     |
+| CLI queries and writes | Pair with your Web account on the authorization page | Pair with your Lark account on the authorization page |
 
 Both methods can remain enabled and share the same board and local Codex.
 
@@ -68,7 +68,7 @@ Sign in over HTTPS with a locally created Web account. Click a thumbnail to view
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | Apple Silicon Mac                     | macOS 13 or later. The current installer does not support Intel Macs, Windows, or Linux.                                       |
 | Codex                                 | Installed, signed in, and working locally.                                                                                     |
-| Lark client and custom app (optional) | Required for Lark access or CLI pairing; not required for Web-only access.                                                     |
+| Lark client and custom app (optional) | Required for Lark access or Lark CLI pairing; not required for the Web board or Web CLI pairing.                               |
 | Public frp tunnel service             | A working server or service-provider configuration to access the local services on your Mac.                                   |
 | Domain name, depending on tunnel type | HTTP/HTTPS domain-based access requires DNS configuration. TCP access through a public IPv4 address can work without a domain. |
 
@@ -81,10 +81,10 @@ The installer includes **Node.js, the board's frontend and backend, the Codex br
 3. Open the DMG and drag `CodexBoard.app` into **Applications**.
 4. Open CodexBoard from Applications, then eject the installer disk.
 
-To check download integrity, also download the corresponding `.dmg.sha256` file and run the following in the directory containing both files. For version 0.1.6:
+To check download integrity, also download the corresponding `.dmg.sha256` file and run the following in the directory containing both files. For version 0.1.10:
 
 ```sh
-shasum -a 256 -c CodexBoard-0.1.6-macos-arm64.dmg.sha256
+shasum -a 256 -c CodexBoard-0.1.10-macos-arm64.dmg.sha256
 ```
 
 An `OK` result means the file matches the publisher's checksum.
@@ -117,9 +117,9 @@ The setup guide can show either Web or Lark instructions. This only changes the 
 
 The guide checks the running configuration and enabled account availability automatically. It does not test the password or prove a successful browser sign-in; verify that separately.
 
-Web accounts are trusted users who can execute tasks. Accounts share the board without per-project access isolation. New tasks belong to the signed-in user, and comments use that identity. Only create accounts for people you trust. Disabling an account or resetting its password invalidates its existing browser sessions.
+Web accounts are trusted users who can execute tasks. Accounts share the board without per-project access isolation. New tasks belong to the signed-in user, and comments use that identity. Only create accounts for people you trust. Disabling an account or resetting its password invalidates its existing browser and CLI pairing sessions.
 
-CLI writes still require pairing with a real Lark user. Web sign-in does not authorize CLI writes or replace that pairing.
+CLI queries and writes require a paired Web or Lark user session. To pair with a Web account, sign in on the browser authorization page, check the account, CLI name and verification code, and confirm the request.
 
 #### Lark app (can remain enabled alongside Web accounts)
 
@@ -153,13 +153,13 @@ The companion Skill lets Codex query and modify tasks and assist with execution 
 
 On first launch, if the companion Skill is not installed, the app displays **让 Codex 使用 CodexBoard (Let Codex use CodexBoard)**. Choose **安装到 Codex (Install to Codex)**, or install it later from **应用设置 → Agent Skill (App Settings → Agent Skill)**. The installation directory is `~/.agents/skills/manage-codexboard`.
 
-The card shows the file installation status; use **重新检查 (Check Again)** to refresh it. After an app upgrade, it will indicate when a newer Skill is available, and replacement happens only when you click to update. If you have edited the Skill, you must explicitly choose **使用随包版本 (Use Bundled Version)** to replace it. Symbolic links, directories managed by another tool, Skills using the old name, or matching Skills in legacy locations prompt you to handle them at their original location or in their manager, avoiding duplicate installations.
+The app checks the bundled Skill against the installed version at startup and while running. When an update is available, a notice at the top of the window offers **查看 Skill (View Skill)** to open the update card; **重新检查 (Check Again)** refreshes the status. Changed bundle contents also trigger a notice when the version number stays the same. Dismissing a notice applies only to that version and content; another update will be shown again. Replacement happens only when you click to update. If you have edited the Skill, you must explicitly choose **使用随包版本 (Use Bundled Version)** to replace it. Symbolic links, directories managed by another tool, Skills using the old name, or matching Skills in legacy locations prompt you to handle them at their original location or in their manager, avoiding duplicate installations. The app does not check those managers for remote updates.
 
 An installed-file status does not mean the Skill is loaded in your current Codex conversation. Check the Skill list in Codex. If it is not recognized, force a Skill reload or reopen Codex when convenient, then use it in a new conversation:
 
 > Please use $manage-codexboard to first list my projects and tasks, then help me handle the task I specify.
 
-Installing the Skill does not grant permission to write to Lark. You still need to complete pairing confirmation in Lark before an agent first acts on your behalf.
+Installing the Skill or signing in to the board does not authorize the CLI automatically. Before an agent queries or changes the board on your behalf, confirm pairing through your Web account in the browser or your Lark account in Lark. The CLI then acts as the real user who confirmed the account, CLI name and verification code; it does not use a local service identity.
 
 ## Let an agent help with installation and configuration
 

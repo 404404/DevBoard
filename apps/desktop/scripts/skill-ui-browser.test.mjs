@@ -17,6 +17,8 @@ async function fixture(browser, state = {}) {
     window.skillCalls = [];
     window.skillTestState = {
       bundledVersion: "0.1.1",
+      bundledRevision: "bundle-original",
+      updateAvailable: false,
       installedVersion: null,
       offerDismissed: false,
       status: "notInstalled",
@@ -58,6 +60,7 @@ async function fixture(browser, state = {}) {
               offerDismissed: true,
               canInstall: false,
               canReplace: false,
+              updateAvailable: false,
             };
           }
           return structuredClone(window.skillTestState);
@@ -71,6 +74,83 @@ async function fixture(browser, state = {}) {
 }
 
 for (const [name, engine] of Object.entries({ chromium, webkit })) {
+  test(`${name}: update notices track content, open settings and never install automatically`, async () => {
+    const browser = await engine.launch();
+    try {
+      const { page, errors } = await fixture(browser, {
+        status: "updateAvailable",
+        installedVersion: "0.1.1",
+        bundledRevision: "bundle-a",
+        updateAvailable: true,
+        offerDismissed: true,
+      });
+      await page.locator("#skill-notice").waitFor({ state: "visible" });
+      assert.equal(await page.locator("#skill-offer-dialog").isVisible(), false);
+      assert.deepEqual(await page.evaluate(() => window.skillCalls), []);
+      await page.locator("#skill-notice-open").click();
+      assert.equal(await page.locator("#skill-card").getAttribute("open"), "");
+      assert.equal(await page.locator("#skill-install").textContent(), "更新 Skill");
+      await page.locator("#skill-notice-dismiss").click();
+      await page.locator("#skill-refresh").click();
+      assert.equal(await page.locator("#skill-notice").isVisible(), false);
+      await page.evaluate(() => {
+        window.skillTestState.bundledRevision = "bundle-b";
+      });
+      await page.locator("#skill-refresh").click();
+      await page.locator("#skill-notice").waitFor({ state: "visible" });
+      assert.deepEqual(await page.evaluate(() => window.skillCalls), []);
+      await page.locator("#skill-install").click();
+      await page.locator("#skill-notice").waitFor({ state: "hidden" });
+      assert.deepEqual(await page.evaluate(() => window.skillCalls), [
+        {
+          command: "install_skill",
+          args: { expectedFingerprint: "original", replaceModified: false },
+        },
+      ]);
+      assert.deepEqual(errors, []);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test(`${name}: updates to locally modified skills prompt review and preserve replacement consent`, async () => {
+    const browser = await engine.launch();
+    try {
+      const { page, errors } = await fixture(browser, {
+        status: "modified",
+        installedVersion: "0.1.1",
+        updateAvailable: true,
+        canInstall: false,
+        canReplace: true,
+        offerDismissed: true,
+      });
+      await page.locator("#skill-notice").waitFor({ state: "visible" });
+      assert.match(await page.locator("#skill-notice-text").textContent(), /包含修改/);
+      await page.locator("#skill-notice-open").click();
+      assert.equal(await page.locator("#skill-install").isVisible(), false);
+      assert.equal(await page.locator("#skill-replace").isVisible(), true);
+      assert.deepEqual(await page.evaluate(() => window.skillCalls), []);
+      await page.locator("#skill-replace").click();
+      await page.locator("#skill-replace-dialog").waitFor({ state: "visible" });
+      assert.deepEqual(await page.evaluate(() => window.skillCalls), []);
+      await page.locator("#skill-replace-cancel").click();
+      await page.evaluate(() => {
+        Object.assign(window.skillTestState, {
+          status: "managed",
+          updateAvailable: false,
+          canReplace: false,
+        });
+      });
+      await page.locator("#skill-refresh").click();
+      await page.locator("#skill-notice").waitFor({ state: "hidden" });
+      assert.equal(await page.locator("#skill-replace").isVisible(), false);
+      assert.deepEqual(await page.evaluate(() => window.skillCalls), []);
+      assert.deepEqual(errors, []);
+    } finally {
+      await browser.close();
+    }
+  });
+
   test(`${name}: first-launch offer waits for consent and settings retain install/update controls`, async () => {
     const browser = await engine.launch();
     try {

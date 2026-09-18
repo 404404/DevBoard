@@ -5,11 +5,13 @@ import { SfSymbol } from "./sf-symbol";
 import { TaskRestoreButton } from "./task-restore-button";
 import { groupTasksForWorkspace, TASK_STATUS_META } from "./task-status";
 
-type ArchiveTab = "done" | "canceled";
+export type ArchiveTab = "done" | "canceled";
 const ARCHIVE_STATUSES = ["done", "canceled"] as const;
 
 export function TaskArchiveDrawer({
   initialTab = "done",
+  tab: controlledTab,
+  onTabChange,
   onClosed,
   onDeleteTask,
   onOpenTask,
@@ -19,6 +21,8 @@ export function TaskArchiveDrawer({
   mutationsEnabled = true,
 }: {
   readonly initialTab?: ArchiveTab;
+  readonly tab?: ArchiveTab;
+  readonly onTabChange?: (tab: ArchiveTab) => void;
   readonly onClosed?: () => void;
   readonly onDeleteTask: (task: TaskView) => void;
   readonly onOpenTask: (taskId: string) => void;
@@ -27,7 +31,8 @@ export function TaskArchiveDrawer({
   readonly csrfToken?: string;
   readonly mutationsEnabled?: boolean;
 }) {
-  const [tab, setTab] = useState<ArchiveTab>(initialTab);
+  const [localTab, setLocalTab] = useState<ArchiveTab>(initialTab);
+  const tab = controlledTab ?? localTab;
   const archive = useMemo(() => groupTasksForWorkspace(tasks).archive, [tasks]);
   const visibleTasks = archive[tab];
 
@@ -56,7 +61,10 @@ export function TaskArchiveDrawer({
             type="button"
             role="tab"
             aria-selected={tab === status}
-            onClick={() => setTab(status)}
+            onClick={() => {
+              setLocalTab(status);
+              onTabChange?.(status);
+            }}
           >
             <SfSymbol name={TASK_STATUS_META[status].symbol} size={14} />
             {TASK_STATUS_META[status].label} {archive[status].length}

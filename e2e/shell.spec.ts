@@ -4,7 +4,13 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSy
 import { join, resolve } from "node:path";
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import type { IdentityRef } from "@codexboard/contracts";
+import type { IdentityRef, RuntimeDescriptor } from "@codexboard/contracts";
+import {
+  credentialPaths,
+  defaultCredentialStore,
+  readCredential,
+  SessionCredentialSchema,
+} from "../packages/taskctl/src/auth.js";
 import {
   e2eOrigin,
   establishSyntheticFeishuSession,
@@ -31,11 +37,6 @@ test.beforeAll(async ({ playwright }) => {
     await request.dispose();
   }
 });
-
-interface RuntimeDescriptor {
-  readonly localAdminBaseUrl: string;
-  readonly capabilityToken: string;
-}
 
 interface DevelopmentContextFixture {
   readonly id: string;
@@ -336,12 +337,35 @@ function taskctl(...args: string[]): { data: Record<string, unknown> } {
       env: {
         ...process.env,
         CODEXBOARD_DATA_DIR: dataDirectory,
-        CODEXBOARD_AUTH_FILE: `${syntheticAuthFile()}-${process.pid}`,
+        CODEXBOARD_AUTH_FILE: taskctlAuthFile(),
       },
       encoding: "utf8",
     },
   );
   return JSON.parse(output) as { data: Record<string, unknown> };
+}
+
+function taskctlAuthFile(): string {
+  return `${syntheticAuthFile()}-${process.pid}`;
+}
+
+async function localUserHeaders(descriptor: RuntimeDescriptor): Promise<Record<string, string>> {
+  // Only read the worker's disposable E2E credential; never fall back to a user's
+  // installed CLI session. beforeAll issues this credential through real pairing.
+  const paths = credentialPaths(descriptor, taskctlAuthFile());
+  const credential = await readCredential(
+    defaultCredentialStore,
+    paths.session,
+    SessionCredentialSchema,
+    paths.scope,
+    Date.now(),
+  );
+  if (!credential) throw new Error("The E2E worker has not completed CLI pairing");
+  expect(credential.identity).toEqual(SYNTHETIC_FEISHU_IDENTITY);
+  return {
+    Authorization: `Bearer ${descriptor.capabilityToken}`,
+    "X-Taskctl-Session": credential.token,
+  };
 }
 
 function uniqueProjectKey(prefix: string): string {
@@ -387,7 +411,7 @@ async function localProjects(): Promise<readonly RegisteredProject[]> {
   await expect.poll(() => existsSync(descriptorPath)).toBe(true);
   const descriptor = JSON.parse(readFileSync(descriptorPath, "utf8")) as RuntimeDescriptor;
   const response = await fetch(`${descriptor.localAdminBaseUrl}/api/v1/local/projects`, {
-    headers: { Authorization: `Bearer ${descriptor.capabilityToken}` },
+    headers: await localUserHeaders(descriptor),
   });
   expect(response.status).toBe(200);
   const payload = (await response.json()) as { data: readonly RegisteredProject[] };
@@ -402,7 +426,7 @@ async function localAdminRequest<Data>(path: string, init?: RequestInit): Promis
   const response = await fetch(`${descriptor.localAdminBaseUrl}${path}`, {
     ...init,
     headers: {
-      Authorization: `Bearer ${descriptor.capabilityToken}`,
+      ...(await localUserHeaders(descriptor)),
       ...(init?.body ? { "Content-Type": "application/json" } : {}),
       ...init?.headers,
     },
@@ -4887,7 +4911,7 @@ test("详情静态显示真实负责人且不提供用户创建入口", async ({
     {
       method: "PUT",
       headers: {
-        Authorization: `Bearer ${descriptor.capabilityToken}`,
+        ...(await localUserHeaders(descriptor)),
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -5790,3 +5814,40 @@ test("完成只检查 main 的 Git 状态：失败留在详情，手动提交后
   expect(git("branch", "--show-current")).toBe("main");
   expect(git("for-each-ref", "--format=%(refname)", "refs/taskboard")).toBe("");
 });
+
+for (const width of [1280, 390]) {
+  test(`LAUB-019 返回看板保留已取消页面并可恢复 ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    const project = await registerProject("CANCELRETURN");
+    await openWorkspace(page);
+    await selectProject(page, project);
+    const identifier = await quickCreate(page, "取消后返回与恢复");
+    const task = (
+      await readPublicData<{ tasks: (TaskFixture & { version: number })[] }>(
+        page,
+        `/api/v1/projects/${project.id}/board`,
+      )
+    ).tasks.find((task) => task.identifier === identifier)!;
+    taskctl("issue", "move", task.id, "--version", String(task.version), "--status", "canceled");
+    await page.getByRole("button", { name: "打开其他任务", exact: true }).click();
+    const drawer = page.getByRole("complementary", { name: "其他任务" });
+    await drawer.getByRole("tab", { name: /已取消/ }).click();
+    await drawer.locator(".archive-task-open").filter({ hasText: identifier }).click();
+    const detail = page.getByRole("region", { name: "任务详情", exact: true });
+    await detail.getByRole("button", { name: "返回看板" }).click();
+    await expect(drawer).toBeVisible();
+    await expect(drawer.getByRole("tab", { name: /已取消/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(
+      drawer.locator(".archive-task-open").filter({ hasText: identifier }),
+    ).toBeVisible();
+    await drawer.getByRole("button", { name: `恢复任务 ${identifier}`, exact: true }).click();
+    await expect(
+      drawer.getByRole("button", { name: `恢复任务 ${identifier}`, exact: true }),
+    ).toHaveCount(0);
+    await page.getByRole("button", { name: "关闭其他任务", exact: true }).click();
+    await expect(page.getByTestId(`task-card-${identifier}`)).toBeVisible();
+  });
+}

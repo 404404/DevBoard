@@ -37,6 +37,28 @@ afterEach(() => {
 });
 
 describe("SQLite foundation", () => {
+  it("adds a credential generation to existing Web accounts without altering credentials", () => {
+    const database = track(openDatabase(":memory:"));
+    runMigrations(
+      database,
+      CORE_MIGRATIONS.filter((migration) => migration.version <= 26),
+    );
+    database
+      .prepare("INSERT INTO web_accounts(id, username, password_hash) VALUES (?, ?, ?)")
+      .run("web-account", "alice", "preserved-password-hash");
+    runMigrations(database, CORE_MIGRATIONS);
+    expect(database.prepare("SELECT * FROM web_accounts WHERE id = ?").get("web-account")).toEqual({
+      id: "web-account",
+      username: "alice",
+      password_hash: "preserved-password-hash",
+      failed_attempts: 0,
+      locked_until: 0,
+      auth_version: 0,
+    });
+    expect(() => database.exec("UPDATE web_accounts SET auth_version = -1")).toThrow();
+    expect(runMigrations(database, CORE_MIGRATIONS)).toEqual([]);
+    expect(database.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+  });
   it("recovers canceled task states from pre-migration history and defaults missing history", () => {
     const database = track(openDatabase(":memory:"));
     runMigrations(database, CORE_MIGRATIONS.slice(0, 19));
@@ -140,6 +162,7 @@ describe("SQLite foundation", () => {
     );
     expect(database.prepare("SELECT version FROM schema_migrations").pluck().all()).toEqual([
       1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
+      27,
     ]);
     expect(
       Object.fromEntries(

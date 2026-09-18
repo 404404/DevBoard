@@ -84,7 +84,17 @@ function setup(
     if (!("token" in session)) throw new Error("missing CLI session");
     return { "x-taskctl-session": session.token };
   }
-  return { app, config, database, capabilityToken, root, projectSync, provisioner, loginCli };
+  return {
+    app,
+    config,
+    database,
+    capabilityToken,
+    root,
+    projectSync,
+    provisioner,
+    loginCli,
+    cliAuth,
+  };
 }
 
 function cookieHeader(response: Awaited<ReturnType<FastifyInstance["inject"]>>): string {
@@ -92,6 +102,85 @@ function cookieHeader(response: Awaited<ReturnType<FastifyInstance["inject"]>>):
 }
 
 describe("local admin HTTP adapter", () => {
+  it("rejects every board route without a valid user session despite a valid machine capability", async () => {
+    const { app, capabilityToken, database, loginCli, cliAuth } = setup();
+    expect(
+      database.prepare("SELECT count(*) FROM identities WHERE kind = 'service'").pluck().get(),
+    ).toBe(0);
+    const id = "11111111-1111-4111-8111-111111111111";
+    const localHeaders = {
+      host: "127.0.0.1:47824",
+      authorization: `Bearer ${capabilityToken}`,
+    };
+    const session = await loginCli();
+    cliAuth.revoke(session["x-taskctl-session"]);
+    const routes = [
+      ["GET", "/context"],
+      ["GET", "/projects"],
+      ["GET", `/projects/${id}/dashboard`],
+      ["GET", `/projects/${id}/task-creation-options`],
+      ["GET", `/projects/${id}/board`],
+      ["POST", `/projects/${id}/contexts/scan`],
+      ["GET", `/projects/${id}/git`],
+      ["POST", `/projects/${id}/git`],
+      ["DELETE", `/projects/${id}/git`],
+      ["GET", "/members/audit"],
+      ["GET", `/events?projectId=${id}&afterRevision=0`],
+      ["GET", "/labels"],
+      ["POST", "/labels"],
+      ["PATCH", `/labels/${id}`],
+      ["DELETE", `/labels/${id}`],
+      ["PUT", "/labels/order"],
+      ["POST", "/tasks"],
+      ["PATCH", `/tasks/${id}`],
+      ["DELETE", `/tasks/${id}`],
+      ["GET", `/tasks/${id}/workspace`],
+      ["POST", `/tasks/${id}/archive`],
+      ["POST", `/tasks/${id}/restore`],
+      ["POST", `/tasks/${id}/read`],
+      ["POST", `/tasks/${id}/move`],
+      ["POST", `/tasks/${id}/reassign`],
+      ["GET", `/tasks/${id}/lifecycle`],
+      ["POST", `/tasks/${id}/lifecycle`],
+      ["POST", `/tasks/${id}/comments`],
+      ["PATCH", `/comments/${id}`],
+      ["DELETE", `/comments/${id}`],
+      ["POST", `/tasks/${id}/relations`],
+      ["DELETE", `/tasks/${id}/relations/${id}`],
+      ["POST", `/tasks/${id}/attachments`],
+      ["GET", `/attachments/${id}`],
+      ["DELETE", `/attachments/${id}`],
+      ["GET", `/tasks/${id}/jobs`],
+      ["POST", `/tasks/${id}/jobs/start`],
+      ["POST", `/tasks/${id}/jobs/continue`],
+      ["GET", `/jobs/${id}`],
+      ["POST", `/jobs/${id}/cancel`],
+      ["GET", `/jobs/${id}/interactions`],
+      ["POST", `/interactions/${id}/respond`],
+      ["GET", "/auth/session"],
+      ["POST", "/auth/logout"],
+    ] as const;
+    for (const extraHeaders of [{}, { "x-taskctl-session": "invalid" }, session]) {
+      for (const [method, path] of routes) {
+        const response = await app.inject({
+          method,
+          url: `/api/v1/local${path}`,
+          headers: { ...localHeaders, ...extraHeaders },
+        });
+        expect(response.statusCode, `${method} ${path}: ${response.body}`).toBe(401);
+        expect(response.json().error.code).toBe("UNAUTHENTICATED");
+      }
+      const head = await app.inject({
+        method: "HEAD",
+        url: "/api/v1/local/projects",
+        headers: { ...localHeaders, ...extraHeaders },
+      });
+      expect(head.statusCode).toBe(401);
+    }
+    expect(database.prepare("SELECT count(*) FROM tasks").pluck().get()).toBe(0);
+    expect(database.prepare("SELECT count(*) FROM comments").pluck().get()).toBe(0);
+  });
+
   it("manages labels through authenticated local routes with versions and replay", async () => {
     const { app, capabilityToken, loginCli } = setup();
     const headers = {
@@ -379,10 +468,11 @@ describe("local admin HTTP adapter", () => {
   });
 
   it("keeps project metadata read-only and rejects arbitrary member creation", async () => {
-    const { app, config, capabilityToken, database, projectSync, root } = setup();
+    const { app, config, capabilityToken, database, projectSync, root, loginCli } = setup();
     const headers = {
       host: "127.0.0.1:47824",
       authorization: `Bearer ${capabilityToken}`,
+      ...(await loginCli()),
     };
     const created = await app.inject({
       method: "POST",
@@ -476,7 +566,7 @@ describe("local admin HTTP adapter", () => {
       backupId: expect.stringMatching(/^backup-/),
       manifest: {
         manifestVersion: 1,
-        schemaVersion: 26,
+        schemaVersion: 27,
         attachments: [],
       },
     });
@@ -519,7 +609,7 @@ describe("local admin HTTP adapter", () => {
   });
 
   it("resolves context from the taskctl caller working directory", async () => {
-    const { app, capabilityToken, root, database, projectSync } = setup();
+    const { app, capabilityToken, root, database, projectSync, loginCli } = setup();
     projectSync.reconcile({
       schemaVersion: 1,
       generatedAt: "2026-09-01T12:00:00.000Z",
@@ -539,6 +629,7 @@ describe("local admin HTTP adapter", () => {
       host: "127.0.0.1:47824",
       authorization: `Bearer ${capabilityToken}`,
       "x-taskctl-cwd": root,
+      ...(await loginCli()),
     };
     const context = await app.inject({ method: "GET", url: "/api/v1/local/context", headers });
     expect(context.statusCode).toBe(200);
@@ -580,7 +671,11 @@ describe("local admin HTTP adapter", () => {
     const missing = await app.inject({
       method: "GET",
       url: "/api/v1/local/context",
-      headers: { host: headers.host, authorization: headers.authorization },
+      headers: {
+        host: headers.host,
+        authorization: headers.authorization,
+        "x-taskctl-session": headers["x-taskctl-session"],
+      },
     });
     expect(missing.statusCode).toBe(400);
   });
@@ -898,7 +993,7 @@ it("distinguishes Terminal and Codex creation on the authenticated CLI route", a
   ).toMatchObject({ kind: "codex", threadId });
 });
 
-it("requires a Feishu session for task writes and preserves the authenticated relation author", async () => {
+it("requires a user session for task writes and preserves the authenticated relation author", async () => {
   const { app, capabilityToken, loginCli, database } = setup();
   const localHeaders = { host: "127.0.0.1:47824", authorization: `Bearer ${capabilityToken}` };
   const userHeaders = { ...localHeaders, ...(await loginCli()) };

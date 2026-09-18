@@ -3,7 +3,7 @@ import { mkdir, readFile as readFileFs, writeFile as writeFileFs } from "node:fs
 import { basename, dirname, join } from "node:path";
 
 import {
-  FeishuIdentityRefSchema,
+  UserIdentityRefSchema,
   RuntimeDescriptorSchema,
   type RuntimeDescriptor,
 } from "@codexboard/contracts";
@@ -82,7 +82,8 @@ export const TASKCTL_HELP = `taskctl — Taskboard 本机命令行（结果为 J
   member audit
   comment add --task ID --body TEXT [--attachments ID,ID]
   comment update ID --version N --body TEXT | comment delete ID --version N
-评论操作需要已授权的 CLI 飞书会话，作者固定为该用户；Codex 执行结果由执行事件自动同步。
+看板查询和写入均需要已授权的 Web 或飞书用户会话；health、backup create 仅需本机连接认证。
+评论作者固定为当前登录用户；Codex 执行结果由执行事件自动同步。
 更新时 --start/--due/--context null 清空字段；--labels "" 清空标签。
 --description "" 清空描述。版本冲突需重新读取，命令不会自动重试。
 退出码：0 成功；1 服务/运行错误；2 命令用法错误。
@@ -347,7 +348,7 @@ function commandFor(parsed: ParsedArguments, codexThreadId?: string): RequestCom
           ? ["version", "body"]
           : ["version"];
     if (Object.keys(option).some((key) => !allowedOptions.includes(key)))
-      throw new UsageError("评论仅支持正文、附件与版本参数；作者由已登录的飞书会话确定");
+      throw new UsageError("评论仅支持正文、附件与版本参数；作者由已登录的用户会话确定");
     if (action === "add")
       return {
         path: `/api/v1/local/tasks/${entity(option.task, "--task")}/comments`,
@@ -524,17 +525,23 @@ export async function runTaskctl(
     secrets.push(runtime.capabilityToken);
     const paths = credentialPaths(runtime, dependencies.authFile());
     if (isAuth) return await runAuth(parsed, command, runtime, dependencies, secrets);
-    const session = await readCredential(
-      dependencies.credentials,
-      paths.session,
-      SessionCredentialSchema,
-      paths.scope,
-      dependencies.now(),
+    const requiresUserSession = !(
+      (command.path === "/api/v1/local/health" && !command.method) ||
+      (command.path === "/api/v1/local/backups" && command.method === "POST")
     );
-    if (parsed.positionals[0] === "comment" && !session)
+    const session = requiresUserSession
+      ? await readCredential(
+          dependencies.credentials,
+          paths.session,
+          SessionCredentialSchema,
+          paths.scope,
+          dependencies.now(),
+        )
+      : null;
+    if (requiresUserSession && !session)
       throw new TaskctlAuthError(
-        "UNAUTHENTICATED",
-        "评论操作需要先完成 taskctl auth login 和网页授权",
+        "CLI_AUTH_NO_SESSION",
+        "看板操作需要先运行 taskctl auth login，并使用 Web 或飞书账号在看板确认授权",
       );
     const headers = new Headers({
       Accept: "application/json",
@@ -632,7 +639,7 @@ const LoginResponseSchema = z.object({
 });
 const CompleteResponseSchema = z.object({
   token: z.string().min(1),
-  identity: FeishuIdentityRefSchema,
+  identity: UserIdentityRefSchema,
   expiresAt: z.iso.datetime(),
 });
 async function runAuth(
@@ -735,7 +742,7 @@ async function runAuth(
     if ((payload.data as { status?: string } | null)?.status === "pending")
       throw new TaskctlAuthError(
         "CLI_AUTH_PENDING",
-        "登录请求尚未在飞书看板确认，请确认后再次运行 taskctl auth complete",
+        "登录请求尚未在看板确认，请确认后再次运行 taskctl auth complete",
       );
     const result = CompleteResponseSchema.safeParse(payload.data);
     if (!result.success) throw new TaskctlAuthError("CLI_AUTH_RESPONSE_INVALID", "会话响应无效");
@@ -751,7 +758,7 @@ async function runAuth(
   } else if (action === "logout") {
     await clearCredentials();
   } else {
-    const identity = FeishuIdentityRefSchema.safeParse(
+    const identity = UserIdentityRefSchema.safeParse(
       (payload.data as { identity?: unknown } | null)?.identity,
     );
     if (!identity.success)

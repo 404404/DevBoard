@@ -19,7 +19,7 @@ afterEach(() => {
 it("installs the natural identity schema on an empty database", () => {
   const db = legacyDatabase();
   runMigrations(db, migrations.CORE_MIGRATIONS);
-  expect(db.prepare("SELECT max(version) FROM schema_migrations").pluck().get()).toBe(26);
+  expect(db.prepare("SELECT max(version) FROM schema_migrations").pluck().get()).toBe(27);
   expect(
     db
       .prepare("SELECT name FROM sqlite_schema WHERE type='table' AND name='identities'")

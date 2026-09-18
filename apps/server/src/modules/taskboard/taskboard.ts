@@ -956,7 +956,9 @@ export class Taskboard {
       assertTaskDeletionAvailable(this.#database, taskId);
       if (!archived && !current.archivedAt && current.status === "canceled") {
         this.#assertTaskMutable(current);
-        this.#validateDevelopmentContext(current.projectId, current.developmentContextId);
+        // Restoring status must work after the task worktree has been cleaned up.
+        // Keep workspace locks and project ownership checks, but allow inactive contexts.
+        this.#validateDevelopmentContext(current.projectId, current.developmentContextId, true);
         const thread = this.#database
           .prepare("SELECT cwd FROM task_threads WHERE task_id = ? AND is_primary = 1")
           .get(taskId) as { cwd: string } | undefined;
@@ -1288,7 +1290,11 @@ export class Taskboard {
     }
   }
 
-  #validateDevelopmentContext(projectId: string, contextId: string | null): void {
+  #validateDevelopmentContext(
+    projectId: string,
+    contextId: string | null,
+    allowInactive = false,
+  ): void {
     const location = this.#database
       .prepare(
         `SELECT COALESCE(contexts.worktree_realpath, projects.workspace_realpath) AS cwd FROM projects LEFT JOIN project_development_contexts contexts ON contexts.project_id = projects.id AND contexts.id = ? WHERE projects.id = ?`,
@@ -1301,9 +1307,9 @@ export class Taskboard {
     const context = this.#database
       .prepare(
         `SELECT 1 FROM project_development_contexts
-        WHERE id = ? AND project_id = ? AND active = 1`,
+        WHERE id = ? AND project_id = ? AND (active = 1 OR ? = 1)`,
       )
-      .get(contextId, projectId);
+      .get(contextId, projectId, Number(allowInactive));
     if (!context) {
       throw new AppError("INVALID_REQUEST", 400, "开发上下文不属于当前项目或已失效");
     }

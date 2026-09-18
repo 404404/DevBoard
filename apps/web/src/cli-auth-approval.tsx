@@ -28,7 +28,7 @@ export function CliAuthApproval({
   const identity = session.actor.identity;
   const data = request.data;
   const expired = data?.status === "expired";
-  const canApprove = identity.kind === "feishu" && data?.status === "pending" && !expired;
+  const canApprove = identity.kind !== "service" && data?.status === "pending" && !expired;
   const error = approval.error ?? request.error;
   return (
     <main className="session-state" aria-labelledby="cli-auth-heading">
@@ -38,8 +38,10 @@ export function CliAuthApproval({
         <p>
           企业：{identity.tenantKey} · 用户：{identity.userId}
         </p>
+      ) : identity.kind === "web" ? (
+        <p>Web 账号 · {identity.accountId}</p>
       ) : (
-        <p role="alert">请使用飞书用户身份登录后授权。</p>
+        <p role="alert">请使用 Web 或飞书账号登录后授权。</p>
       )}
       {request.isPending && <p role="status">正在读取登录请求…</p>}
       {data && (
@@ -52,7 +54,7 @@ export function CliAuthApproval({
           </p>
           <p>
             请确认名称和核对码与刚才发起登录的终端一致。授权后，该 CLI 可在 8
-            小时内以你的身份访问看板，并受你的项目权限约束；可通过 taskctl auth logout 撤销。
+            小时内以你的身份访问和操作看板；可通过 taskctl auth logout 撤销。
           </p>
           <p>
             此请求截止时间：

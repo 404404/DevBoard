@@ -1,6 +1,7 @@
 import { seedProjectMember } from "./helpers/project-member-fixture.js";
 import { identityKey, type IdentityRef } from "@codexboard/contracts";
 import { seedFeishuTestActor, TEST_FEISHU_ACTOR } from "./helpers/identity.js";
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -124,6 +125,7 @@ async function feishuSetup() {
     cookies: cookieHeader(login),
     csrfToken: login.json().data.csrfToken as string,
     provisioner,
+    dataDirectory: config.CODEXBOARD_DATA_DIR,
   };
 }
 
@@ -445,8 +447,36 @@ describe("taskboard HTTP routes", () => {
   });
 
   it("archives the linked Codex task before permanently deleting a canceled task", async () => {
-    const { app, database, project, trusted, cookies, csrfToken, provisioner } =
+    const { app, database, project, trusted, cookies, csrfToken, provisioner, dataDirectory } =
       await feishuSetup();
+    // Cancellation checks the task's Git workspace, so keep this fixture independent
+    // of the source checkout's allowed roots, branch and uncommitted release changes.
+    const workspace = join(realpathSync(dataDirectory), "workspace");
+    mkdirSync(workspace);
+    execFileSync("git", ["init", "--initial-branch=main", workspace], { stdio: "pipe" });
+    execFileSync(
+      "git",
+      [
+        "-C",
+        workspace,
+        "-c",
+        "user.name=HTTP Test",
+        "-c",
+        "user.email=http-test@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "commit",
+        "--allow-empty",
+        "-m",
+        "Initialize isolated HTTP fixture",
+      ],
+      { stdio: "pipe" },
+    );
+    database
+      .prepare("UPDATE projects SET workspace_realpath = ? WHERE id = ?")
+      .run(workspace, project.id);
     const headers = (idempotencyKey: string) => ({
       ...trusted,
       cookie: cookies,
@@ -459,12 +489,30 @@ describe("taskboard HTTP routes", () => {
       headers: headers("http-delete-create"),
       payload: { projectId: project.id, title: "待删除任务" },
     });
+    expect(created.statusCode, created.body).toBe(201);
     const task = created.json().data;
     const canceled = await app.inject({
       method: "POST",
       url: `/api/v1/tasks/${task.id}/move`,
       headers: headers("http-delete-cancel"),
       payload: { expectedVersion: task.version, targetStatus: "canceled" },
+    });
+    expect(canceled.statusCode, canceled.body).toBe(200);
+    expect(canceled.json().data).toMatchObject({ id: task.id, status: "canceled" });
+    expect(provisioner.archived).toEqual([]);
+
+    const lifecycle = await app.inject({
+      method: "GET",
+      url: `/api/v1/tasks/${task.id}/lifecycle`,
+      headers: { host: trusted.host, cookie: cookies },
+    });
+    expect(lifecycle.statusCode, lifecycle.body).toBe(200);
+    expect(lifecycle.json().data).toMatchObject({
+      taskId: task.id,
+      targetStatus: "canceled",
+      status: "succeeded",
+      phase: "completed",
+      errorSummary: null,
     });
 
     const deleted = await app.inject({

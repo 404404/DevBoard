@@ -32,7 +32,6 @@ import {
   SubmitExecutionCommandSchema,
   UpdateTaskCommandSchema,
   TaskLifecycleCommandSchema,
-  type PrincipalView,
 } from "@codexboard/contracts";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -49,9 +48,8 @@ import {
 } from "../modules/execution/index.js";
 import {
   DevelopmentIdentityAdapter,
-  DEVELOPMENT_IDENTITY,
   IdentityService,
-  assertFeishuAssignee,
+  assertUserAssignee,
   readIdentityAudit,
 } from "../modules/identity/index.js";
 import { ProjectRegistry } from "../modules/project-registry/index.js";
@@ -181,25 +179,21 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
       provider: new DevelopmentIdentityAdapter(),
       sessionTtlSeconds: options.config.CODEXBOARD_SESSION_TTL_SECONDS,
     });
-  identityService.ensureDevelopmentActor(DEVELOPMENT_IDENTITY);
-  const localActor: PrincipalView = {
-    identity: DEVELOPMENT_IDENTITY.identity,
-    name: DEVELOPMENT_IDENTITY.name,
-    avatarUrl: DEVELOPMENT_IDENTITY.avatarUrl,
-    role: "admin",
-  };
-  const cliAuth = options.services?.cliAuth ?? options.cliAuth ?? new CliAuthService();
-  function requestActor(request: FastifyRequest): PrincipalView {
+  const cliAuth =
+    options.services?.cliAuth ??
+    options.cliAuth ??
+    new CliAuthService({
+      identityVersion: (identity) => identityService.cliIdentityVersion(identity),
+    });
+  function requestActor(
+    request: FastifyRequest,
+  ): ReturnType<IdentityService["authenticatedUserPrincipal"]> {
     const token = request.headers["x-taskctl-session"];
-    if (token === undefined) return localActor;
     if (typeof token !== "string" || !token)
-      throw new AppError("UNAUTHENTICATED", 401, "CLI 用户会话无效");
-    return identityService.authenticatedFeishuPrincipal(
+      throw new AppError("UNAUTHENTICATED", 401, "请先完成 taskctl auth login 和网页用户授权");
+    return identityService.authenticatedUserPrincipal(
       cliAuthOperation(() => cliAuth.authenticate(token)),
     );
-  }
-  function requireLocalOperator(request: FastifyRequest): PrincipalView {
-    return requestActor(request);
   }
   const revisionOption = options.onRevisionCommitted
     ? { onRevisionCommitted: options.onRevisionCommitted }
@@ -326,20 +320,21 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
         .run(randomUUID(), request.id);
       throw new AppError("FORBIDDEN", 403, "本机管理能力令牌无效");
     }
-    const actor = requestActor(request);
     const route = request.routeOptions.url ?? "";
-    const isTaskWrite =
-      !["GET", "HEAD", "OPTIONS"].includes(request.method) &&
-      /^\/api\/v1\/local\/(tasks|jobs|comments|attachments|interactions|labels)(?:\/|$)/.test(
-        route,
-      );
-    if (isTaskWrite && actor.identity.kind !== "feishu") {
-      throw new AppError(
-        "UNAUTHENTICATED",
-        401,
-        "任务写操作需要先完成 taskctl auth login 和网页授权；不会回退为本地管理员",
-      );
-    }
+    // The capability authenticates the local transport, never a board user. Keep
+    // bootstrap and machine operations explicit so new business routes fail closed.
+    const machineOperation =
+      ((request.method === "GET" || request.method === "HEAD") &&
+        (route === "/api/v1/local/health" || route === "/api/v1/local/web-accounts")) ||
+      (request.method === "POST" &&
+        [
+          "/api/v1/local/backups",
+          "/api/v1/local/web-accounts",
+          "/api/v1/local/auth/requests",
+          "/api/v1/local/auth/complete",
+        ].includes(route)) ||
+      (request.method === "PATCH" && route === "/api/v1/local/web-accounts/:id");
+    if (!machineOperation) requestActor(request);
   });
 
   const webAccounts = new WebAccountService(options.database);
@@ -391,7 +386,7 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
     const result = cliAuthOperation(() => cliAuth.complete(requestId, claimSecret));
     if ("token" in result) {
       try {
-        identityService.authenticatedFeishuPrincipal(result.identity);
+        identityService.authenticatedUserPrincipal(result.identity);
       } catch (error) {
         cliAuth.revoke(result.token);
         throw error;
@@ -401,8 +396,6 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
   });
   app.get("/api/v1/local/auth/session", async (request, reply) => {
     const actor = requestActor(request);
-    if (actor.identity.kind !== "feishu")
-      throw new AppError("UNAUTHENTICATED", 401, "请先完成 CLI 飞书登录");
     return reply
       .header("Cache-Control", "no-store")
       .send({ data: { identity: actor.identity, name: actor.name, role: actor.role } });
@@ -410,7 +403,7 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
   app.post("/api/v1/local/auth/logout", async (request, reply) => {
     const token = request.headers["x-taskctl-session"];
     if (typeof token !== "string" || !token)
-      throw new AppError("UNAUTHENTICATED", 401, "请先完成 CLI 飞书登录");
+      throw new AppError("UNAUTHENTICATED", 401, "请先完成 CLI 用户登录");
     cliAuthOperation(() => cliAuth.revoke(token));
     return reply.header("Cache-Control", "no-store").send({ data: { revoked: true } });
   });
@@ -419,8 +412,7 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
     data: { listener: "local-admin", ...operations.snapshot() },
   }));
 
-  app.post("/api/v1/local/backups", async (request, reply) => {
-    requireLocalOperator(request);
+  app.post("/api/v1/local/backups", async (_request, reply) => {
     const result = await backupRunner.create();
     await reply.code(201).send({ data: result });
   });
@@ -475,7 +467,6 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
     return { data: { labels: result.labels }, meta: { revision: result.revision } };
   });
   function gitProject(request: FastifyRequest): string {
-    requireLocalOperator(request);
     const { projectId } = ProjectParamsSchema.parse(request.params);
     if (
       !taskboard
@@ -608,7 +599,7 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
   }));
 
   app.get("/api/v1/local/members/audit", async (request) => {
-    requireLocalOperator(request);
+    requestActor(request);
     return { data: readIdentityAudit(options.database) };
   });
 
@@ -630,12 +621,6 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
 
   app.post("/api/v1/local/tasks", async (request, reply) => {
     const actor = requestActor(request);
-    if (actor.identity.kind !== "feishu")
-      throw new AppError(
-        "UNAUTHENTICATED",
-        401,
-        "创建任务需要先完成 taskctl auth login 和网页授权",
-      );
     if (!taskCreation) {
       throw new AppError("UPSTREAM_ERROR", 503, "Codex App Server 当前不可用，无法创建任务");
     }
@@ -643,7 +628,7 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
     if (command.assigneeIdentity && !sameIdentity(command.assigneeIdentity, actor.identity))
       throw new AppError("FORBIDDEN", 403, "CLI 创建任务的负责人必须是当前登录用户");
     command.assigneeIdentity = actor.identity;
-    assertFeishuAssignee(options.database, identityKey(actor.identity));
+    assertUserAssignee(options.database, identityKey(actor.identity));
     const result = await taskCreation.create(command, mutationContext(request));
     await reply.code(201).send({ data: result.task, meta: { revision: result.revision } });
   });

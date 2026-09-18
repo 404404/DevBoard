@@ -295,3 +295,208 @@ it("Web-only mode has no development or Feishu login and advertises account logi
     loadConfig({ CODEXBOARD_AUTH_MODE: "web", CODEXBOARD_ORIGIN: "http://tasks.example.com" }),
   ).toThrow();
 });
+
+it.each(["feishu", "web"] as const)(
+  "%s: a paired Web CLI uses the approving user for tasks and comments and cannot impersonate another user",
+  async (mode) => {
+    const t = setup("https", mode);
+    const alice = await t.accounts.create({ username: "alice", name: "Alice Web", password });
+    const bob = await t.accounts.create({ username: "bob", name: "Bob Web", password });
+    const identity = { kind: "web", accountId: alice.id };
+    const login = await t.login();
+    const browser = {
+      ...t.headers,
+      cookie: login.cookies.map((c) => `${c.name}=${c.value}`).join("; "),
+      "x-csrf-token": login.json().data.csrfToken,
+    };
+    const created = await t.local.inject({
+      method: "POST",
+      url: "/api/v1/local/auth/requests",
+      headers: t.localHeaders,
+      payload: { label: "Web terminal" },
+    });
+    expect(created.statusCode).toBe(201);
+    const { requestId, claimSecret } = created.json().data;
+    const url = `/api/v1/auth/cli/requests/${requestId}`;
+    const inspected = await t.app.inject({ url, headers: browser });
+    expect(inspected.statusCode).toBe(200);
+    expect(inspected.json().data.status).toBe("pending");
+    expect(inspected.body).not.toContain(claimSecret);
+    for (const identity of [
+      { kind: "web", accountId: bob.id },
+      { kind: "service", serviceId: "local-admin" },
+    ]) {
+      expect(
+        (
+          await t.app.inject({
+            method: "POST",
+            url: `${url}/approve`,
+            headers: browser,
+            payload: { identity },
+          })
+        ).statusCode,
+      ).toBe(400);
+    }
+    const missingCsrf = { ...browser, "x-csrf-token": "wrong" };
+    expect(
+      (
+        await t.app.inject({
+          method: "POST",
+          url: `${url}/approve`,
+          headers: missingCsrf,
+          payload: {},
+        })
+      ).statusCode,
+    ).toBe(403);
+    expect(
+      (await t.app.inject({ method: "POST", url: `${url}/approve`, headers: browser, payload: {} }))
+        .statusCode,
+    ).toBe(200);
+    const bobLogin = await t.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/web/login",
+      headers: t.headers,
+      payload: { username: "bob", password },
+    });
+    const bobBrowser = {
+      ...t.headers,
+      cookie: bobLogin.cookies.map((c) => `${c.name}=${c.value}`).join("; "),
+      "x-csrf-token": bobLogin.json().data.csrfToken,
+    };
+    expect(
+      (
+        await t.app.inject({
+          method: "POST",
+          url: `${url}/approve`,
+          headers: bobBrowser,
+          payload: {},
+        })
+      ).statusCode,
+    ).toBe(409);
+    const complete = await t.local.inject({
+      method: "POST",
+      url: "/api/v1/local/auth/complete",
+      headers: t.localHeaders,
+      payload: { requestId, claimSecret },
+    });
+    expect(complete.statusCode, complete.body).toBe(200);
+    expect(complete.json().data.identity).toEqual(identity);
+    const token = complete.json().data.token;
+    const headers = { ...t.localHeaders, "x-taskctl-session": token };
+    const status = await t.local.inject({ url: "/api/v1/local/auth/session", headers });
+    expect(status.json().data.identity).toEqual(identity);
+    expect(status.body).not.toContain(token);
+    const task = await t.local.inject({
+      method: "POST",
+      url: "/api/v1/local/tasks",
+      headers: { ...headers, "idempotency-key": "web-cli-create" },
+      payload: { projectId: TEMPORARY_PROJECT_ID, title: "Web CLI task" },
+    });
+    expect(task.statusCode, task.body).toBe(201);
+    expect(task.json().data).toMatchObject({
+      assigneeIdentity: identity,
+      creatorIdentity: identity,
+    });
+    const comment = await t.local.inject({
+      method: "POST",
+      url: `/api/v1/local/tasks/${task.json().data.id}/comments`,
+      headers: { ...headers, "idempotency-key": "web-cli-comment" },
+      payload: { body: "Web CLI comment" },
+    });
+    expect(comment.statusCode, comment.body).toBe(201);
+    expect(comment.json().data.author.identity).toEqual(identity);
+    expect(
+      (
+        await t.local.inject({
+          method: "POST",
+          url: `/api/v1/local/tasks/${task.json().data.id}/comments`,
+          headers: { ...headers, "idempotency-key": "web-cli-forged-comment" },
+          payload: { body: "Forged comment", authorIdentity: { kind: "web", accountId: bob.id } },
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await t.local.inject({
+          method: "POST",
+          url: "/api/v1/local/tasks",
+          headers: { ...headers, "idempotency-key": "web-cli-forged-create" },
+          payload: {
+            projectId: TEMPORARY_PROJECT_ID,
+            title: "Forged task",
+            assigneeIdentity: { kind: "web", accountId: bob.id },
+          },
+        })
+      ).statusCode,
+    ).toBe(403);
+    // Browser logout and CLI logout are independent; only account changes revoke both.
+    expect(
+      (await t.app.inject({ method: "POST", url: "/api/v1/session/logout", headers: browser }))
+        .statusCode,
+    ).toBe(204);
+    expect((await t.local.inject({ url: "/api/v1/local/projects", headers })).statusCode).toBe(200);
+  },
+);
+
+it.each(["reset", "disable"] as const)(
+  "%s revokes Web CLI sessions and approved unclaimed requests across account service instances",
+  async (change) => {
+    const t = setup("https", "web");
+    const account = await t.accounts.create({ username: "alice", name: "Alice", password });
+    await t.login();
+    const services = appControl(t.app).services;
+    const identity = { kind: "web" as const, accountId: account.id };
+    const approved = services.cliAuth.create("approved");
+    const claimed = services.cliAuth.create("claimed");
+    const dormant = services.cliAuth.create("unused while disabled");
+    services.cliAuth.approve(approved.requestId, identity);
+    services.cliAuth.approve(claimed.requestId, identity);
+    services.cliAuth.approve(dormant.requestId, identity);
+    const session = services.cliAuth.complete(claimed.requestId, claimed.claimSecret);
+    const dormantSession = services.cliAuth.complete(dormant.requestId, dormant.claimSecret);
+    if (!("token" in session)) throw new Error("Missing CLI session");
+    if (!("token" in dormantSession)) throw new Error("Missing dormant CLI session");
+    const headers = { ...t.localHeaders, "x-taskctl-session": session.token };
+    expect((await t.local.inject({ url: "/api/v1/local/projects", headers })).statusCode).toBe(200);
+    // Use another instance to ensure invalidation relies on durable state, not callbacks.
+    const accountManager = new WebAccountService(t.database);
+    await accountManager.update(
+      account.id,
+      change === "reset" ? { password: "reset-password-2026" } : { active: false },
+    );
+    for (const url of ["/api/v1/local/auth/session", "/api/v1/local/projects"]) {
+      expect((await t.local.inject({ url, headers })).statusCode).toBe(401);
+    }
+    if (change === "disable") await accountManager.update(account.id, { active: true });
+    // Re-enabling the account must not revive either a session or a pending claim.
+    expect((await t.local.inject({ url: "/api/v1/local/projects", headers })).statusCode).toBe(401);
+    expect(
+      (
+        await t.local.inject({
+          url: "/api/v1/local/projects",
+          headers: { ...t.localHeaders, "x-taskctl-session": dormantSession.token },
+        })
+      ).statusCode,
+    ).toBe(401);
+    const complete = await t.local.inject({
+      method: "POST",
+      url: "/api/v1/local/auth/complete",
+      headers: t.localHeaders,
+      payload: { requestId: approved.requestId, claimSecret: approved.claimSecret },
+    });
+    expect(complete.statusCode).toBe(401);
+    expect(complete.json().error.details.reason).toBe("CLI_AUTH_SESSION_INVALID");
+    const renewed = services.cliAuth.create("renewed");
+    services.cliAuth.approve(renewed.requestId, identity);
+    const freshSession = services.cliAuth.complete(renewed.requestId, renewed.claimSecret);
+    if (!("token" in freshSession)) throw new Error("Missing fresh CLI session");
+    expect(
+      (
+        await t.local.inject({
+          url: "/api/v1/local/projects",
+          headers: { ...t.localHeaders, "x-taskctl-session": freshSession.token },
+        })
+      ).statusCode,
+    ).toBe(200);
+  },
+);

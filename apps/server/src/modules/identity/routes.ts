@@ -5,7 +5,7 @@ import { z } from "zod";
 import { cliAuthOperation, type CliAuthService } from "./cli-auth-service.js";
 import {
   AuthBootstrapSchema,
-  FeishuIdentityRefSchema,
+  UserIdentityRefSchema,
   ExchangeFeishuCodeSchema,
   SessionViewSchema,
   type SessionView,
@@ -122,7 +122,7 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
     const session = service.authenticate(
       request.cookies[sessionCookieNames(config, request.cookies).session],
     );
-    service.authenticatedFeishuPrincipal(session.actor.identity);
+    service.authenticatedUserPrincipal(session.actor.identity);
     const { requestId } = requestParams.parse(request.params);
     reply.header("Cache-Control", "no-store");
     return { data: cliAuthOperation(() => cliAuth.inspect(requestId)) };
@@ -140,13 +140,13 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
     z.object({})
       .strict()
       .parse(request.body ?? {});
-    const actor = service.authenticatedFeishuPrincipal(session.actor.identity);
+    const actor = service.authenticatedUserPrincipal(session.actor.identity);
     const { requestId } = requestParams.parse(request.params);
     reply.header("Cache-Control", "no-store");
     // This identity only comes from the authenticated browser session, never from the payload.
     return {
       data: cliAuthOperation(() =>
-        cliAuth.approve(requestId, FeishuIdentityRefSchema.parse(actor.identity)),
+        cliAuth.approve(requestId, UserIdentityRefSchema.parse(actor.identity)),
       ),
     };
   });
