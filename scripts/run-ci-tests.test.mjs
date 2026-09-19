@@ -121,6 +121,28 @@ test("desktop Node suite reports success", async (t) => {
   assert.equal(result.status, "passed");
 });
 
+test("Node timeout reports hanging tests and leaked handles as failures", async (t) => {
+  const f = fixture(t);
+  f.write(
+    "scripts/pending.test.mjs",
+    'import test from "node:test"; test("pending fixture", async () => { setInterval(() => {}, 100); await new Promise(() => {}); });',
+  );
+  f.write(
+    "scripts/leaked-handle.test.mjs",
+    'import test from "node:test"; test("passing fixture with leaked handle", () => { setInterval(() => {}, 100); });',
+  );
+  const result = await runSuite("scripts", { rootDirectory: f.rootDirectory, testTimeoutMs: 1000 });
+  assert.notEqual(result.exitCode, 0);
+  assert.equal(result.status, "failed");
+  const output = f.outputDirectory("scripts");
+  const junit = readFileSync(join(output, "junit.xml"), "utf8");
+  assert.match(junit, /pending\.test\.mjs/);
+  assert.match(junit, /leaked-handle\.test\.mjs/);
+  assert.equal((junit.match(/<failure type="testTimeoutFailure"/g) ?? []).length, 2);
+  assert.ok(result.finishedAt);
+  assert.deepEqual(JSON.parse(readFileSync(join(output, "result.json"), "utf8")), result);
+});
+
 test("a child that cannot start leaves a failing result and JUnit report", async (t) => {
   const f = fixture(t);
   mkdirSync(join(f.rootDirectory, "packages", "contracts"), { recursive: true });

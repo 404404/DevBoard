@@ -28,6 +28,8 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 20
     steps:
+      - name: Preserve repository bytes on checkout
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
@@ -84,6 +86,8 @@ jobs:
     env:
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/playwright
     steps:
+      - name: Preserve repository bytes on checkout
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
@@ -118,6 +122,8 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 30
     steps:
+      - name: Preserve repository bytes on checkout
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false

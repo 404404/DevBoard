@@ -86,7 +86,7 @@ function isolatedEnvironment(home) {
   };
 }
 
-function suiteCommand(rootDirectory, suite, outputDirectory) {
+function suiteCommand(rootDirectory, suite, outputDirectory, testTimeoutMs) {
   const cwd = join(rootDirectory, suites[suite]);
   const junit = join(outputDirectory, "junit.xml");
   if (suite === "scripts" || suite === "desktop-scripts") {
@@ -99,6 +99,7 @@ function suiteCommand(rootDirectory, suite, outputDirectory) {
       cwd: rootDirectory,
       args: [
         "--test",
+        `--test-timeout=${testTimeoutMs}`,
         "--test-reporter=spec",
         "--test-reporter-destination=stdout",
         "--test-reporter=junit",
@@ -128,7 +129,7 @@ function xmlEscape(value) {
 // Options are only for isolated runner tests; the CLI always uses this checkout and Node.
 export async function runSuite(
   suite,
-  { rootDirectory = projectRoot, nodeExecutable = process.execPath } = {},
+  { rootDirectory = projectRoot, nodeExecutable = process.execPath, testTimeoutMs = 120_000 } = {},
 ) {
   if (!Object.hasOwn(suites, suite)) throw new Error(`Unknown test suite: ${suite}`);
   rootDirectory = resolve(rootDirectory);
@@ -141,6 +142,7 @@ export async function runSuite(
     arch: arch(),
     node: process.version,
     suite,
+    testTimeoutMs: suite === "scripts" || suite === "desktop-scripts" ? testTimeoutMs : null,
     status: "running",
     startedAt: startedAt.toISOString(),
     exitCode: null,
@@ -151,7 +153,7 @@ export async function runSuite(
     writeFileSync(join(outputDirectory, "result.json"), `${JSON.stringify(result, null, 2)}\n`);
     home = mkdtempSync(join(tmpdir(), `codexboard-ci-${suite}-`));
     const environment = isolatedEnvironment(home);
-    const { cwd, args } = suiteCommand(rootDirectory, suite, outputDirectory);
+    const { cwd, args } = suiteCommand(rootDirectory, suite, outputDirectory, testTimeoutMs);
     const execution = await new Promise((complete) => {
       let spawnError;
       const child = spawn(nodeExecutable, args, {
