@@ -57,3 +57,32 @@ cargo check --locked --all-targets --manifest-path apps/desktop/src-tauri/Cargo.
 ```
 
 在 macOS 上运行同一组命令只提供 macOS 证据。Windows 结论必须对应实际 Windows Actions 运行记录。
+
+## 2026-09-19 实际基线
+
+测试提交：`641676e746ba16722354749a81a4d00c86d8e6ec`。完整记录见 [Windows Actions 运行 35420294000](https://github.com/RocYan98/CodexBoard/actions/runs/35420294000)。平台元数据确认为 `win32` / `x64` / Node `v22.23.2`，整体结论为 **failure**。
+
+| 检查            | 通过 | 失败 | 跳过 |
+| --------------- | ---: | ---: | ---: |
+| contracts       |   49 |    0 |    0 |
+| web             |  204 |    0 |    0 |
+| taskctl         |   97 |    6 |    0 |
+| server          |  510 |   98 |    1 |
+| scripts         |   33 |   69 |    0 |
+| desktop-scripts |  144 |   79 |    0 |
+
+以上按 JUnit 的 testcase 记录统计。Node 脚本的失败包含超时及其连带取消，不代表相同数量的独立缺陷；服务端日志还记录了未处理异步错误，需要结合标准输出和标准错误分析。
+
+四个 Node/Web 工作区构建、类型检查和 ESLint 均通过。Windows 上测试执行器自身 8 项回归全部通过，包括非零退出码、失败报告、挂起测试和遗留句柄。六组测试报告、编译日志及构建产物共 8 个 artifact 已上传。
+
+桌面 Rust 检查返回 101，首个阻断为 `icons/icon.ico` 缺失，停在 `tauri-build`。该结果尚未覆盖项目中 Unix 专用 Rust 源码的后续编译错误。没有生成 Windows 桌面安装包。
+
+首次运行暴露了两项测试设施问题：Windows 检出转换换行导致上游许可证哈希不匹配，以及脚本失败后遗留句柄阻止报告完成。当前提交分别通过保留仓库字节和测试超时解决；复测中许可证校验已通过，脚本组在约 121 秒后以失败状态输出完整报告。没有屏蔽失败测试或放宽产品权限保护。
+
+后续适配优先项：
+
+1. Windows 凭据和数据权限策略：现有 `0600/0700` 与所有者检查需要对应的 Windows 安全实现。
+2. Git 路径等价性、盘符路径与 CLI cwd 校验，以及附件命令的执行端路径和 shell 语法。
+3. Codex Desktop IPC、Unix socket、进程停止和 POSIX 启动包装器。
+4. 将 `/private/tmp`、macOS 临时目录别名和固定正斜杠等测试夹具改为明确的平台语义，保留安全断言。
+5. Windows 图标、桌面资源及 Rust 平台模块；之后验证安装更新与真实 Codex 会话。备份入口、浏览器超时等其他失败仍需分别复现定位。
