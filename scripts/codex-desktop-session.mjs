@@ -848,7 +848,15 @@ export async function connectDesktopSession({
                   ...(params.serviceTier !== undefined ? { serviceTier: params.serviceTier } : {}),
                   ...(selectedCollaboration ? { collaborationMode: selectedCollaboration } : {}),
                 },
-                context: { inheritThreadSettings: true },
+                context: {
+                  inheritThreadSettings: true,
+                  // Desktop requests its native summary title on a direct first
+                  // turn only when the start kind is present. Do not name an
+                  // existing conversation or run a separate title-generating turn.
+                  ...(!state.title && desktopTurns(state).length === 0
+                    ? { threadStartKind: state.threadStartKind ?? "default" }
+                    : {}),
+                },
               },
             });
             const response = result.result?.result;
@@ -907,7 +915,15 @@ export async function connectDesktopSession({
               ),
             },
             // Preserve the owner's permission selection, including auto-review.
-            context: { inheritThreadSettings: true },
+            context: {
+              inheritThreadSettings: true,
+              // Desktop requests its native summary title on a direct first
+              // turn only when the start kind is present. Do not name an
+              // existing conversation or run a separate title-generating turn.
+              ...(!state.title && desktopTurns(state).length === 0
+                ? { threadStartKind: state.threadStartKind ?? "default" }
+                : {}),
+            },
           },
         });
         const response = result.result?.result;

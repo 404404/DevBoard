@@ -26,6 +26,11 @@ export function RemoteTurnContent({
   showActivityStatus?: boolean;
 }) {
   const active = turn.status === "inProgress";
+  // A diff can arrive while tools are still running (or the final answer streams).
+  // Only terminal turns may show their review summary.
+  const visibleChanges = ["completed", "interrupted", "failed"].includes(turn.status)
+    ? changes
+    : null;
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (!active || turn.startedAtMs == null || turn.workDurationMs != null) return;
@@ -107,9 +112,9 @@ export function RemoteTurnContent({
         </div>
       )}
       {parts.final.map((item, index) =>
-        renderItem(item, undefined, index === parts.final.length - 1 ? changes : undefined),
+        renderItem(item, undefined, index === parts.final.length - 1 ? visibleChanges : undefined),
       )}
-      {!parts.final.length && changes}
+      {!parts.final.length && visibleChanges}
     </>
   );
 }

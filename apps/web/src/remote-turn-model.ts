@@ -5,16 +5,22 @@ export type RemoteItem = Turn["items"][number];
 export type RemoteCommandAction = NonNullable<RemoteItem["commandActions"]>[number];
 export function splitRemoteTurn(turn: Turn) {
   const explicitFinal = turn.items.filter(
-    (i) => i.type === "agentMessage" && i.phase === "final_answer",
+    (i) => i.type === "agentMessage" && i.phase === "final_answer" && !i.asyncQuestions?.length,
   );
   // Older Desktop history has no phase. Only its last unclassified message
   // in a successfully completed turn can serve as the final answer.
   const fallback =
     turn.status === "completed" && explicitFinal.length === 0
-      ? turn.items.filter((i) => i.type === "agentMessage" && !i.phase).at(-1)
+      ? turn.items
+          .filter((i) => i.type === "agentMessage" && !i.phase && !i.asyncQuestions?.length)
+          .at(-1)
       : undefined;
   const answers = explicitFinal.length ? explicitFinal : fallback ? [fallback] : [];
-  const final = turn.items.filter((i) => answers.includes(i) || i.asyncQuestions?.length);
+  // Keep pending questions accessible; answered questions return to their original
+  // position in the activity stream instead of being treated as final answers.
+  const final = turn.items.filter(
+    (i) => answers.includes(i) || i.asyncQuestions?.some((q) => q.answer === null),
+  );
   const firstActivity = turn.items.findIndex((i) => i.type !== "userMessage");
   const leading = firstActivity < 0 ? turn.items.length : firstActivity;
   return {

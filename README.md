@@ -10,7 +10,7 @@
 
 CodexBoard 将项目任务看板与本机 Codex 连接起来。你可以整理项目和任务、提交需求、查看执行进度，并在需要时处理审批或补充信息。Mac 应用负责启动和管理本机服务，看板可通过 HTTPS 浏览器账号登录，也可在飞书中使用；两种方式可以同时配置。
 
-当前为 **0.1.10 预览版**，支持 **Apple Silicon Mac · macOS 13 或更新版本**。
+当前为 **0.1.11 预览版**，支持 **Apple Silicon Mac · macOS 13 或更新版本**。
 
 ## 访问方式
 
@@ -82,10 +82,10 @@ CodexBoard 将项目任务看板与本机 Codex 连接起来。你可以整理�
 3. 打开 DMG，将 `CodexBoard.app` 拖入 **Applications（应用程序）**。
 4. 从“应用程序”打开 CodexBoard，随后推出安装磁盘。
 
-如需校验下载完整性，同时下载对应的 `.dmg.sha256` 文件，在两个文件所在目录执行。以 0.1.10 为例：
+如需校验下载完整性，同时下载对应的 `.dmg.sha256` 文件，在两个文件所在目录执行。以 0.1.11 为例：
 
 ```sh
-shasum -a 256 -c CodexBoard-0.1.10-macos-arm64.dmg.sha256
+shasum -a 256 -c CodexBoard-0.1.11-macos-arm64.dmg.sha256
 ```
 
 显示 `OK` 表示文件与发布者提供的校验值一致。

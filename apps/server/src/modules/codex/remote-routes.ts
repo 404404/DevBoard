@@ -1,3 +1,4 @@
+import { cleanUserText, remoteDisplayTitle } from "./remote-title.js";
 import { ModelsSchema } from "./model-catalog.js";
 import {
   RemoteUploadChunks,
@@ -167,8 +168,8 @@ export function registerRemoteRoutes(
       data: RemoteThreadListSchema.parse({
         threads: result.data.map((thread) => ({
           id: thread.id,
-          title: thread.name || thread.preview.split("\n")[0]?.slice(0, 120) || "新任务",
-          preview: thread.preview.slice(0, 300),
+          title: remoteDisplayTitle(thread.name, thread.preview),
+          preview: cleanUserText(thread.preview).slice(0, 300),
           cwd: thread.cwd,
           updatedAt: thread.updatedAt,
           status: thread.status?.type ?? "unknown",

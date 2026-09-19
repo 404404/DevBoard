@@ -1058,7 +1058,10 @@ for (const tier of [null, "priority"]) {
     assert.equal(sent.params.turnStart.request.serviceTier, tier);
     assert.equal(sent.params.turnStart.request.model, "gpt-6-astra");
     assert.equal(sent.params.turnStart.request.effort, "medium");
-    assert.deepEqual(sent.params.turnStart.context, { inheritThreadSettings: true });
+    assert.deepEqual(sent.params.turnStart.context, {
+      inheritThreadSettings: true,
+      threadStartKind: "default",
+    });
     assert.equal(
       f.requests.some((r) => r.method === "thread/resume" || r.method === "turn/start"),
       false,
@@ -1469,4 +1472,36 @@ for (const reviewer of ["auto_review", "user"]) {
       false,
     );
   });
+}
+
+for (const method of ["taskboard/remote/send", "turn/start"]) {
+  for (const [name, initialState, expected] of [
+    ["new draft", {}, "default"],
+    ["named draft", { title: "User title" }, undefined],
+    [
+      "existing history",
+      { turns: [{ turnId: "previous", status: "completed", items: [] }] },
+      undefined,
+    ],
+    ["explicit kind", { threadStartKind: "review" }, "review"],
+  ]) {
+    test(`${method} preserves Desktop title generation for ${name}`, async (t) => {
+      const f = await fixture(t, { initialState });
+      await f.session.request(method, {
+        threadId: "thread-a",
+        cwd: "/recent",
+        text: "Fix title synchronization",
+        clientUserMessageId: "title-test",
+        input: [{ type: "text", text: "Fix title synchronization", text_elements: [] }],
+      });
+      const sent = f.requests.filter((r) => r.method === "thread-follower-start-turn");
+      assert.equal(sent.length, 1);
+      assert.equal(sent[0].targetClientId, "owner");
+      assert.equal(sent[0].params.turnStart.context.threadStartKind, expected);
+      assert.equal(
+        f.requests.some((r) => /thread\/resume|thread\/name\/set|thread\/start/.test(r.method)),
+        false,
+      );
+    });
+  }
 }

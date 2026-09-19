@@ -48,6 +48,7 @@ readline.createInterface({input:process.stdin}).on('line', line => {
   return send({id:m.id,result:{config:{approvals_reviewer:reviewer ?? null}}});
  }
  if(m.method==='account/rateLimits/read') return send({id:m.id,result:{rateLimits:{secondary:{usedPercent:37}}}});
+ if(m.method==='thread/list') return send({id:m.id,result:{data:[{id:'11111111-1111-4111-8111-111111111111',name:'old',preview:'opening'}],nextCursor:'next'}});
  if(m.method==='thread/name/set') {
   fs.appendFileSync(${JSON.stringify(join(directory, "session_index.jsonl"))},JSON.stringify({id:m.params.threadId,thread_name:m.params.name})+'\\n');
   return send({id:m.id,result:{}});
@@ -507,6 +508,15 @@ process.on('SIGTERM',()=>setTimeout(()=>{if(lock && fs.existsSync(lock)) fs.unli
       request("thread/archive", { threadId: "unknown-thread" }),
       /no rollout found for thread id unknown-thread/,
     );
+    const titleThread = "11111111-1111-4111-8111-111111111111";
+    await request("taskboard/remote/rename", {
+      threadId: titleThread,
+      name: "Latest Desktop title",
+    });
+    const titleList = await request("thread/list", {});
+    assert.equal(titleList.data[0].name, "Latest Desktop title");
+    assert.equal(titleList.data[0].preview, "opening");
+    assert.equal(titleList.nextCursor, "next");
     await request("thread/name/set", { threadId: "thread-a", name: "named" });
     await assert.rejects(request("turn/steer", { threadId: "thread-a" }));
     await assert.rejects(request("thread/start", { cwd: "ephemeral", ephemeral: true }));

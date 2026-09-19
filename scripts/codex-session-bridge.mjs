@@ -3,7 +3,7 @@ import { readTaskProgress } from "./codex-task-progress.mjs";
 import { readRemoteImage } from "./codex-remote-image.mjs";
 import { storeRemoteUpload, readRemoteUploadImage } from "./codex-remote-upload.mjs";
 import { readRemoteReview } from "./codex-remote-review.mjs";
-import { readCodexThreadTitle } from "./codex-thread-title.mjs";
+import { readCodexThreadTitle, readCodexThreadTitles } from "./codex-thread-title.mjs";
 import { readGitOrigins } from "./git-origin-reader.mjs";
 import { loadDesktopSession } from "./codex-desktop-loader.mjs";
 import { connectDesktopSession } from "./codex-desktop-session.mjs";
@@ -525,17 +525,27 @@ export async function createCodexSessionBridge({
           },
         };
       }
+      if (message.method === "thread/list") {
+        const result = await control.request(message.method, message.params);
+        const titles = await readCodexThreadTitles(
+          codexHome,
+          result.data.map((thread) => thread.id),
+        );
+        return {
+          ...result,
+          data: result.data.map((thread) => ({
+            ...thread,
+            name: titles.get(thread.id) ?? thread.name,
+          })),
+        };
+      }
       if (message.method === "thread/name/set") {
         return await withHelper((worker) => worker.request(message.method, message.params));
       }
       if (
-        [
-          "fs/createDirectory",
-          "model/list",
-          "account/rateLimits/read",
-          "command/exec",
-          "thread/list",
-        ].includes(message.method)
+        ["fs/createDirectory", "model/list", "account/rateLimits/read", "command/exec"].includes(
+          message.method,
+        )
       ) {
         return await control.request(message.method, message.params);
       }

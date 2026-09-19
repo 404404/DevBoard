@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { readCodexThreadTitle } from "./codex-thread-title.mjs";
+import { readCodexThreadTitle, readCodexThreadTitles } from "./codex-thread-title.mjs";
 
 test("reads the latest persisted title without accepting another thread or a partial append", async (t) => {
   const home = await mkdtemp(join(tmpdir(), "codex-title-test-"));
@@ -20,4 +20,8 @@ test("reads the latest persisted title without accepting another thread or a par
   );
   assert.equal(await readCodexThreadTitle(home, "one"), "新名称");
   assert.equal(await readCodexThreadTitle(home, "missing"), null);
+  assert.deepEqual(
+    [...(await readCodexThreadTitles(home, ["one", "missing"]))],
+    [["one", "新名称"]],
+  );
 });

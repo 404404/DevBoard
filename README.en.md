@@ -10,7 +10,7 @@ Connect your projects to Codex and turn ideas into progress.
 
 CodexBoard connects your project task board to Codex running on your Mac. Organize projects and tasks, submit requests, track execution, and handle approvals or requests for more information. The Mac app starts and manages local services; you access the board through HTTPS with a locally created Web account, through Lark, or both.
 
-Current release: **0.1.10 preview**, for **Apple Silicon Macs running macOS 13 or later**.
+Current release: **0.1.11 preview**, for **Apple Silicon Macs running macOS 13 or later**.
 
 ## Access methods
 
@@ -81,10 +81,10 @@ The installer includes **Node.js, the board's frontend and backend, the Codex br
 3. Open the DMG and drag `CodexBoard.app` into **Applications**.
 4. Open CodexBoard from Applications, then eject the installer disk.
 
-To check download integrity, also download the corresponding `.dmg.sha256` file and run the following in the directory containing both files. For version 0.1.10:
+To check download integrity, also download the corresponding `.dmg.sha256` file and run the following in the directory containing both files. For version 0.1.11:
 
 ```sh
-shasum -a 256 -c CodexBoard-0.1.10-macos-arm64.dmg.sha256
+shasum -a 256 -c CodexBoard-0.1.11-macos-arm64.dmg.sha256
 ```
 
 An `OK` result means the file matches the publisher's checksum.
