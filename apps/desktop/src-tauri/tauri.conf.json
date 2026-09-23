@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "CodexBoard",
+  "productName": "DevBoard",
   "version": "0.1.11",
   "identifier": "cn.rocyan.codexboard.desktop",
   "build": {
@@ -11,7 +11,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "CodexBoard",
+        "title": "DevBoard",
         "width": 1000,
         "height": 730,
         "minWidth": 780,
@@ -33,7 +33,7 @@
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRDQTM5MkIzNEYxNDg0OTUKUldTVmhCUlBzNUtqVEwwUGUxdk1YNjFUZWwxZys0MC9MM0lITEVtNUttMmhHUmN0Y3FrRXdCRVgK",
-      "endpoints": ["https://github.com/RocYan98/CodexBoard/releases/latest/download/latest.json"]
+      "endpoints": ["https://github.com/404404/DevBoard/releases/latest/download/latest.json"]
     }
   }
 }

@@ -223,7 +223,7 @@
       status: "unavailable",
       canInstall: false,
       canReplace: false,
-      message: "请在 CodexBoard 应用中安装配套 Skill。",
+      message: "请在 DevBoard 应用中安装配套 Skill。",
     };
     render();
   }

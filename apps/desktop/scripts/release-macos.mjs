@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 const project = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const desktop = join(project, "apps/desktop");
 const output = join(desktop, "dist");
-const repository = process.env.CODEXBOARD_RELEASE_REPOSITORY ?? "RocYan98/CodexBoard";
+const repository = process.env.CODEXBOARD_RELEASE_REPOSITORY ?? "404404/DevBoard";
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, { cwd: project, stdio: "inherit", ...options });
@@ -125,7 +125,7 @@ function release() {
       .join("\x1f"),
   };
   run(process.execPath, [join(desktop, "scripts/build-macos.mjs")], { env: buildEnv });
-  const app = join(output, "CodexBoard.app");
+  const app = join(output, "DevBoard.app");
   const builtVersion = run(
     "/usr/libexec/PlistBuddy",
     ["-c", "Print :CFBundleShortVersionString", join(app, "Contents/Info.plist")],
@@ -135,9 +135,9 @@ function release() {
   run("codesign", ["--verify", "--deep", "--strict", app]);
   assertDistributionClean(app);
 
-  const stem = `CodexBoard-${version}-macos-arm64`;
+  const stem = `DevBoard-${version}-macos-arm64`;
   const archive = join(output, `${stem}.app.tar.gz`);
-  run("/usr/bin/tar", ["-czf", archive, "-C", output, "CodexBoard.app"], {
+  run("/usr/bin/tar", ["-czf", archive, "-C", output, "DevBoard.app"], {
     env: { ...process.env, COPYFILE_DISABLE: "1" },
   });
   const signingEnv = {
@@ -190,17 +190,17 @@ function release() {
       { env: { ...buildEnv, CODEXBOARD_UPDATE_ARCHIVE: archive } },
     );
     rmSync(publicKeyFile);
-    cpSync(app, join(staging, "CodexBoard.app"), { recursive: true, verbatimSymlinks: true });
+    cpSync(app, join(staging, "DevBoard.app"), { recursive: true, verbatimSymlinks: true });
     symlinkSync("/Applications", join(staging, "Applications"));
     writeFileSync(
       join(staging, "安装说明.txt"),
-      `CodexBoard ${version}\n\n适用于 Apple Silicon Mac，macOS 13 或更新版本。\n\n1. 更新旧版前，请先处理执行中的任务并正常退出 CodexBoard。\n2. 将 CodexBoard.app 拖入 Applications（应用程序）。\n3. 打开应用，按“使用引导”完成配置，然后推出本安装磁盘。\n\n当前未完成 Apple Developer ID 签名和公证。确认来源可信后，首次打开方法见：\nhttps://support.apple.com/en-mo/102445\n无需关闭系统整体安全检查。\n\n已安装版本可在“应用设置 → 应用更新”中检查、下载并确认安装更新。\n更新包通过独立签名校验；更新不会覆盖应用的数据目录。\n\n安装包包含 Node.js、前后端、Codex 桥接、SQLite、Caddy、frp 客户端。\nCodex、公网 frp 服务端需自行准备；使用飞书入口或飞书 CLI 配对时另需飞书客户端与自建应用。Web 账号登录及 CLI 配对需要 HTTPS。\n\n用户指南：https://github.com/${repository}\nAgent 指南：https://github.com/${repository}/blob/main/AGENTS.md\n`,
+      `DevBoard ${version}\n\n适用于 Apple Silicon Mac，macOS 13 或更新版本。\n\n1. 更新旧版前，请先处理执行中的任务并正常退出 DevBoard。\n2. 将 DevBoard.app 拖入 Applications（应用程序）。\n3. 打开应用，按“使用引导”完成配置，然后推出本安装磁盘。\n\n当前未完成 Apple Developer ID 签名和公证。确认来源可信后，首次打开方法见：\nhttps://support.apple.com/en-mo/102445\n无需关闭系统整体安全检查。\n\n已安装版本可在“应用设置 → 应用更新”中检查、下载并确认安装更新。\n更新包通过独立签名校验；更新不会覆盖应用的数据目录。\n\n安装包包含 Node.js、前后端、Codex 桥接、SQLite、Caddy、frp 客户端。\nCodex、公网 frp 服务端需自行准备；使用飞书入口或飞书 CLI 配对时另需飞书客户端与自建应用。Web 账号登录及 CLI 配对需要 HTTPS。\n\n用户指南：https://github.com/${repository}\nAgent 指南：https://github.com/${repository}/blob/main/AGENTS.md\n`,
     );
     const dmg = join(output, `${stem}.dmg`);
     run("hdiutil", [
       "create",
       "-volname",
-      "CodexBoard",
+      "DevBoard",
       "-srcfolder",
       staging,
       "-ov",
@@ -217,7 +217,7 @@ function release() {
     );
     const notes = process.env.CODEXBOARD_RELEASE_NOTES_FILE
       ? readFileSync(process.env.CODEXBOARD_RELEASE_NOTES_FILE, "utf8")
-      : `CodexBoard ${version} 更新`;
+      : `DevBoard ${version} 更新`;
     writeFileSync(
       join(output, "latest.json"),
       JSON.stringify(
@@ -242,4 +242,7 @@ function release() {
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) release();
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  console.error("macOS Desktop releases are retired. Use the multi-architecture GHCR image release.");
+  process.exit(78);
+}

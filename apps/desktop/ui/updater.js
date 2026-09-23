@@ -130,7 +130,7 @@
         "update-notice-text",
         state.status === "ready"
           ? `新版本${version}已准备好安装。`
-          : `发现 CodexBoard 新版本${version}。`,
+          : `发现 DevBoard 新版本${version}。`,
       );
   }
 
@@ -262,7 +262,7 @@
   renderUpdate();
   if (invokeUpdate) void pollUpdates();
   else {
-    text("update-current-version", "请在 CodexBoard 应用中检查更新");
+    text("update-current-version", "请在 DevBoard 应用中检查更新");
     text("update-status", "界面预览不检查或安装更新。");
   }
 })();

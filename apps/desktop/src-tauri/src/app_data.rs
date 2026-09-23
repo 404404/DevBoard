@@ -95,7 +95,7 @@ fn instance_lock(directory: RawFd, attempts: usize) -> Result<File, String> {
             std::thread::sleep(Duration::from_millis(100));
         }
     }
-    Err("CodexBoard 已在运行，请先正常退出旧应用后再打开；现有数据未迁移".into())
+    Err("DevBoard 已在运行，请先正常退出旧应用后再打开；现有数据未迁移".into())
 }
 
 // Keep the same instance-lock inode across an atomic rename. The old updater
@@ -121,7 +121,7 @@ pub fn open(home: &Path, attempts: usize) -> Result<(PathBuf, File), String> {
         .collect::<Result<Vec<_>, _>>()?;
     let present: Vec<_> = existing.iter().filter(|(_, id)| id.is_some()).collect();
     if present.len() > 1 {
-        return Err("新旧应用数据目录同时存在。未合并或覆盖，请先核对目录后再打开 CodexBoard".into());
+        return Err("新旧应用数据目录同时存在。未合并或覆盖，请先核对目录后再打开 DevBoard".into());
     }
     let selected = present.first().map(|(name, _)| *name).unwrap_or(NAME);
     let legacy = if selected != NAME { identity(parent, selected)? } else { None };

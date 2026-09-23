@@ -22,6 +22,6 @@ int main(int argc, char **argv) {
       }
     }
   }
-  fputs("无法启动更新后的 CodexBoard，请重新安装完整应用。\n", stderr);
+  fputs("无法启动更新后的 DevBoard，请重新安装完整应用。\n", stderr);
   return 1;
 }

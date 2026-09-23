@@ -110,6 +110,7 @@ export const RUNTIME_SCRIPT_FILES = Object.freeze([
 export const DESKTOP_RUNTIME_SCRIPT_FILES = Object.freeze([
   "runtime.mjs",
   "frpc-config.mjs",
+  "public-access.mjs",
   "ports.mjs",
   "setup-controller.mjs",
   "web-accounts.mjs",

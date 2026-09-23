@@ -3,12 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>CodexBoard</title>
+    <title>DevBoard</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <aside>
-      <div class="brand"><img class="logo" src="icon.png" alt="" />CodexBoard</div>
+      <div class="brand"><img class="logo" src="icon.png" alt="" />DevBoard</div>
       <div class="edition">本机工作空间</div>
       <nav>
         <button data-tab="overview" class="selected">
@@ -250,11 +250,32 @@
           class="update-card collapsible-card"
           aria-labelledby="connections-title"
         >
-          <summary><h2 id="connections-title">飞书应用与公网隧道</h2></summary>
+          <summary><h2 id="connections-title">飞书应用与公网访问</h2></summary>
           <form id="connections-form" autocomplete="off">
             <p class="hint">
-              飞书应用与 Web 账号可同时使用，共用下方公网隧道。仅使用 Web 时，飞书凭据可留空。
+              DevBoard 将项目看板、飞书入口和 Web 账号连接到同一套执行数据。公网入口可使用内置 FRP、外部反向代理或仅本机访问。
             </p>
+            <div class="connection-fields">
+              <div>
+                <label for="public-access-mode">公网访问模式</label>
+                <select id="public-access-mode">
+                  <option value="builtin-frp">内置 FRP（兼容旧配置）</option>
+                  <option value="external-reverse-proxy">外部反向代理（Lucky/Nginx/Caddy）</option>
+                  <option value="local">本机</option>
+                </select>
+                <p id="public-access-help" class="hint"></p>
+              </div>
+              <div>
+                <label for="public-origin">Public Origin</label>
+                <input id="public-origin" spellcheck="false" placeholder="https://devboard.example.com" />
+                <p class="hint">仅外部反向代理模式填写；不要填写路径、账号或密钥。</p>
+              </div>
+              <div>
+                <label for="listen-address">Caddy 监听地址</label>
+                <input id="listen-address" spellcheck="false" value="127.0.0.1" placeholder="127.0.0.1" />
+                <p class="hint">外部代理在其他局域网主机时才改为本机 LAN IP；管理 API 始终只监听本机。</p>
+              </div>
+            </div>
             <div id="feishu-connection-fields" class="connection-fields">
               <div>
                 <label for="app-id">App ID</label>
@@ -278,7 +299,6 @@
             </div>
             <label for="frpc-content">frpc.toml</label>
             <textarea
-              required
               id="frpc-content"
               rows="9"
               spellcheck="false"
@@ -418,7 +438,7 @@
             <span class="skill-target-label">Codex</span>
           </summary>
           <p class="update-help">
-            让 Codex 查询和管理 CodexBoard 任务。Skill 随应用提供，无需下载源码。
+            让 Codex 查询和管理 DevBoard 任务。Skill 随应用提供，无需下载源码。
           </p>
           <p id="skill-status" role="status" aria-live="polite">正在检查 Skill…</p>
           <p id="skill-version" class="update-help"></p>
@@ -515,7 +535,7 @@
     >
       <h2 id="update-dialog-title">安装更新并重启</h2>
       <p id="update-dialog-description">
-        安装会停止 CodexBoard 的本机服务，任务看板将暂时不可用，并中断尚未完成的执行。
+        安装会停止 DevBoard 的本机服务，任务看板将暂时不可用，并中断尚未完成的执行。
         请先结束正在执行的任务并保存配置。安装完成后应用会重新启动，原有配置与任务数据会保留。
       </p>
       <p id="update-dialog-error" class="update-error" role="alert" hidden></p>
@@ -529,7 +549,7 @@
       aria-labelledby="skill-offer-title"
       aria-describedby="skill-offer-description"
     >
-      <h2 id="skill-offer-title">让 Codex 使用 CodexBoard</h2>
+      <h2 id="skill-offer-title">让 Codex 使用 DevBoard</h2>
       <p id="skill-offer-description">
         安装配套 Skill 后，Codex 可以按说明查询和管理任务。Skill
         随应用提供，无需下载源码；查询或操作看板前需使用 Web 或飞书账号确认 CLI 配对授权。

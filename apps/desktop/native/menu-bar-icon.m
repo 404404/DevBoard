@@ -84,7 +84,7 @@ void codexboard_install_menu_glyph(void *pointer) {
     button.image = image;
     button.imagePosition = NSImageOnly;
     button.imageScaling = NSImageScaleNone;
-    button.accessibilityLabel = @"CodexBoard";
+    button.accessibilityLabel = @"DevBoard";
     CodexBoardMenuGlyph *view = [[CodexBoardMenuGlyph alloc] initWithFrame:button.bounds];
     view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     [view setAccessibilityElement:NO];

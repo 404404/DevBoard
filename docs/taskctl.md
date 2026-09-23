@@ -1,4 +1,15 @@
-# taskctl 命令参考
+# Legacy taskctl（已弃用）
+
+> 本文是 v0.1.11 macOS Desktop CLI 的历史参考。该 CLI 依赖调用者本地 cwd、旧 Codex Desktop 项目导入和 Job/Git 模型，不支持当前 Docker Control Plane 的 SSH Workspace Mapping 或 Run。不要按下方命令启动远端执行，也不要将容器路径误作 Host 路径。当前操作请使用 DevBoard Web/飞书；容器运维请在容器内调用 ops CLI。
+
+备份和备份校验示例（Admin API 仍只绑定容器内 loopback，不要发布管理端口）：
+
+```sh
+docker compose exec -T devboard node apps/server/dist/ops.js backup
+docker compose exec -T devboard node apps/server/dist/ops.js verify /var/lib/devboard/backups/<backup-id>
+```
+
+以下内容仅供排查/迁移旧安装，不是当前产品接口。
 
 `node packages/taskctl/dist/cli.js --help` 可以在服务未运行时查看全部命令。
 构建：`npm run build -w @codexboard/taskctl`。运行时从

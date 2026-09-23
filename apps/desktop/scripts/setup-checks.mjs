@@ -147,10 +147,12 @@ export async function runSetupChecks(input, options = {}) {
     Number.isFinite(options.timeoutMs) && options.timeoutMs > 0
       ? Math.min(options.timeoutMs, 5000)
       : 3500;
+  const publicAccessMode = input.publicAccessMode || "builtin-frp";
   const selected =
     input.section === "all" || !input.section
       ? SETUP_SECTIONS.filter((section) =>
-          input.accessMode === "web" ? section !== "feishu" : section !== "web",
+          (input.accessMode === "web" ? section !== "feishu" : section !== "web") &&
+          (publicAccessMode === "builtin-frp" || section !== "tunnel")
         )
       : [input.section];
   if (selected.some((section) => !SETUP_SECTIONS.includes(section)))
@@ -187,7 +189,11 @@ export async function runSetupChecks(input, options = {}) {
     if (section === "web") {
       let secure = false;
       try {
-        secure = new URL(readFrpcOrigin(input.frpc, input.caddyPort)).protocol === "https:";
+        secure =
+          publicAccessMode === "local" ||
+          (publicAccessMode === "external-reverse-proxy"
+            ? new URL(input.publicOrigin).protocol === "https:"
+            : new URL(readFrpcOrigin(input.frpc, input.caddyPort)).protocol === "https:");
       } catch {
         /* Invalid drafts are reported below. */
       }
@@ -195,7 +201,11 @@ export async function runSetupChecks(input, options = {}) {
         "web.https",
         "HTTPS 访问",
         secure ? "passed" : "failed",
-        secure ? "已配置 HTTPS 公网入口。" : "Web 账号访问必须配置 HTTPS 隧道。",
+        secure
+          ? publicAccessMode === "local"
+            ? "已配置本机访问入口。"
+            : "已配置 HTTPS 公网入口。"
+          : "Web 账号访问必须配置 HTTPS 隧道。",
       );
       if (!input.servicesRunning || input.restartRequired) {
         emit("web.account", "Web 账号", "warning", "请先保存配置并启动或重启服务，再检查账号。");
@@ -278,6 +288,15 @@ export async function runSetupChecks(input, options = {}) {
       }
     }
     if (section === "tunnel") {
+      if (publicAccessMode !== "builtin-frp") {
+        emit(
+          "tunnel.configuration",
+          "内置 frp",
+          "warning",
+          "当前模式由外部反向代理或本地访问负责入口，DevBoard 不会启动 frpc。",
+        );
+        return results;
+      }
       let config;
       try {
         config = tunnelConfiguration(input);
@@ -372,10 +391,19 @@ export async function runSetupChecks(input, options = {}) {
             : "本机服务未运行，请启动服务后再确认隧道连接状态。",
         );
     }
+    if (section === "dns" && publicAccessMode === "local") {
+      emit("dns.local", "公网 DNS", "warning", "本机访问模式不需要公网 DNS 或外部入口检查。");
+      return results;
+    }
     if (section === "dns") {
       let origin;
       try {
-        origin = readFrpcOrigin(input.frpc, input.caddyPort);
+        origin =
+          publicAccessMode === "external-reverse-proxy"
+            ? new URL(input.publicOrigin).origin
+            : publicAccessMode === "local"
+              ? "http://127.0.0.1:" + (input.apiPort || input.caddyPort)
+              : readFrpcOrigin(input.frpc, input.caddyPort);
       } catch {
         emit(
           "dns.configuration",
@@ -456,8 +484,8 @@ export async function runSetupChecks(input, options = {}) {
             `公网 ${protocolName}`,
             "passed",
             url.protocol === "http:"
-              ? "HTTP 明文测试入口已返回健康的 CodexBoard 看板服务；此连接不受 TLS 加密保护。"
-              : "TLS 证书有效，公网已返回健康的 CodexBoard 看板服务。",
+              ? "HTTP 明文测试入口已返回健康的 DevBoard 看板服务；此连接不受 TLS 加密保护。"
+              : "TLS 证书有效，公网已返回健康的 DevBoard 看板服务。",
           );
         }
       } catch {

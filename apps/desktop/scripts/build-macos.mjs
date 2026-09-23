@@ -23,6 +23,11 @@ import { copyCargoLicenses } from "./cargo-licenses.mjs";
 import { copyBundledSkill } from "./package-skills.mjs";
 import { writeLegacyUpdateLauncher } from "./legacy-update-launcher.mjs";
 
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  console.error("macOS Desktop packaging is retired. Use the Docker image and Compose deployment.");
+  process.exit(78);
+}
+
 const project = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const desktop = join(project, "apps/desktop");
 const version = JSON.parse(readFileSync(join(project, "package.json"), "utf8")).version;
@@ -80,7 +85,7 @@ run("cargo", [
   "--manifest-path",
   join(desktop, "src-tauri/Cargo.toml"),
 ]);
-const app = join(desktop, "dist/CodexBoard.app");
+const app = join(desktop, "dist/DevBoard.app");
 rmSync(app, { recursive: true, force: true });
 const contents = join(app, "Contents");
 const runtime = join(contents, "Resources/runtime");
@@ -129,7 +134,7 @@ const legacyUpdateLaunchers = ["taskboard-desktop", "lark-codex-desktop"].map((n
 );
 writeFileSync(
   join(contents, "Info.plist"),
-  `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>codexboard-desktop</string><key>CFBundleIdentifier</key><string>cn.rocyan.codexboard.desktop</string><key>CFBundleName</key><string>CodexBoard</string><key>CFBundleDisplayName</key><string>CodexBoard</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>${version}</string><key>CFBundleVersion</key><string>${version.split("-")[0]}</string><key>LSMinimumSystemVersion</key><string>13.0</string><key>NSHighResolutionCapable</key><true/></dict></plist>`,
+  `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>codexboard-desktop</string><key>CFBundleIdentifier</key><string>cn.rocyan.codexboard.desktop</string><key>CFBundleName</key><string>DevBoard</string><key>CFBundleDisplayName</key><string>DevBoard</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>${version}</string><key>CFBundleVersion</key><string>${version.split("-")[0]}</string><key>LSMinimumSystemVersion</key><string>13.0</string><key>NSHighResolutionCapable</key><true/></dict></plist>`,
 );
 const roundedIcon = join(cache, "CodexBoard-rounded.png");
 const iconRenderer = join(cache, "icon-mask");
