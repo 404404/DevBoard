@@ -1,0 +1,28 @@
+services:
+  devboard:
+    environment:
+      DEVBOARD_TRUST_PROXY: ${DEVBOARD_TRUST_PROXY:-172.31.87.2/32}
+    networks:
+      proxy_backend:
+        ipv4_address: 172.31.87.3
+
+  reverse-proxy-example:
+    image: nginx:stable-alpine
+    restart: unless-stopped
+    depends_on:
+      devboard:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:47824:443"
+    volumes:
+      - ./deploy/reverse-proxy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./secrets/nginx:/etc/nginx/certs:ro
+    networks:
+      proxy_backend:
+        ipv4_address: 172.31.87.2
+
+networks:
+  proxy_backend:
+    ipam:
+      config:
+        - subnet: 172.31.87.0/24

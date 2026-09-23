@@ -1,0 +1,8 @@
+services:
+  devboard:
+    environment:
+      SSH_AUTH_SOCK: /run/devboard/ssh-agent
+    volumes:
+      - type: bind
+        source: ${SSH_AUTH_SOCK:?Set SSH_AUTH_SOCK to an agent socket visible to Docker}
+        target: /run/devboard/ssh-agent

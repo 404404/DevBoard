@@ -8,6 +8,7 @@ test-results/
 .env
 .env.*
 !.env.example
+/secrets/
 .codexboard/
 # Protect data and configuration created by published versions.
 .lark-codex/

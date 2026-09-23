@@ -1,0 +1,15 @@
+.git
+.github
+node_modules
+**/node_modules
+**/dist
+.data
+coverage
+playwright-report
+apps/desktop
+secrets
+.env
+.env.*
+!.env.example
+*.dmg
+*.tar.gz
