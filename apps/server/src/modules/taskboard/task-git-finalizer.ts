@@ -26,11 +26,14 @@ export interface TaskGitSnapshot {
 /** Task finalization only observes Git state. It never commits, removes files, or writes refs. */
 export class TaskGitFinalizer {
   readonly #allowedRoots: readonly string[];
+  readonly #remoteOnly: boolean;
   constructor(
     allowedRoots: readonly string[],
     private readonly runner?: WorkspaceCommandRunner,
+    options: { readonly remoteOnly?: boolean } = {},
   ) {
-    this.#allowedRoots = allowedRoots.map((root) => realpathSync(root));
+    this.#remoteOnly = options.remoteOnly ?? false;
+    this.#allowedRoots = this.#remoteOnly ? [] : allowedRoots.map((root) => realpathSync(root));
   }
 
   async inspect(
@@ -40,6 +43,7 @@ export class TaskGitFinalizer {
     projectDirectory?: string | null,
     taskBranch?: string | null,
   ): Promise<TaskGitSnapshot | null> {
+    this.#assertLocalFilesystemEnabled();
     const cwd = this.#allowed(directory);
     const present = existsSync(directory);
     if (!present && !projectDirectory)
@@ -89,6 +93,7 @@ export class TaskGitFinalizer {
   }
 
   async verify(snapshot: TaskGitSnapshot, cancellationTaskId?: string): Promise<TaskGitSnapshot> {
+    this.#assertLocalFilesystemEnabled();
     const { cwd, mainCwd, branch, mainTask } = snapshot;
     if (this.#allowed(mainCwd) !== mainCwd || this.#allowed(cwd) !== cwd)
       throw new AppError("VERSION_CONFLICT", 409, "工作树路径已变化");
@@ -170,6 +175,16 @@ export class TaskGitFinalizer {
       )
         throw new WorkspaceNotGitError();
       throw new AppError("UPSTREAM_ERROR", 502, `Git 检查失败：${args[0]}`, { cause });
+    }
+  }
+
+  #assertLocalFilesystemEnabled(): void {
+    if (this.#remoteOnly) {
+      throw new AppError(
+        "INVALID_REQUEST",
+        409,
+        "任务收尾不能检查容器本地路径；请使用 SSH Host Workspace Mapping 执行远程 Git 检查",
+      );
     }
   }
 }

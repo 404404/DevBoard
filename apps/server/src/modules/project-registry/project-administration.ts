@@ -29,10 +29,16 @@ const ProjectRowSchema = z.object({
 export class ProjectAdministration {
   readonly #database: SqliteDatabase;
   readonly #now: () => Date;
+  readonly #onRevisionCommitted: ((revision: number) => void) | undefined;
 
-  constructor(database: SqliteDatabase, now: () => Date = () => new Date()) {
+  constructor(
+    database: SqliteDatabase,
+    now: () => Date = () => new Date(),
+    onRevisionCommitted?: (revision: number) => void,
+  ) {
     this.#database = database;
     this.#now = now;
+    this.#onRevisionCommitted = onRevisionCommitted;
   }
 
   listProjects(): readonly LocalProjectView[] {
@@ -69,7 +75,7 @@ export class ProjectAdministration {
     const id = randomUUID();
     const timestamp = this.#now().toISOString();
 
-    withTransaction(this.#database, () => {
+    const revision = withTransaction(this.#database, () => {
       this.#database
         .prepare(
           `INSERT INTO projects (
@@ -80,7 +86,9 @@ export class ProjectAdministration {
       this.#recordAudit("project.create", id, {
         projectKey: command.projectKey,
       });
+      return this.#recordChange("project.created", id, { projectKey: command.projectKey }, timestamp);
     });
+    this.#onRevisionCommitted?.(revision);
 
     return this.#readProject(id);
   }
@@ -119,12 +127,13 @@ export class ProjectAdministration {
           ...(command.description === undefined ? [] : ["description"]),
         ],
       });
-      return true;
+      return this.#recordChange("project.updated", projectId, {}, timestamp);
     });
 
     if (!result) {
       throw new AppError("VERSION_CONFLICT", 409, "项目版本已变化，请重新加载");
     }
+    this.#onRevisionCommitted?.(result);
     return this.#readProject(projectId);
   }
 
@@ -150,12 +159,13 @@ export class ProjectAdministration {
       }
 
       this.#recordAudit("project.archive", projectId, {});
-      return true;
+      return this.#recordChange("project.archived", projectId, {}, timestamp);
     });
 
     if (!changed) {
       throw new AppError("VERSION_CONFLICT", 409, "项目版本已变化，请重新加载");
     }
+    this.#onRevisionCommitted?.(changed);
     return this.#readProject(projectId);
   }
 
@@ -198,5 +208,16 @@ export class ProjectAdministration {
         ) VALUES (?, NULL, ?, 'project', ?, 'allowed', ?)`,
       )
       .run(randomUUID(), action, projectId, JSON.stringify(metadata));
+  }
+
+  #recordChange(eventType: string, projectId: string, payload: Record<string, unknown>, createdAt: string): number {
+    const result = this.#database
+      .prepare(
+        `INSERT INTO change_events (
+          aggregate_type, aggregate_id, event_type, safe_payload_json, created_at
+        ) VALUES ('project', ?, ?, ?, ?)`
+      )
+      .run(projectId, eventType, JSON.stringify(payload), createdAt);
+    return Number(result.lastInsertRowid);
   }
 }

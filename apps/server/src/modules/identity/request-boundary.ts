@@ -22,5 +22,13 @@ export function registerRequestBoundary(app: FastifyInstance, config: AppConfig)
     if (!SAFE_METHODS.has(request.method) && origin !== config.CODEXBOARD_ORIGIN) {
       throw new AppError("FORBIDDEN", 403, "写请求必须来自受信任 Origin");
     }
+
+    if (
+      request.url !== "/api/health" &&
+      new URL(config.CODEXBOARD_ORIGIN).protocol === "https:" &&
+      request.protocol !== "https:"
+    ) {
+      throw new AppError("FORBIDDEN", 403, "请通过配置的 HTTPS 反向代理访问 DevBoard");
+    }
   });
 }

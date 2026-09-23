@@ -93,6 +93,7 @@ export const CreateTaskCommandSchema = z
     dueAt: NullableTimestampSchema.default(null),
     recurrence: TaskRecurrenceRuleSchema.nullable().default(null),
     developmentContextId: EntityIdSchema.nullable().default(null),
+    milestoneId: EntityIdSchema.nullable().default(null),
     links: TaskLinksSchema.default([]),
     initialRelations: InitialTaskRelationsSchema.default({
       parentTaskId: null,
@@ -114,6 +115,7 @@ export const UpdateTaskCommandSchema = z
     dueAt: NullableTimestampSchema.optional(),
     recurrence: TaskRecurrenceRuleSchema.nullable().optional(),
     developmentContextId: EntityIdSchema.nullable().optional(),
+    milestoneId: EntityIdSchema.nullable().optional(),
     links: TaskLinksSchema.optional(),
   })
   .refine(
@@ -190,6 +192,7 @@ export const TaskViewBaseSchema = z.object({
   dueAt: NullableTimestampSchema,
   recurrence: TaskRecurrenceRuleSchema.nullable(),
   developmentContextId: EntityIdSchema.nullable(),
+  milestoneId: EntityIdSchema.nullable(),
   links: TaskLinksSchema.default([]),
   sortOrder: z.number().finite(),
   version: EntityVersionSchema,

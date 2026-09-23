@@ -1,5 +1,3 @@
-import { execFileSync } from "node:child_process";
-import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { AppError } from "../../app-error.js";
 import type { SqliteDatabase } from "../database/index.js";
@@ -20,11 +18,9 @@ export function assertTaskLifecycleAvailable(database: SqliteDatabase, taskId: s
 }
 
 export function canonicalWorkspace(directory: string): string {
-  try {
-    return realpathSync(directory);
-  } catch {
-    return resolve(directory);
-  }
+  // Workspace paths can belong to a remote SSH Host. Never resolve them against
+  // the control-plane container's filesystem.
+  return resolve(directory);
 }
 
 export function assertWorkspaceLifecycleAvailable(
@@ -43,18 +39,7 @@ export function assertWorkspaceLifecycleAvailable(
 
 export function workspaceResourceKeys(directory: string): readonly string[] {
   const cwd = canonicalWorkspace(directory);
-  const keys = [`cwd:${cwd}`];
-  try {
-    const common = execFileSync("git", ["-C", cwd, "rev-parse", "--git-common-dir"], {
-      encoding: "utf8",
-      timeout: 2_000,
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
-    keys.push(`repo:${canonicalWorkspace(resolve(cwd, common))}`);
-  } catch {
-    /* Non-Git temporary tasks still participate in the directory lock. */
-  }
-  return keys;
+  return [`cwd:${cwd}`];
 }
 
 // The application owns one database/process; release in finally and restart clears in-flight locks.

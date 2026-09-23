@@ -16,15 +16,16 @@ describe("loadConfig", () => {
       ConfigError,
     );
   });
-  it("uses localhost-safe defaults", () => {
+  it("uses a Docker-publishable public listener and loopback admin listener by default", () => {
     const config = loadConfig({});
 
     expect(config).toMatchObject({
-      CODEXBOARD_HOST: "127.0.0.1",
+      CODEXBOARD_HOST: "0.0.0.0",
       CODEXBOARD_PORT: 47_823,
       CODEXBOARD_ADMIN_HOST: "127.0.0.1",
       CODEXBOARD_ADMIN_PORT: 47_824,
       CODEXBOARD_ORIGIN: "http://localhost:5173",
+      CODEXBOARD_SSH_IDENTITY_DIR: "/run/devboard/ssh/identities",
       CODEXBOARD_EVENT_HISTORY_LIMIT: 10_000,
       CODEXBOARD_SSE_HEARTBEAT_MS: 15_000,
       CODEXBOARD_SSE_RETRY_MS: 3_000,
@@ -42,6 +43,32 @@ describe("loadConfig", () => {
   it("rejects invalid ports", () => {
     expect(() => loadConfig({ CODEXBOARD_PORT: "70000" })).toThrow(ConfigError);
     expect(() => loadConfig({ CODEXBOARD_ADMIN_PORT: "47823" })).toThrow(ConfigError);
+  });
+
+  it("accepts explicit proxy addresses and rejects wildcard proxy trust", () => {
+    expect(loadConfig({ CODEXBOARD_TRUST_PROXY: "172.20.0.0/16,127.0.0.1" }).CODEXBOARD_TRUST_PROXY)
+      .toEqual(["172.20.0.0/16", "127.0.0.1"]);
+    expect(() => loadConfig({ CODEXBOARD_TRUST_PROXY: "*" })).toThrow(ConfigError);
+    expect(() => loadConfig({ CODEXBOARD_TRUST_PROXY: "0.0.0.0/0" })).toThrow(ConfigError);
+    expect(() => loadConfig({ CODEXBOARD_TRUST_PROXY: "::/0" })).toThrow(ConfigError);
+    expect(() => loadConfig({ CODEXBOARD_TRUST_PROXY: "proxy.local" })).toThrow(ConfigError);
+  });
+
+  it("accepts the published SSH Identity directory setting and rejects relative paths", () => {
+    expect(loadConfig({ DEVBOARD_SSH_IDENTITY_DIR: "/run/devboard/ssh/identities" })
+      .CODEXBOARD_SSH_IDENTITY_DIR).toBe("/run/devboard/ssh/identities");
+    expect(() => loadConfig({ DEVBOARD_SSH_IDENTITY_DIR: "./secrets/identities" })).toThrow(ConfigError);
+  });
+
+  it("requires an explicit HTTPS Public Origin in production", () => {
+    expect(() => loadConfig({ CODEXBOARD_ENV: "production" })).toThrow(/PUBLIC_ORIGIN/);
+    expect(() =>
+      loadConfig({ CODEXBOARD_ENV: "production", DEVBOARD_PUBLIC_ORIGIN: "http://board.example.com" }),
+    ).toThrow(/HTTPS/);
+    expect(
+      loadConfig({ CODEXBOARD_ENV: "production", DEVBOARD_PUBLIC_ORIGIN: "https://board.example.com" })
+        .CODEXBOARD_ORIGIN,
+    ).toBe("https://board.example.com");
   });
 
   it("rejects unsafe event feed limits and timing values", () => {

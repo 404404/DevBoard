@@ -12,6 +12,7 @@ export const EDITABLE_TASK_FIELDS = [
   "priority",
   "assigneeIdentity",
   "developmentContextId",
+  "milestoneId",
   "labels",
   "links",
 ] as const;
@@ -46,6 +47,7 @@ function draftOf(task: TaskView): TaskDraft {
     priority: task.priority,
     assigneeIdentity: task.assigneeIdentity,
     developmentContextId: task.developmentContextId,
+    milestoneId: task.milestoneId,
     labels: [...task.labels],
     links: [...task.links],
   };

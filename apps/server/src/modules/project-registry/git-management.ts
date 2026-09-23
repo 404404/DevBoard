@@ -45,8 +45,9 @@ export class GitManagement {
     roots: readonly string[],
     private readonly runner?: WorkspaceCommandRunner,
     originReader?: GitOriginReader,
+    private readonly remoteOnly = false,
   ) {
-    this.#roots = roots.map((root) => realpathSync(root));
+    this.#roots = remoteOnly ? [] : roots.map((root) => realpathSync(root));
     this.#origins = new GitOrigins(database, originReader);
   }
   async #run(cwd: string, command: readonly string[]) {
@@ -89,6 +90,7 @@ export class GitManagement {
     return { cwd, common };
   }
   async read(projectId: string): Promise<GitManagementView> {
+    this.#assertLocalFilesystemEnabled();
     const { cwd } = await this.#repository(projectId);
     return this.#read(cwd, projectId);
   }
@@ -242,6 +244,7 @@ export class GitManagement {
     principalKey?: string,
     origin: GitCreationOrigin = { kind: "unknown" },
   ): Promise<void> {
+    this.#assertLocalFilesystemEnabled();
     const command = CreateGitResourceCommandSchema.parse(input);
     const repo = await this.#repository(projectId);
     const release = acquireGitManagementLock(this.database, repo.cwd);
@@ -336,6 +339,7 @@ export class GitManagement {
     input: DeleteGitResourceCommand,
     principalKey?: string,
   ): Promise<void> {
+    this.#assertLocalFilesystemEnabled();
     const command = DeleteGitResourceCommandSchema.parse(input);
     const repo = await this.#repository(projectId);
     const release = acquireGitManagementLock(this.database, repo.cwd);
@@ -437,5 +441,15 @@ export class GitManagement {
         "INSERT INTO audit_events (id, identity_key, action, resource_type, resource_id, outcome, safe_metadata_json) VALUES (?, ?, ?, 'project', ?, 'allowed', ?)",
       )
       .run(randomUUID(), principalKey ?? null, action, projectId, JSON.stringify(command));
+  }
+
+  #assertLocalFilesystemEnabled(): void {
+    if (this.remoteOnly) {
+      throw new AppError(
+        "INVALID_REQUEST",
+        409,
+        "此部署不对容器本地目录执行 Git；请先将 Git 操作接入项目的 SSH Workspace Mapping",
+      );
+    }
   }
 }

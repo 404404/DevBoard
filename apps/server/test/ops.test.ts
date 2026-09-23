@@ -43,6 +43,159 @@ describe("operations CLI", () => {
     ]);
   });
 
+  it("creates Web accounts through the loopback Admin API without exposing passwords in output", async () => {
+    const dataDirectory = mkdtempSync(join(tmpdir(), "codexboard-ops-web-account-"));
+    temporaryDirectories.push(dataDirectory);
+    mkdirSync(join(dataDirectory, "run"));
+    writeFileSync(
+      join(dataDirectory, "run", "runtime.json"),
+      JSON.stringify({
+        descriptorVersion: 1,
+        pid: process.pid,
+        generatedAt: "2026-09-23T00:00:00.000Z",
+        publicBaseUrl: "https://board.example.test",
+        localAdminBaseUrl: "http://127.0.0.1:47824",
+        capabilityToken: "x".repeat(43),
+      }),
+      { mode: 0o600 },
+    );
+    const lines: string[] = [];
+    const secret = "not-in-argv-or-output-123";
+    const secrets = [secret, secret];
+    let request: { url?: string; authorization?: string | null; body?: unknown } = {};
+
+    expect(
+      await runOperations(
+        ["web-account", "create", "--username", "alice", "--name", "Alice"],
+        {
+          CODEXBOARD_ENV: "test",
+          CODEXBOARD_DATA_DIR: dataDirectory,
+          CODEXBOARD_WORKSPACE_ROOTS: dataDirectory,
+        },
+        (line) => lines.push(line),
+        {
+          readSecret: async () => secrets.shift() ?? "",
+          fetch: async (input, init) => {
+            request = {
+              url: String(input),
+              authorization: new Headers(init?.headers).get("authorization"),
+              body: init?.body ? JSON.parse(String(init.body)) as unknown : undefined,
+            };
+            return new Response(
+              JSON.stringify({
+                data: {
+                  id: "11111111-1111-4111-8111-111111111111",
+                  username: "alice",
+                  name: "Alice",
+                  active: 1,
+                },
+              }),
+              { status: 201, headers: { "content-type": "application/json" } },
+            );
+          },
+        },
+      ),
+    ).toBe(0);
+    expect(request).toEqual({
+      url: "http://127.0.0.1:47824/api/v1/local/web-accounts",
+      authorization: `Bearer ${"x".repeat(43)}`,
+      body: { username: "alice", name: "Alice", password: secret },
+    });
+    expect(lines.join("\n")).not.toContain(secret);
+    expect(JSON.parse(lines[0]!)).toMatchObject({
+      ok: true,
+      command: "web-account",
+      action: "create",
+      account: { username: "alice", active: 1 },
+    });
+  });
+
+  it("does not call the Admin API when Web account password confirmation differs", async () => {
+    const dataDirectory = mkdtempSync(join(tmpdir(), "codexboard-ops-web-account-mismatch-"));
+    temporaryDirectories.push(dataDirectory);
+    mkdirSync(join(dataDirectory, "run"));
+    writeFileSync(
+      join(dataDirectory, "run", "runtime.json"),
+      JSON.stringify({
+        descriptorVersion: 1,
+        pid: process.pid,
+        generatedAt: "2026-09-23T00:00:00.000Z",
+        publicBaseUrl: "https://board.example.test",
+        localAdminBaseUrl: "http://127.0.0.1:47824",
+        capabilityToken: "x".repeat(43),
+      }),
+      { mode: 0o600 },
+    );
+    const first = "first-private-password";
+    const second = "second-private-password";
+    const secrets = [first, second];
+    const lines: string[] = [];
+    let requests = 0;
+
+    expect(
+      await runOperations(
+        ["web-account", "create", "--username", "alice", "--name", "Alice"],
+        {
+          CODEXBOARD_ENV: "test",
+          CODEXBOARD_DATA_DIR: dataDirectory,
+          CODEXBOARD_WORKSPACE_ROOTS: dataDirectory,
+        },
+        (line) => lines.push(line),
+        {
+          readSecret: async () => secrets.shift() ?? "",
+          fetch: async () => {
+            requests += 1;
+            return new Response("{}", { status: 500 });
+          },
+        },
+      ),
+    ).toBe(1);
+    expect(requests).toBe(0);
+    expect(lines.join("\n")).not.toContain(first);
+    expect(lines.join("\n")).not.toContain(second);
+    expect(JSON.parse(lines[0]!).message).toContain("两次密码不一致");
+  });
+
+  it("refuses a runtime descriptor that points the Admin capability at a non-loopback host", async () => {
+    const dataDirectory = mkdtempSync(join(tmpdir(), "codexboard-ops-admin-boundary-"));
+    temporaryDirectories.push(dataDirectory);
+    mkdirSync(join(dataDirectory, "run"));
+    writeFileSync(
+      join(dataDirectory, "run", "runtime.json"),
+      JSON.stringify({
+        descriptorVersion: 1,
+        pid: process.pid,
+        generatedAt: "2026-09-23T00:00:00.000Z",
+        publicBaseUrl: "https://board.example.test",
+        localAdminBaseUrl: "http://attacker.example:47824",
+        capabilityToken: "x".repeat(43),
+      }),
+      { mode: 0o600 },
+    );
+    let requests = 0;
+    const lines: string[] = [];
+
+    expect(
+      await runOperations(
+        ["web-account", "list"],
+        {
+          CODEXBOARD_ENV: "test",
+          CODEXBOARD_DATA_DIR: dataDirectory,
+          CODEXBOARD_WORKSPACE_ROOTS: dataDirectory,
+        },
+        (line) => lines.push(line),
+        {
+          fetch: async () => {
+            requests += 1;
+            return new Response("{}", { status: 200 });
+          },
+        },
+      ),
+    ).toBe(1);
+    expect(requests).toBe(0);
+    expect(JSON.parse(lines[0]!).message).toContain("管理地址与本机配置不一致");
+  });
+
   it("audits only verified backups without changing their database bytes", async () => {
     const dataDirectory = mkdtempSync(join(tmpdir(), "taskboard-identity-audit-"));
     temporaryDirectories.push(dataDirectory);

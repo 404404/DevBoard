@@ -13,8 +13,7 @@
     "apps/web"
   ],
   "scripts": {
-    "dev": "npm run build -w @codexboard/contracts && concurrently -k -n project-sync,server,web -c cyan,green,yellow \"npm run dev:project-sync\" \"npm run dev -w @codexboard/server\" \"npm run dev -w @codexboard/web\"",
-    "dev:project-sync": "node scripts/codex-project-snapshot.mjs --state-file ${CODEX_HOME:-$HOME/.codex}/.codex-global-state.json --snapshot-file \"$PWD/.data/run/codex-projects.json\"",
+    "dev": "npm run build -w @codexboard/contracts && concurrently -k -n server,web -c green,yellow \"npm run dev -w @codexboard/server\" \"npm run dev -w @codexboard/web\"",
     "dev:server": "npm run dev -w @codexboard/server",
     "dev:web": "npm run dev -w @codexboard/web",
     "db:migrate": "npm run db:migrate -w @codexboard/server",
@@ -31,9 +30,7 @@
     "test": "npm run test --workspaces --if-present && npm run test:scripts",
     "test:scripts": "node --test scripts/*.test.mjs",
     "test:e2e": "node scripts/run-e2e.mjs",
-    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run codex:protocol:check && npm run test && npm run build",
-    "build:desktop": "node apps/desktop/scripts/build-macos.mjs",
-    "release:desktop": "node apps/desktop/scripts/release-macos.mjs"
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run codex:protocol:check && npm run test && npm run build"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

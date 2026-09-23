@@ -1,4 +1,6 @@
 import {
+  ArchiveProjectCommandSchema,
+  CreateProjectCommandSchema,
   ArchiveTaskCommandSchema,
   AttachmentContentTypeSchema,
   CreateCommentCommandSchema,
@@ -12,6 +14,7 @@ import {
   ProjectTaskCreationOptionsViewSchema,
   ReassignTaskCommandSchema,
   RestoreTaskCommandSchema,
+  UpdateProjectCommandSchema,
   UpdateTaskCommandSchema,
   UpdateCommentCommandSchema,
   TEMPORARY_PROJECT_ID,
@@ -29,6 +32,7 @@ import {
   type SessionContext,
 } from "../identity/index.js";
 import type { ProjectRegistry } from "../project-registry/index.js";
+import type { ProjectAdministration } from "../project-registry/project-administration.js";
 import type { TaskWorkspace } from "./task-workspace.js";
 import type { TaskCreationService } from "./task-creation-service.js";
 import type { TaskDeletionService } from "./task-deletion-service.js";
@@ -61,6 +65,7 @@ interface TaskboardRoutesOptions {
   readonly workspace: TaskWorkspace;
   readonly attachments: AttachmentService;
   readonly projectRegistry: ProjectRegistry;
+  readonly projectAdministration: ProjectAdministration;
 }
 
 function authenticate(
@@ -106,11 +111,35 @@ export function registerTaskboardRoutes(
     workspace,
     attachments,
     projectRegistry,
+    projectAdministration,
   } = options;
 
   app.get("/api/v1/projects", async (request) => {
     const session = authenticate(request, config, identityService);
     return { data: taskboard.listProjects(session.actor) };
+  });
+
+  app.post("/api/v1/projects", async (request, reply) => {
+    const context = mutationContext(request, config, identityService);
+    identityService.assertBoardAccess(context.actor);
+    const project = projectAdministration.createProject(CreateProjectCommandSchema.parse(request.body ?? {}));
+    await reply.code(201).send({ data: taskboard.readBoard(project.id, context.actor).project });
+  });
+
+  app.patch("/api/v1/projects/:projectId", async (request) => {
+    const context = mutationContext(request, config, identityService);
+    const { projectId } = ProjectParamsSchema.parse(request.params);
+    identityService.authorizeProject(context.actor, projectId, "write");
+    const project = projectAdministration.updateProject(projectId, UpdateProjectCommandSchema.parse(request.body ?? {}));
+    return { data: taskboard.readBoard(project.id, context.actor).project };
+  });
+
+  app.post("/api/v1/projects/:projectId/archive", async (request) => {
+    const context = mutationContext(request, config, identityService);
+    const { projectId } = ProjectParamsSchema.parse(request.params);
+    identityService.authorizeProject(context.actor, projectId, "write");
+    const project = projectAdministration.archiveProject(projectId, ArchiveProjectCommandSchema.parse(request.body ?? {}));
+    return { data: taskboard.readBoard(project.id, context.actor).project };
   });
 
   app.get("/api/v1/projects/:projectId/board", async (request) => {
@@ -125,7 +154,7 @@ export function registerTaskboardRoutes(
     const optionsView = taskboard.readTaskCreationOptions(projectId, session.actor, () => [], {
       attachmentMaxBytes: config.CODEXBOARD_ATTACHMENT_MAX_BYTES,
     });
-    if (projectId === TEMPORARY_PROJECT_ID) {
+    if (projectId === TEMPORARY_PROJECT_ID || taskboard.projectSourceKind(projectId, session.actor) === "legacy") {
       return { data: optionsView };
     }
     const executionContext = await projectRegistry.resolveExecutionContext(projectId);
@@ -172,10 +201,14 @@ export function registerTaskboardRoutes(
   app.post("/api/v1/tasks", async (request, reply) => {
     const context = mutationContext(request, config, identityService);
     const command = CreateTaskCommandSchema.parse(request.body);
-    if (!taskCreation) {
-      throw new AppError("UPSTREAM_ERROR", 503, "Codex App Server 当前不可用，无法创建任务");
-    }
-    const result = await taskCreation.create(command, context);
+    const result =
+      taskboard.projectSourceKind(command.projectId, context.actor) === "legacy"
+        ? taskboard.createTask(command, context)
+        : taskCreation
+          ? await taskCreation.create(command, context)
+          : (() => {
+              throw new AppError("UPSTREAM_ERROR", 503, "Codex App Server 当前不可用，无法创建任务");
+            })();
     await reply.code(201).send({ data: result.task, meta: { revision: result.revision } });
   });
 

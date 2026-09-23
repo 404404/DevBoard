@@ -171,7 +171,12 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
   const registry =
     options.services?.projectRegistry ??
     options.projectRegistry ??
-    new ProjectRegistry(options.database, options.config.CODEXBOARD_WORKSPACE_ROOTS);
+    new ProjectRegistry(
+      options.database,
+      options.config.CODEXBOARD_WORKSPACE_ROOTS,
+      undefined,
+      { remoteOnly: options.config.CODEXBOARD_ENV === "production" },
+    );
   const identityService =
     options.services?.identityService ??
     new IdentityService({
@@ -266,7 +271,11 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
       database: options.database,
       taskboard,
       queue,
-      gitFinalizer: new TaskGitFinalizer(options.config.CODEXBOARD_WORKSPACE_ROOTS),
+      gitFinalizer: new TaskGitFinalizer(
+        options.config.CODEXBOARD_WORKSPACE_ROOTS,
+        undefined,
+        { remoteOnly: options.config.CODEXBOARD_ENV === "production" },
+      ),
       scheduleExecution: options.scheduleExecution ?? (() => {}),
       ...revisionOption,
     });
@@ -291,7 +300,14 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
   const eventFeed = new EventFeed({ database: options.database });
   const gitManagement =
     options.services?.gitManagement ??
-    new GitManagement(options.database, registry, options.config.CODEXBOARD_WORKSPACE_ROOTS);
+    new GitManagement(
+      options.database,
+      registry,
+      options.config.CODEXBOARD_WORKSPACE_ROOTS,
+      undefined,
+      undefined,
+      options.config.CODEXBOARD_ENV === "production",
+    );
   const expectedHost = `${options.config.CODEXBOARD_ADMIN_HOST}:${options.config.CODEXBOARD_ADMIN_PORT}`;
 
   app.addHook("onRequest", async (request) => {
@@ -565,6 +581,13 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
   });
 
   app.get("/api/v1/local/context", async (request) => {
+    if (options.config.CODEXBOARD_ENV === "production") {
+      throw new AppError(
+        "INVALID_REQUEST",
+        409,
+        "容器部署不解析 taskctl 客户端目录；请通过 SSH Host 和 Workspace Mapping 选择项目",
+      );
+    }
     const header = request.headers["x-taskctl-cwd"];
     const requestedCwd = TaskctlCwdHeaderSchema.parse(
       decodeTaskctlCwdHeader(typeof header === "string" ? header : undefined),

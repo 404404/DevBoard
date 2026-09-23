@@ -26,6 +26,7 @@ function task(status: "done" | "canceled", id: string, title: string): TaskView 
     startAt: null,
     dueAt: null,
     recurrence: null,
+    milestoneId: null,
     developmentContextId: null,
     links: [],
     sortOrder: 1,

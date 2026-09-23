@@ -520,6 +520,56 @@ describe("App Server Codex executor", () => {
     },
   );
 
+  it("maps workspace-write permission mode to the official sandbox policy", async () => {
+    const transport = new FakeTransport();
+    const client = new CodexJsonRpcClient({ transport, requestTimeoutMs: 1000 });
+    const executor = new AppServerCodexExecutor(client);
+    const running = executor.start(
+      {
+        jobId: "job-permission",
+        cwd: "/workspace/project",
+        prompt: "read files",
+        permissionMode: "workspace-write",
+      },
+      {
+        onThread() {},
+        onTurn() {},
+        onEvent() {},
+        onInteraction: async () => ({ type: "decline" }),
+      },
+    );
+    const initialize = (await waitForMessage(transport, 0)) as { id: number };
+    transport.receive({ id: initialize.id, result: {} });
+    const threadStart = (await waitForMessage(transport, 2)) as { id: number };
+    transport.receive({ id: threadStart.id, result: { thread: { id: "thread-permission" } } });
+    const turnStart = (await waitForMessage(transport, 3)) as {
+      id: number;
+      params: Record<string, unknown>;
+    };
+    expect(turnStart).toMatchObject({
+      method: "turn/start",
+      params: {
+        sandboxPolicy: {
+          type: "workspaceWrite",
+          writableRoots: ["/workspace/project"],
+          networkAccess: false,
+          excludeTmpdirEnvVar: false,
+          excludeSlashTmp: false,
+        },
+      },
+    });
+    transport.receive({ id: turnStart.id, result: { turn: { id: "turn-permission" } } });
+    transport.receive({
+      method: "turn/completed",
+      params: {
+        threadId: "thread-permission",
+        turn: { id: "turn-permission", status: "completed", error: null },
+      },
+    });
+    await expect(running).resolves.toMatchObject({ status: "completed" });
+    await client.close();
+  });
+
   it("waits for the final interrupted notification after turn/interrupt", async () => {
     const transport = new FakeTransport();
     const client = new CodexJsonRpcClient({ transport, requestTimeoutMs: 1_000 });

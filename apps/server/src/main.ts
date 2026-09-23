@@ -1,29 +1,29 @@
 import {
-  startEmbeddedCodexBridge,
-  type EmbeddedCodexBridge,
-} from "./modules/codex/embedded-bridge.js";
+  constants,
+  closeSync,
+  fchmodSync,
+  fstatSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+} from "node:fs";
 import {
   resolveLegacyIdentities,
   IdentityMigrationPreflightError,
 } from "./modules/identity/identity-migration-preflight.js";
 import { join } from "node:path";
-import {
-  hostWorkspaceCommand,
-  hostGitOriginReader,
-} from "./modules/taskboard/task-git-host-command.js";
-
 import type { FastifyInstance } from "fastify";
 
 import { appControl, createApp } from "./app.js";
 import { ConfigError, loadConfig } from "./config.js";
-import {
-  CodexAppServerSupervisor,
-  CodexJsonRpcClient,
-  TcpWebSocketTransport,
-  UnixWebSocketTransport,
-} from "./modules/codex/index.js";
 import { identityMigrations, MigrationError, openDatabase } from "./modules/database/index.js";
-import { AppServerCodexExecutor } from "./modules/execution/index.js";
+import {
+  CodexProvider,
+  CursorProvider,
+  ExecutionProviderRegistry,
+  GrokBuildProvider,
+  OpenCodeProvider,
+} from "./modules/execution/index.js";
 import {
   acquireDataDirectoryLock,
   BackgroundBackupRunner,
@@ -42,24 +42,42 @@ import { createLocalAdminApp } from "./transports/local-admin-http.js";
 interface RunningServers {
   readonly publicApp: FastifyInstance;
   readonly localAdminApp: FastifyInstance;
-  readonly stopCodex: () => Promise<void>;
 }
 
 async function startServer(): Promise<RunningServers> {
   const config = loadConfig();
   const dataLock = acquireDataDirectoryLock(config.CODEXBOARD_DATA_DIR, "server");
   let database: ReturnType<typeof openDatabase> | undefined;
-  let codexSupervisor: CodexAppServerSupervisor | undefined;
-  let codexClient: CodexJsonRpcClient | undefined;
-  let embeddedBridge: EmbeddedCodexBridge | undefined;
-  const stopCodex = async () => {
-    await Promise.allSettled([codexClient?.close(), codexSupervisor?.stop()]);
-    await Promise.allSettled([embeddedBridge?.close()]);
-  };
   let publicApp: FastifyInstance | undefined;
   let localAdminApp: FastifyInstance | undefined;
   let runtimeDescriptor: RuntimeDescriptorHandle | undefined;
   try {
+    mkdirSync(config.CODEXBOARD_DATA_DIR, { recursive: true, mode: 0o700 });
+    const sshDirectory = join(config.CODEXBOARD_DATA_DIR, "ssh");
+    mkdirSync(sshDirectory, { recursive: true, mode: 0o700 });
+    const sshDirectoryStat = lstatSync(sshDirectory);
+    if (sshDirectoryStat.isSymbolicLink() || !sshDirectoryStat.isDirectory()) {
+      throw new Error("SSH data directory must be a real directory");
+    }
+    const knownHostsFile = join(sshDirectory, "known_hosts");
+    const knownHostsDescriptor = openSync(
+      knownHostsFile,
+      constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NOFOLLOW,
+      0o600,
+    );
+    try {
+      if (!fstatSync(knownHostsDescriptor).isFile()) {
+        throw new Error("known_hosts must be a regular file");
+      }
+      fchmodSync(knownHostsDescriptor, 0o600);
+    } finally {
+      closeSync(knownHostsDescriptor);
+    }
+    if (config.CODEXBOARD_ENV !== "production") {
+      for (const workspaceRoot of config.CODEXBOARD_WORKSPACE_ROOTS) {
+        mkdirSync(workspaceRoot, { recursive: true, mode: 0o700 });
+      }
+    }
     recoverInterruptedRestore(config.CODEXBOARD_DATA_DIR);
     database = openDatabase(join(config.CODEXBOARD_DATA_DIR, "taskboard.sqlite"));
     await runMigrationsWithBackup(
@@ -73,30 +91,11 @@ async function startServer(): Promise<RunningServers> {
       ),
       new BackupService({ database, dataDirectory: config.CODEXBOARD_DATA_DIR }),
     );
-    const codexSocketPath = join(config.CODEXBOARD_DATA_DIR, "codex-app-server.sock");
-    if (config.CODEXBOARD_CODEX_TRANSPORT === "managed-unix") {
-      codexSupervisor = new CodexAppServerSupervisor({
-        socketPath: codexSocketPath,
-        codexCommand: config.CODEXBOARD_CODEX_COMMAND,
-      });
-      await codexSupervisor.start();
-    }
-    if (config.CODEXBOARD_CODEX_TRANSPORT === "embedded") {
-      embeddedBridge = await startEmbeddedCodexBridge(config);
-    }
-    codexClient = new CodexJsonRpcClient({
-      transport:
-        config.CODEXBOARD_CODEX_TRANSPORT !== "managed-unix"
-          ? new TcpWebSocketTransport({
-              endpoint: config.CODEXBOARD_CODEX_ENDPOINT,
-              tokenFile: config.CODEXBOARD_CODEX_TOKEN_FILE as string,
-            })
-          : new UnixWebSocketTransport({ socketPath: codexSocketPath }),
-    });
-    const codexExecutor = new AppServerCodexExecutor(
-      codexClient,
-      config.CODEXBOARD_TEMPORARY_PROJECT_ROOT,
-    );
+    const executionProviders = new ExecutionProviderRegistry();
+    executionProviders.register(new CodexProvider());
+    executionProviders.register(new CursorProvider());
+    executionProviders.register(new GrokBuildProvider());
+    executionProviders.register(new OpenCodeProvider());
     const capabilityToken = createRuntimeCapability();
     publicApp = createApp({
       config,
@@ -104,19 +103,7 @@ async function startServer(): Promise<RunningServers> {
       logger: true,
       logLevel: config.CODEXBOARD_LOG_LEVEL,
       closeDatabaseOnClose: false,
-      codexExecutor,
-      remoteClient: codexClient,
-      workspaceCommandRunner: hostWorkspaceCommand(codexClient),
-      gitOriginReader: hostGitOriginReader(codexClient),
-      codexThreadProvisioner: codexExecutor,
-      runtimeHealth: {
-        connectorHealth: () => ({ connected: codexClient?.connected ?? false }),
-        appServerHealth: () =>
-          codexSupervisor?.health() ??
-          (codexClient?.connected
-            ? { status: "ready", pid: null, error: null }
-            : { status: "offline", pid: null, error: null }),
-      },
+      executionProviders,
     });
     const control = appControl(publicApp);
     localAdminApp = createLocalAdminApp({
@@ -144,24 +131,12 @@ async function startServer(): Promise<RunningServers> {
       shutdownPromise ??= (async () => {
         publicApp?.log.info({ signal }, "Shutting down server");
         await Promise.allSettled([publicApp?.close(), localAdminApp?.close()]);
-        await stopCodex();
         runtimeDescriptor?.remove();
         if (database?.open) database.close();
         dataLock.release();
       })();
       return shutdownPromise;
     };
-    if (codexSupervisor) {
-      codexSupervisor.onUnexpectedExit(() => {
-        publicApp?.log.error(
-          { component: "codex-app-server" },
-          "Managed Codex App Server exited unexpectedly",
-        );
-        void shutdown("SIGTERM").then(() => {
-          process.exitCode = 1;
-        });
-      });
-    }
     process.once("SIGINT", () => void shutdown("SIGINT"));
     process.once("SIGTERM", () => void shutdown("SIGTERM"));
     publicApp.log.info(
@@ -175,11 +150,9 @@ async function startServer(): Promise<RunningServers> {
     return {
       publicApp,
       localAdminApp,
-      stopCodex,
     };
   } catch (error: unknown) {
     await Promise.allSettled([publicApp?.close(), localAdminApp?.close()]);
-    await stopCodex();
     runtimeDescriptor?.remove();
     if (database?.open) database.close();
     dataLock.release();

@@ -10,6 +10,8 @@ export const HealthResponseSchema = z.object({
   checks: z.object({
     http: ComponentHealthSchema,
     sqlite: ComponentHealthSchema,
+    migrations: ComponentHealthSchema,
+    events: ComponentHealthSchema,
   }),
 });
 

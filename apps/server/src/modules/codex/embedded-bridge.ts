@@ -14,15 +14,7 @@ interface BridgeModule {
   }): Promise<EmbeddedCodexBridge>;
 }
 
-/** Load the shared bridge inside the backend; no independent Node service is spawned. */
-export async function startEmbeddedCodexBridge(config: AppConfig): Promise<EmbeddedCodexBridge> {
-  const url = new URL("../../../../../scripts/run-codex-app-server.mjs", import.meta.url);
-  const bridge = (await import(url.href)) as BridgeModule;
-  return bridge.startCodexBridge({
-    codexPath: config.CODEXBOARD_CODEX_COMMAND,
-    tokenFile: config.CODEXBOARD_CODEX_TOKEN_FILE as string,
-    endpoint: config.CODEXBOARD_CODEX_ENDPOINT,
-    projectStateFile: config.CODEXBOARD_CODEX_PROJECT_STATE_FILE as string,
-    projectSnapshotFile: config.CODEXBOARD_CODEX_PROJECT_SNAPSHOT_FILE,
-  });
+/** @deprecated Local Codex bridges are removed; use an SSH Host Connection. */
+export async function startEmbeddedCodexBridge(_config: AppConfig): Promise<EmbeddedCodexBridge> {
+  throw new Error("Embedded Codex bridge was removed; configure an SSH Host Connection");
 }

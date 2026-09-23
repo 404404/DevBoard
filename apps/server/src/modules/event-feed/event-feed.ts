@@ -23,6 +23,11 @@ const RawEventRowSchema = z.object({
     "attachment",
     "job",
     "interaction",
+    "milestone",
+    "connection",
+    "execution_profile",
+    "workspace_mapping",
+    "run",
     "system",
   ]),
   aggregateId: z.uuid().nullable(),
@@ -99,6 +104,10 @@ export class EventFeed {
     this.#database = options.database;
     this.#historyLimit = Math.max(1, options.historyLimit ?? 10_000);
     this.#subscriptionPageSize = Math.min(200, Math.max(1, options.subscriptionPageSize ?? 100));
+  }
+
+  isHealthy(): boolean {
+    return !this.#closed;
   }
 
   readSince(input: EventFeedQuery): EventPage {

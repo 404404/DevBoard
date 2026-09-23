@@ -35,6 +35,7 @@ function blockedTask(blockedFromStatus: TaskView["blockedFromStatus"]): TaskView
     startAt: null,
     dueAt: null,
     recurrence: null,
+    milestoneId: null,
     developmentContextId: null,
     links: [],
     sortOrder: 1,

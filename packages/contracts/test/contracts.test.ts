@@ -29,9 +29,46 @@ import {
   GlobalLabelListViewSchema,
   ReorderGlobalLabelsCommandSchema,
   UpdateGlobalLabelCommandSchema,
+  CreateConnectionCommandSchema,
+  SshIdentityDescriptorSchema,
 } from "../src/index.js";
 
 describe("shared contracts", () => {
+  it("accepts only opaque SSH identity refs, never paths or private key fields", () => {
+    const connection = {
+      name: "Docker Host",
+      host: "host.docker.internal",
+      username: "developer",
+      identityRef: "mac_ed25519",
+    };
+    expect(CreateConnectionCommandSchema.parse(connection).identityRef).toBe("mac_ed25519");
+    expect(() =>
+      CreateConnectionCommandSchema.parse({
+        ...connection,
+        identityRef: "/run/devboard/ssh/key",
+      }),
+    ).toThrow();
+    expect(() =>
+      CreateConnectionCommandSchema.parse({
+        ...connection,
+        privateKey: "-----BEGIN OPENSSH PRIVATE KEY-----",
+      }),
+    ).toThrow();
+    expect(() =>
+      SshIdentityDescriptorSchema.parse({
+        id: "mac_ed25519",
+        name: "mac_ed25519",
+        algorithm: "ssh-ed25519",
+        fingerprint: "SHA256:public-only",
+        encrypted: false,
+        usable: true,
+        warning: null,
+        path: "/run/devboard/ssh/identities/mac_ed25519",
+        privateKey: "-----BEGIN OPENSSH PRIVATE KEY-----",
+      }),
+    ).toThrow();
+  });
+
   it("keeps actor avatars backward compatible and accepts local attachment URLs", () => {
     const actor = {
       identity: { kind: "feishu", tenantKey: "tenant-a", userId: "user-1" },
@@ -255,6 +292,7 @@ describe("shared contracts", () => {
       startAt: null,
       dueAt: null,
       recurrence: null,
+      milestoneId: null,
       developmentContextId: null,
       sortOrder: 1,
       version: 1,
@@ -402,6 +440,7 @@ describe("shared contracts", () => {
       startAt: null,
       dueAt: null,
       recurrence: null,
+      milestoneId: null,
       developmentContextId: null,
       sortOrder: 1,
       version: 1,
@@ -479,6 +518,7 @@ describe("shared contracts", () => {
       startAt: null,
       dueAt: null,
       recurrence: null,
+      milestoneId: null,
       developmentContextId: null,
       links: [],
       sortOrder: 1,

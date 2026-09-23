@@ -9,11 +9,15 @@ const temporaryProjectRoot = join(dataDirectory, "temporary-project-root");
 mkdirSync(temporaryProjectRoot);
 const fakeCodexCommand = resolve("scripts/fake-codex-app-server.mjs");
 // All naming generations may be configured in a developer's shell. Keep
-// deployment endpoints, credentials and directories out of synthetic tests.
+// deployment endpoints, credentials, identity catalogs and SSH agents out of
+// synthetic tests so they cannot inherit a real deployment's trust boundary.
 const testEnvironment = Object.fromEntries(
   Object.entries(process.env).filter(
     ([key]) =>
-      !["CODEXBOARD_", "LARK_CODEX_", "LARK_TASKBOARD_"].some((prefix) => key.startsWith(prefix)),
+      key !== "SSH_AUTH_SOCK" &&
+      !["CODEXBOARD_", "DEVBOARD_", "LARK_CODEX_", "LARK_TASKBOARD_"].some((prefix) =>
+        key.startsWith(prefix),
+      ),
   ),
 );
 

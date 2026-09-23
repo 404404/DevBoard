@@ -92,7 +92,7 @@ export function TaskDeleteDialog({
             <div className="task-delete-dialog__body">
               <h2 id="task-delete-title">彻底删除 {task.identifier}？</h2>
               <p>
-                关联的 Codex 原始任务将先归档，然后永久删除 CodexBoard
+                关联的 Codex 原始任务将先归档，然后永久删除 DevBoard
                 中的任务、评论、附件与执行记录。
               </p>
               <strong>{task.title}</strong>

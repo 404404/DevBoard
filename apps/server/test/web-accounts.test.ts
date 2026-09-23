@@ -14,7 +14,11 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
 });
 const password = "A-long-private-password-2026";
-function setup(protocol = "https", mode: "feishu" | "web" = "feishu") {
+function setup(
+  protocol = "https",
+  mode: "feishu" | "web" = "feishu",
+  trustProxy = "127.0.0.1",
+) {
   const root = mkdtempSync(join(tmpdir(), "web-account-test-"));
   const database = initializeDatabase(":memory:");
   const config = loadConfig({
@@ -22,6 +26,7 @@ function setup(protocol = "https", mode: "feishu" | "web" = "feishu") {
     CODEXBOARD_AUTH_MODE: mode,
     CODEXBOARD_ORIGIN: `${protocol}://tasks.example.com`,
     CODEXBOARD_ALLOWED_HOSTS: "tasks.example.com",
+    CODEXBOARD_TRUST_PROXY: trustProxy,
     CODEXBOARD_FEISHU_APP_ID: mode === "feishu" ? "cli_test" : undefined,
     CODEXBOARD_FEISHU_APP_SECRET: mode === "feishu" ? "test-secret" : undefined,
     CODEXBOARD_DATA_DIR: root,
@@ -56,7 +61,11 @@ function setup(protocol = "https", mode: "feishu" | "web" = "feishu") {
     database.close();
     rmSync(root, { recursive: true, force: true });
   });
-  const headers = { host: "tasks.example.com", origin: config.CODEXBOARD_ORIGIN };
+  const headers = {
+    host: "tasks.example.com",
+    origin: config.CODEXBOARD_ORIGIN,
+    ...(protocol === "https" ? { "x-forwarded-proto": "https" } : {}),
+  };
   const localHeaders = { host: "127.0.0.1:47824", authorization: `Bearer ${"x".repeat(43)}` };
   const accounts = new WebAccountService(database);
   const login = () =>
@@ -215,6 +224,28 @@ it("blocks HTTP password login, cross-origin and forged Host requests", async ()
       })
     ).statusCode,
   ).toBe(400);
+});
+
+it("uses forwarded HTTPS only when the proxy source is explicitly trusted", async () => {
+  const trusted = setup("https", "web", "127.0.0.1");
+  await trusted.accounts.create({ username: "alice", name: "Alice", password });
+  const trustedLogin = await trusted.login();
+  expect(trustedLogin.statusCode).toBe(201);
+  expect(trustedLogin.cookies.find((cookie) => cookie.name.endsWith("session"))?.secure).toBe(true);
+
+  const untrusted = setup("https", "web", "10.20.0.0/16");
+  await untrusted.accounts.create({ username: "alice", name: "Alice", password });
+  const forgedForwardedScheme = await untrusted.app.inject({
+    method: "POST",
+    url: "/api/v1/auth/web/login",
+    headers: {
+      host: "tasks.example.com",
+      origin: "https://tasks.example.com",
+      "x-forwarded-proto": "https",
+    },
+    payload: { username: "alice", password },
+  });
+  expect(forgedForwardedScheme.statusCode).toBe(403);
 });
 it("locks after five guesses across service instances and disables existing sessions", async () => {
   const t = setup();

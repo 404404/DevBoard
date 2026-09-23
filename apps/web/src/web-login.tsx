@@ -28,9 +28,9 @@ export function WebLoginForm({ enabled }: { readonly enabled: boolean }) {
   }
   return (
     <main className="session-state web-login">
-      <img src="/codexboard.png" width="72" height="72" alt="CodexBoard" />
-      <h1>登录 CodexBoard</h1>
-      <p>使用本机应用管理员为你创建的 Web 账号。</p>
+      <img src="/codexboard.png" width="72" height="72" alt="DevBoard" />
+      <h1>登录 DevBoard</h1>
+      <p>使用 DevBoard 管理员为你创建的 Web 账号。</p>
       {enabled ? (
         <form onSubmit={(event) => void submit(event)}>
           <label>
@@ -63,11 +63,12 @@ export function WebLoginForm({ enabled }: { readonly enabled: boolean }) {
         </form>
       ) : (
         <p>
-          Web 登录尚未启用。请在本机 CodexBoard 的“应用设置 → Web 账号”中创建账号，并配置 HTTPS
-          公网地址。
+          Web 登录尚未启用。请确认已配置 HTTPS，并在运行 DevBoard 的容器内创建 Web 账号：
+          <code>docker compose exec -it devboard node apps/server/dist/ops.js web-account create --username alice --name "Alice"</code>
+          创建后刷新此页面。
         </p>
       )}
-      <p>不提供公开注册。忘记密码请联系本机应用管理员重置。</p>
+      <p>不提供公开注册。忘记密码请联系 DevBoard 管理员重置。</p>
     </main>
   );
 }

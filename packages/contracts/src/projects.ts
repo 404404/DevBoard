@@ -18,7 +18,7 @@ const LegacyProjectKeySchema = z
 
 export const ProjectNameSchema = z.string().trim().min(1).max(120);
 export const ProjectDescriptionSchema = z.string().max(20_000);
-export const ProjectKindSchema = z.enum(["all", "temporary", "codex"]);
+export const ProjectKindSchema = z.enum(["all", "temporary", "codex", "managed"]);
 export const LocalProjectKindSchema = z.enum(["legacy", "codex", "system"]);
 export const ProjectSyncStateSchema = z.enum(["synced", "stale"]);
 export const ProjectRootPathSchema = z.string().trim().min(1).max(4_096);
@@ -78,6 +78,10 @@ export const ProjectViewSchema = z.discriminatedUnion("kind", [
   ProjectViewBaseSchema.extend({ kind: z.literal("all"), projectKey: z.null() }),
   ProjectViewBaseSchema.extend({ kind: z.literal("temporary"), projectKey: z.literal("TEMP") }),
   ProjectViewBaseSchema.extend({ kind: z.literal("codex"), projectKey: ProjectKeySchema }),
+  ProjectViewBaseSchema.extend({
+    kind: z.literal("managed"),
+    projectKey: z.union([ProjectKeySchema, LegacyProjectKeySchema]),
+  }),
 ]);
 
 export const TaskAssigneeCandidateSchema = z.object({

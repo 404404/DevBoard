@@ -3,22 +3,26 @@ import { z } from "zod";
 export const CodexRequestIdSchema = z.union([z.string().min(1), z.number().int()]);
 
 const JsonRpcRequestSchema = z.object({
+  jsonrpc: z.literal("2.0").optional(),
   id: CodexRequestIdSchema,
   method: z.string().min(1),
   params: z.unknown().optional(),
 });
 
 const JsonRpcNotificationSchema = z.object({
+  jsonrpc: z.literal("2.0").optional(),
   method: z.string().min(1),
   params: z.unknown().optional(),
 });
 
 const JsonRpcSuccessSchema = z.object({
+  jsonrpc: z.literal("2.0").optional(),
   id: CodexRequestIdSchema,
   result: z.unknown(),
 });
 
 const JsonRpcFailureSchema = z.object({
+  jsonrpc: z.literal("2.0").optional(),
   id: CodexRequestIdSchema,
   error: z.object({
     code: z.number().int(),
