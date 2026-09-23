@@ -1,0 +1,77 @@
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        id: checkout
+      - name: Validate Compose deployment and optional overrides
+        id: compose
+        run: |
+          docker compose --env-file .env.example config --quiet
+          SSH_AUTH_SOCK=/tmp/devboard-agent.sock docker compose --env-file .env.example -f compose.yaml -f compose.ssh-agent.yaml config --quiet
+          docker compose --env-file .env.example -f compose.yaml -f compose.feishu.yaml config --quiet
+          docker compose --env-file .env.example -f compose.yaml -f compose.reverse-proxy-example.yaml config --quiet
+      - uses: actions/setup-node@v4
+        id: node
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        id: install
+      - run: npm run format:check
+        id: format
+      - run: npm run lint
+        id: lint
+      - run: npm run typecheck
+        id: typecheck
+      - run: npm run codex:protocol:check
+        id: protocol
+      - name: Verify v0.1.11 and SSH identity migrations
+        run: npm run test -w @codexboard/server -- test/container-migration-integration.test.ts test/ssh-identity-migration.test.ts
+        id: migration
+      - run: npm run test
+        id: unit
+      - run: npm run test:e2e
+        id: e2e
+      - run: npm run build
+        id: build
+      - name: Write verification summary
+        if: always()
+        env:
+          CHECKOUT_RESULT: ${{ steps.checkout.outcome }}
+          COMPOSE_RESULT: ${{ steps.compose.outcome }}
+          NODE_RESULT: ${{ steps.node.outcome }}
+          INSTALL_RESULT: ${{ steps.install.outcome }}
+          FORMAT_RESULT: ${{ steps.format.outcome }}
+          LINT_RESULT: ${{ steps.lint.outcome }}
+          TYPECHECK_RESULT: ${{ steps.typecheck.outcome }}
+          PROTOCOL_RESULT: ${{ steps.protocol.outcome }}
+          MIGRATION_RESULT: ${{ steps.migration.outcome }}
+          UNIT_RESULT: ${{ steps.unit.outcome }}
+          E2E_RESULT: ${{ steps.e2e.outcome }}
+          BUILD_RESULT: ${{ steps.build.outcome }}
+        run: |
+          {
+            echo '### Verify workflow'
+            echo
+            echo '| Gate | Result |'
+            echo '|---|---|'
+            echo "| Checkout | $CHECKOUT_RESULT |"
+            echo "| Compose variants | $COMPOSE_RESULT |"
+            echo "| Node setup / npm ci | $NODE_RESULT / $INSTALL_RESULT |"
+            echo "| Format | $FORMAT_RESULT |"
+            echo "| Lint | $LINT_RESULT |"
+            echo "| Typecheck | $TYPECHECK_RESULT |"
+            echo "| Codex protocol compatibility | $PROTOCOL_RESULT |"
+            echo "| v0.1.11 / SSH identity migration | $MIGRATION_RESULT |"
+            echo "| Unit tests | $UNIT_RESULT |"
+            echo "| E2E | $E2E_RESULT |"
+            echo "| Build | $BUILD_RESULT |"
+          } >> "$GITHUB_STEP_SUMMARY"
