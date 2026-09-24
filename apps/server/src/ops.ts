@@ -15,6 +15,8 @@ import { acquireDataDirectoryLock, BackupService } from "./modules/operations/in
 
 type Output = (line: string) => void;
 
+const ONLINE_BACKUP_TIMEOUT_MS = 30_000;
+
 const OnlineBackupResponseSchema = z
   .object({
     data: z
@@ -304,7 +306,7 @@ export async function runOperations(
             {
               method: "POST",
               headers: { Authorization: `Bearer ${context.runtime.capabilityToken}` },
-              signal: AbortSignal.timeout(2_000),
+              signal: AbortSignal.timeout(ONLINE_BACKUP_TIMEOUT_MS),
             },
           );
         } catch {

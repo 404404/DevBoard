@@ -289,7 +289,11 @@ describe("operations CLI", () => {
         { mode: 0o600 },
       );
       const lines: string[] = [];
-      let request: { url?: string; authorization?: string | undefined } = {};
+      let request: {
+        url?: string;
+        authorization?: string | undefined;
+        signal?: AbortSignal | null;
+      } = {};
 
       expect(
         await runOperations(
@@ -306,6 +310,7 @@ describe("operations CLI", () => {
               request = {
                 url: String(input),
                 authorization: new Headers(init?.headers).get("authorization") ?? undefined,
+                signal: init?.signal,
               };
               return new Response(
                 JSON.stringify({
@@ -330,13 +335,15 @@ describe("operations CLI", () => {
           },
         ),
       ).toBe(0);
-      expect(request).toEqual({
+      expect(request).toMatchObject({
         url:
           adminPort === 80
             ? "http://127.0.0.1/api/v1/local/backups"
             : "http://127.0.0.1:47824/api/v1/local/backups",
         authorization: `Bearer ${"x".repeat(43)}`,
       });
+      expect(request.signal).toBeInstanceOf(AbortSignal);
+      expect(request.signal?.aborted).toBe(false);
       expect(JSON.parse(lines[0] as string)).toMatchObject({
         ok: true,
         mode: "online",
