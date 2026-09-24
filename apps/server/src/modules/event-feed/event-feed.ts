@@ -144,11 +144,14 @@ export class EventFeed {
         FROM change_events
         WHERE revision > ?
           AND revision <= ?
-          AND json_extract(safe_payload_json, '$.projectId') = ?
+          AND (
+            json_extract(safe_payload_json, '$.projectId') = ?
+            OR (aggregate_type = 'project' AND aggregate_id = ?)
+          )
         ORDER BY revision
         LIMIT ?`,
       )
-      .all(query.afterRevision, latestRevision, query.projectId, query.limit + 1);
+      .all(query.afterRevision, latestRevision, query.projectId, query.projectId, query.limit + 1);
     const events = rows.slice(0, query.limit).map((row) => this.#boardEvent(row));
     const hasMore = rows.length > query.limit;
     const cursorRevision = hasMore

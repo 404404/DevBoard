@@ -107,7 +107,10 @@ async function readUntil(reader, textToFind) {
   let accumulated = "";
   let timer;
   const deadline = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error("SSE event timed out")), 8_000);
+    timer = setTimeout(
+      () => reject(new Error(`SSE event timed out while waiting for ${textToFind}`)),
+      8_000,
+    );
   });
   try {
     while (!accumulated.includes(textToFind) && accumulated.length < 128_000) {

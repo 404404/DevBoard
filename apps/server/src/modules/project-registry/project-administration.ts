@@ -89,7 +89,7 @@ export class ProjectAdministration {
       return this.#recordChange(
         "project.created",
         id,
-        { projectKey: command.projectKey },
+        { projectId: id, projectKey: command.projectKey },
         timestamp,
       );
     });
@@ -132,7 +132,7 @@ export class ProjectAdministration {
           ...(command.description === undefined ? [] : ["description"]),
         ],
       });
-      return this.#recordChange("project.updated", projectId, {}, timestamp);
+      return this.#recordChange("project.updated", projectId, { projectId }, timestamp);
     });
 
     if (!result) {
@@ -164,7 +164,7 @@ export class ProjectAdministration {
       }
 
       this.#recordAudit("project.archive", projectId, {});
-      return this.#recordChange("project.archived", projectId, {}, timestamp);
+      return this.#recordChange("project.archived", projectId, { projectId }, timestamp);
     });
 
     if (!changed) {

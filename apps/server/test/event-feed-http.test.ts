@@ -144,6 +144,11 @@ describe("event feed HTTP and SSE routes", () => {
     expect(page).toMatchObject({
       events: [
         {
+          aggregateId: project.id,
+          aggregateType: "project",
+          eventType: "project.created",
+        },
+        {
           aggregateId: created.data.id,
           eventType: "task.created",
         },
