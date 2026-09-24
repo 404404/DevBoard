@@ -3602,12 +3602,18 @@ body.is-resizing-task-dialog {
 
   .board-title-block {
     flex: 1;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 4px;
   }
 
   .board-header .project-switcher {
-    max-width: 100%;
+    flex: 0 1 60%;
+    max-width: 60%;
+  }
+
+  .board-header .board-project-meta {
+    flex: 1 1 40px;
+    min-width: 40px;
   }
 
   .board-header .project-switcher__trigger {

@@ -424,16 +424,18 @@ export function BoardPage({
                   <span className="command-label--full">标签管理</span>
                   <span className="command-label--compact">标签</span>
                 </button>
-                <button
-                  className="button"
-                  type="button"
-                  disabled={realtime === "offline"}
-                  onClick={() => setGitManagerOpen(true)}
-                >
-                  <GitBranch />
-                  <span className="command-label--full">分支 / worktree 管理</span>
-                  <span className="command-label--compact">分支</span>
-                </button>
+                {selectedProject?.kind === "codex" && (
+                  <button
+                    className="button"
+                    type="button"
+                    disabled={realtime === "offline"}
+                    onClick={() => setGitManagerOpen(true)}
+                  >
+                    <GitBranch />
+                    <span className="command-label--full">分支 / worktree 管理</span>
+                    <span className="command-label--compact">分支</span>
+                  </button>
+                )}
                 <button
                   className="button button--primary"
                   type="button"
