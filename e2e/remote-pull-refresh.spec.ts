@@ -5,23 +5,21 @@ test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true
 async function touch(page: Page, type: string, y: number, x = 100, count = 1) {
   await page.locator(".remote-list-body").evaluate(
     (element, args) => {
-      const touches =
-        args.type === "touchend" || args.type === "touchcancel"
-          ? []
-          : Array.from(
-              { length: args.count },
-              (_, identifier) =>
-                new Touch({
-                  identifier,
-                  target: element,
-                  clientX: args.x + identifier * 20,
-                  clientY: args.y,
-                }),
-            );
-      const event = new TouchEvent(args.type, {
+      const touches = Array.from({ length: args.count }, (_, identifier) => ({
+        identifier,
+        target: element,
+        clientX: args.x + identifier * 20,
+        clientY: args.y,
+      }));
+      const activeTouches = args.type === "touchend" || args.type === "touchcancel" ? [] : touches;
+      const event = new Event(args.type, {
         bubbles: true,
         cancelable: true,
-        touches,
+      });
+      Object.defineProperties(event, {
+        touches: { value: activeTouches },
+        targetTouches: { value: activeTouches },
+        changedTouches: { value: touches },
       });
       element.dispatchEvent(event);
     },
