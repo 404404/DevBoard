@@ -28,21 +28,35 @@ function insertBusinessData(projectKey, options = {}) {
       .prepare("INSERT INTO projects (id, project_key, name, description) VALUES (?, ?, ?, ?)")
       .run(projectId, projectKey, projectName, "CI data-volume and backup acceptance");
     database
-      .prepare(`INSERT INTO tasks (
+      .prepare(
+        `INSERT INTO tasks (
         id, identifier, project_id, task_number, title, status
-      ) VALUES (?, ?, ?, ?, ?, 'todo')`)
+      ) VALUES (?, ?, ?, ?, ?, 'todo')`,
+      )
       .run(taskId, `${projectKey}-1`, projectId, taskNumber, taskTitle);
     database
-      .prepare(`INSERT INTO comments (
+      .prepare(
+        `INSERT INTO comments (
         id, task_id, body, version, created_at, updated_at
-      ) VALUES (?, ?, ?, 1, ?, ?)`)
+      ) VALUES (?, ?, ?, 1, ?, ?)`,
+      )
       .run(commentId, taskId, commentBody, now, now);
     database
-      .prepare(`INSERT INTO attachments (
+      .prepare(
+        `INSERT INTO attachments (
         id, task_id, comment_id, filename, content_type, size_bytes, sha256, storage_key, created_at
-      ) VALUES (?, ?, ?, ?, 'text/plain', ?, ?, ?, ?)`)
-      .run(attachmentId, taskId, commentId, "smoke.txt", contents.length,
-        createHash("sha256").update(contents).digest("hex"), storageKey, now);
+      ) VALUES (?, ?, ?, ?, 'text/plain', ?, ?, ?, ?)`,
+      )
+      .run(
+        attachmentId,
+        taskId,
+        commentId,
+        "smoke.txt",
+        contents.length,
+        createHash("sha256").update(contents).digest("hex"),
+        storageKey,
+        now,
+      );
   });
   tx();
   const attachmentPath = join(dataDirectory, "attachments", storageKey);
@@ -103,8 +117,10 @@ try {
       .prepare("SELECT body FROM comments WHERE id = ? AND task_id = ?")
       .get(fixture.commentId, fixture.taskId);
     const attachment = database
-      .prepare(`SELECT filename, size_bytes, sha256, storage_key FROM attachments
-        WHERE id = ? AND task_id = ?`)
+      .prepare(
+        `SELECT filename, size_bytes, sha256, storage_key FROM attachments
+        WHERE id = ? AND task_id = ?`,
+      )
       .get(fixture.attachmentId, fixture.taskId);
     const digest = createHash("sha256").update(fixture.attachmentText).digest("hex");
     if (
@@ -129,9 +145,7 @@ try {
     }
     if (
       state.mutatedProjectKey &&
-      database
-        .prepare("SELECT 1 FROM projects WHERE project_key = ?")
-        .get(state.mutatedProjectKey)
+      database.prepare("SELECT 1 FROM projects WHERE project_key = ?").get(state.mutatedProjectKey)
     ) {
       throw new Error("post-backup mutation unexpectedly survived restore");
     }

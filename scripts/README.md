@@ -9,7 +9,7 @@
 | `run-codex-app-server.mjs`                              | 导出后端内嵌桥接入口，同时支持独立桥接调试；桌面生产环境由后端导入，无需另装 launchd 服务 |
 | `codex-session-bridge.mjs`                              | 请求路由、鉴权与 Desktop 会话桥接                                                         |
 | `codex-desktop-loader.mjs`、`codex-desktop-session.mjs` | Desktop 加载、owner/follower IPC 和会话生命周期                                           |
-| `codex-project-snapshot.mjs`                            | 项目状态读取与快照写入，也用于 `npm run dev:project-sync`                                 |
+| `codex-project-snapshot.mjs`                            | 可选的旧版 Codex Desktop 项目快照导入工具；不属于默认开发启动或容器运行依赖               |
 | `codex-remote-image.mjs`、`codex-remote-upload.mjs`     | Remote 图片读取与附件上传                                                                 |
 | `codex-remote-queue.mjs`、`codex-remote-review.mjs`     | 待发消息队列与只读代码审查                                                                |
 | `codex-task-progress.mjs`、`codex-thread-title.mjs`     | 任务进度与对话标题同步                                                                    |

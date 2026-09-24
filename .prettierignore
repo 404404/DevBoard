@@ -3,6 +3,8 @@ apps/desktop/src-tauri/target/
 apps/desktop/src-tauri/gen/
 apps/desktop/.cache/
 apps/desktop/staging/
+# Generated Objective-C path fragment consumed by the legacy native icon code; Prettier has no C parser.
+apps/desktop/native/knot-path.inc
 .worktrees/
 .superpowers/
 dist

@@ -4,9 +4,8 @@ import { join } from "node:path";
 
 const require = createRequire("/app/package.json");
 const Database = require("better-sqlite3");
-const { WebAccountService } = await import(
-  "/app/apps/server/dist/modules/identity/web-account-service.js"
-);
+const { WebAccountService } =
+  await import("/app/apps/server/dist/modules/identity/web-account-service.js");
 const origin = "https://devboard.example.test";
 const proxyBase = process.env.DEVBOARD_SMOKE_PROXY_URL ?? "https://devboard.example.test";
 const username = `ci${randomUUID().replaceAll("-", "").slice(0, 12)}`;

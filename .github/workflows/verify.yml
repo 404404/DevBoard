@@ -25,6 +25,11 @@ jobs:
           cache: npm
       - run: npm ci
         id: install
+      - name: Install the pinned Codex CLI for upstream protocol verification
+        run: |
+          version="$(node -p "require('./apps/server/src/modules/codex/protocol-manifest.json').codexVersion")"
+          npm install --global "@openai/codex@${version}"
+        id: codex-cli
       - run: npm run format:check
         id: format
       - run: npm run lint
@@ -38,6 +43,9 @@ jobs:
         id: migration
       - run: npm run test
         id: unit
+      - name: Install Playwright browsers and system dependencies
+        run: npx playwright install --with-deps chromium webkit
+        id: browsers
       - run: npm run test:e2e
         id: e2e
       - run: npm run build
@@ -49,12 +57,14 @@ jobs:
           COMPOSE_RESULT: ${{ steps.compose.outcome }}
           NODE_RESULT: ${{ steps.node.outcome }}
           INSTALL_RESULT: ${{ steps.install.outcome }}
+          CODEX_CLI_RESULT: ${{ steps.codex-cli.outcome }}
           FORMAT_RESULT: ${{ steps.format.outcome }}
           LINT_RESULT: ${{ steps.lint.outcome }}
           TYPECHECK_RESULT: ${{ steps.typecheck.outcome }}
           PROTOCOL_RESULT: ${{ steps.protocol.outcome }}
           MIGRATION_RESULT: ${{ steps.migration.outcome }}
           UNIT_RESULT: ${{ steps.unit.outcome }}
+          BROWSER_RESULT: ${{ steps.browsers.outcome }}
           E2E_RESULT: ${{ steps.e2e.outcome }}
           BUILD_RESULT: ${{ steps.build.outcome }}
         run: |
@@ -66,12 +76,14 @@ jobs:
             echo "| Checkout | $CHECKOUT_RESULT |"
             echo "| Compose variants | $COMPOSE_RESULT |"
             echo "| Node setup / npm ci | $NODE_RESULT / $INSTALL_RESULT |"
+            echo "| Pinned Codex CLI (CI-only protocol check) | $CODEX_CLI_RESULT |"
             echo "| Format | $FORMAT_RESULT |"
             echo "| Lint | $LINT_RESULT |"
             echo "| Typecheck | $TYPECHECK_RESULT |"
             echo "| Codex protocol compatibility | $PROTOCOL_RESULT |"
             echo "| v0.1.11 / SSH identity migration | $MIGRATION_RESULT |"
             echo "| Unit tests | $UNIT_RESULT |"
+            echo "| Playwright browsers / system dependencies | $BROWSER_RESULT |"
             echo "| E2E | $E2E_RESULT |"
             echo "| Build | $BUILD_RESULT |"
           } >> "$GITHUB_STEP_SUMMARY"

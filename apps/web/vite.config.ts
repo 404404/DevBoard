@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 
 // Existing development launch profiles can keep their old variable names.
 const webPort = Number.parseInt(
@@ -36,5 +36,8 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+  },
+  test: {
+    maxWorkers: 2,
   },
 });
