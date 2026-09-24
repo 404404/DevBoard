@@ -20,13 +20,25 @@ export interface AvailableFilterOptions {
   readonly labels: ReadonlySet<string>;
 }
 
+function normalizeQuery(value: string): string {
+  return value.trim().toLocaleLowerCase("zh-CN");
+}
+
+function matchesQuery(task: TaskView, query: string): boolean {
+  if (!query) return true;
+  if (
+    task.identifier.toLocaleLowerCase("zh-CN").includes(query) ||
+    task.title.toLocaleLowerCase("zh-CN").includes(query) ||
+    task.description.toLocaleLowerCase("zh-CN").includes(query)
+  ) {
+    return true;
+  }
+  return task.labels.some((label) => label.toLocaleLowerCase("zh-CN").includes(query));
+}
+
 export function matchesTask(task: TaskView, filters: TaskFilters): boolean {
-  const query = filters.query.trim().toLocaleLowerCase("zh-CN");
-  const haystack = [task.identifier, task.title, task.description, ...task.labels]
-    .join("\n")
-    .toLocaleLowerCase("zh-CN");
   return (
-    (!query || haystack.includes(query)) &&
+    matchesQuery(task, normalizeQuery(filters.query)) &&
     (!filters.statuses.size || filters.statuses.has(task.status)) &&
     (!filters.priorities.size || filters.priorities.has(task.priority)) &&
     (!filters.labels.size || task.labels.some((label) => filters.labels.has(label)))
@@ -34,7 +46,14 @@ export function matchesTask(task: TaskView, filters: TaskFilters): boolean {
 }
 
 export function filterTasks(tasks: readonly TaskView[], filters: TaskFilters): TaskView[] {
-  return tasks.filter((task) => matchesTask(task, filters));
+  const query = normalizeQuery(filters.query);
+  return tasks.filter(
+    (task) =>
+      matchesQuery(task, query) &&
+      (!filters.statuses.size || filters.statuses.has(task.status)) &&
+      (!filters.priorities.size || filters.priorities.has(task.priority)) &&
+      (!filters.labels.size || task.labels.some((label) => filters.labels.has(label))),
+  );
 }
 
 export function availableFilterOptions(tasks: readonly TaskView[]): AvailableFilterOptions {

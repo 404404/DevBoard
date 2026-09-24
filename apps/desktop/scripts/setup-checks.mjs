@@ -150,9 +150,10 @@ export async function runSetupChecks(input, options = {}) {
   const publicAccessMode = input.publicAccessMode || "builtin-frp";
   const selected =
     input.section === "all" || !input.section
-      ? SETUP_SECTIONS.filter((section) =>
-          (input.accessMode === "web" ? section !== "feishu" : section !== "web") &&
-          (publicAccessMode === "builtin-frp" || section !== "tunnel")
+      ? SETUP_SECTIONS.filter(
+          (section) =>
+            (input.accessMode === "web" ? section !== "feishu" : section !== "web") &&
+            (publicAccessMode === "builtin-frp" || section !== "tunnel"),
         )
       : [input.section];
   if (selected.some((section) => !SETUP_SECTIONS.includes(section)))

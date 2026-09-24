@@ -537,11 +537,13 @@ function render(s) {
     initialPageChosen = true;
     if (!navigationTouched)
       showPage(
-        (deployment.publicAccessMode === "builtin-frp"
-          ? !document.getElementById("frpc-content").value.trim()
-          : deployment.publicAccessMode === "external-reverse-proxy"
-            ? !document.getElementById("public-origin").value.trim()
-            : false)
+        (
+          deployment.publicAccessMode === "builtin-frp"
+            ? !document.getElementById("frpc-content").value.trim()
+            : deployment.publicAccessMode === "external-reverse-proxy"
+              ? !document.getElementById("public-origin").value.trim()
+              : false
+        )
           ? "guide"
           : "overview",
         undefined,

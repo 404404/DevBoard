@@ -79,7 +79,7 @@ export function assertDistributionClean(app) {
   visit(app);
 }
 
-function release() {
+export function release() {
   if (process.platform !== "darwin" || process.arch !== "arm64")
     throw new Error("当前发布仅支持 Apple Silicon macOS");
   if (!/^[\w.-]+\/[\w.-]+$/.test(repository)) throw new Error("GitHub 仓库名称无效");
@@ -243,6 +243,8 @@ function release() {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  console.error("macOS Desktop releases are retired. Use the multi-architecture GHCR image release.");
+  console.error(
+    "macOS Desktop releases are retired. Use the multi-architecture GHCR image release.",
+  );
   process.exit(78);
 }

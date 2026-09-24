@@ -64,7 +64,10 @@ export function WebLoginForm({ enabled }: { readonly enabled: boolean }) {
       ) : (
         <p>
           Web 登录尚未启用。请确认已配置 HTTPS，并在运行 DevBoard 的容器内创建 Web 账号：
-          <code>docker compose exec -it devboard node apps/server/dist/ops.js web-account create --username alice --name "Alice"</code>
+          <code>
+            docker compose exec -it devboard node apps/server/dist/ops.js web-account create
+            --username alice --name "Alice"
+          </code>
           创建后刷新此页面。
         </p>
       )}

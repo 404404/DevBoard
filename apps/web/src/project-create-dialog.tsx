@@ -39,7 +39,11 @@ export function ProjectCreateDialog({
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    mutation.mutate({ projectKey: projectKey.trim().toUpperCase(), name: name.trim(), description });
+    mutation.mutate({
+      projectKey: projectKey.trim().toUpperCase(),
+      name: name.trim(),
+      description,
+    });
   };
 
   return (
@@ -58,7 +62,9 @@ export function ProjectCreateDialog({
       <section className="tag-manager-dialog execution-settings-dialog">
         <header>
           <div>
-            <span className="execution-settings-mark" aria-hidden="true">◈</span>
+            <span className="execution-settings-mark" aria-hidden="true">
+              ◈
+            </span>
             <h2 id="project-create-title">新建 Project</h2>
           </div>
           <button className="icon-button" type="button" aria-label="关闭" onClick={onClose}>
@@ -66,7 +72,10 @@ export function ProjectCreateDialog({
           </button>
         </header>
         {mutation.isError ? (
-          <Notice message={userErrorMessage(mutation.error, "项目创建失败，请检查 Project Key。")} eventKey={mutation.error} />
+          <Notice
+            message={userErrorMessage(mutation.error, "项目创建失败，请检查 Project Key。")}
+            eventKey={mutation.error}
+          />
         ) : null}
         <form className="execution-settings-form" onSubmit={submit}>
           <label>
@@ -85,14 +94,29 @@ export function ProjectCreateDialog({
           </label>
           <label>
             <span>名称</span>
-            <input required maxLength={120} value={name} onChange={(event) => setName(event.target.value)} />
+            <input
+              required
+              maxLength={120}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+            />
           </label>
           <label>
             <span>描述</span>
-            <textarea maxLength={20_000} rows={4} value={description} onChange={(event) => setDescription(event.target.value)} />
+            <textarea
+              maxLength={20_000}
+              rows={4}
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+            />
           </label>
           <footer className="execution-settings-actions">
-            <button className="button" type="button" disabled={mutation.isPending} onClick={onClose}>
+            <button
+              className="button"
+              type="button"
+              disabled={mutation.isPending}
+              onClick={onClose}
+            >
               取消
             </button>
             <button className="button button--primary" type="submit" disabled={mutation.isPending}>

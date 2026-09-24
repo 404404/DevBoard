@@ -375,15 +375,17 @@ export function BoardPage({
               window.history.replaceState(null, "", url);
               setSelectedTaskId(undefined);
             }}
-            renderActions={(task, enabled) => selectedProject?.kind !== "managed" ? (
-              <CodexExecutionPanel
-                taskId={task.id}
-                csrfToken={session.csrfToken}
-                executable={enabled && task.permissions.canExecute}
-                temporary={task.projectId === TEMPORARY_PROJECT_ID}
-                threadState={task.codexThreadState}
-              />
-            ) : null}
+            renderActions={(task, enabled) =>
+              selectedProject?.kind !== "managed" ? (
+                <CodexExecutionPanel
+                  taskId={task.id}
+                  csrfToken={session.csrfToken}
+                  executable={enabled && task.permissions.canExecute}
+                  temporary={task.projectId === TEMPORARY_PROJECT_ID}
+                  threadState={task.codexThreadState}
+                />
+              ) : null
+            }
             renderReassign={(task, enabled) =>
               task.permissions.canReassign ? (
                 <TaskReassignPanel
@@ -600,7 +602,9 @@ export function BoardPage({
           onClose={() => setProjectCreateOpen(false)}
           onCreated={(project) => {
             queryClient.setQueryData<readonly ProjectView[]>(["projects"], (current) =>
-              current ? [...current.filter((entry) => entry.id !== project.id), project] : [project],
+              current
+                ? [...current.filter((entry) => entry.id !== project.id), project]
+                : [project],
             );
             selectProject(project.id);
             setProjectCreateOpen(false);
@@ -1014,7 +1018,9 @@ function TaskReassignPanel({
           </button>
         </div>
       ) : (
-        <p className="reassign-empty">暂无可重新分配的项目。请先创建 Project 并配置对应的 SSH Workspace Mapping。</p>
+        <p className="reassign-empty">
+          暂无可重新分配的项目。请先创建 Project 并配置对应的 SSH Workspace Mapping。
+        </p>
       )}
       {mutation.isError ? (
         <Notice

@@ -14,11 +14,11 @@ DevBoard 是运行在 Docker 中的项目控制面。容器提供 Web、API、SQ
 
 ## 访问方式
 
-|          | Web                          | 飞书                         |
-| -------- | ---------------------------- | ---------------------------- |
-| 打开方式 | 桌面或移动浏览器             | 飞书桌面端或移动端           |
-| 登录身份 | Web 账号                     | 自建应用可用范围内的飞书用户 |
-| 配置要求 | 外部 HTTPS reverse proxy     | 飞书自建应用与外部 HTTPS     |
+|          | Web                      | 飞书                         |
+| -------- | ------------------------ | ---------------------------- |
+| 打开方式 | 桌面或移动浏览器         | 飞书桌面端或移动端           |
+| 登录身份 | Web 账号                 | 自建应用可用范围内的飞书用户 |
+| 配置要求 | 外部 HTTPS reverse proxy | 飞书自建应用与外部 HTTPS     |
 
 两种方式可同时启用，共用同一控制面、项目与 Run。
 
@@ -126,15 +126,15 @@ SQLite、附件和备份位于 Compose named volume `devboard-data`，不要在�
 
 ## 常见问题
 
-| 现象                         | 先检查什么                                                                            |
-| ---------------------------- | ------------------------------------------------------------------------------------- |
-| 容器不能健康启动             | `docker compose logs devboard`；检查 Public Origin、SQLite 持久卷和 migration          |
-| Web 登录/secure cookie 失败  | 检查 HTTPS Public Origin、保留的 Host 与实际代理地址是否在 `DEVBOARD_TRUST_PROXY`      |
-| SSE 没有实时更新             | 关闭 `/api/v1/events` 的代理 buffering/cache，增加 read timeout                         |
-| SSH Host 测试失败            | 分别检查 DNS/TCP、Host Key 确认、SSH Agent socket/Identity File 及远端 sshd              |
-| Provider 未检测到            | 在目标 SSH Host 安装对应 CLI；DevBoard 镜像不包含这些 CLI                                |
-| Workspace/Git 状态不正确     | 核对该项目到所选 Connection 的远端绝对路径映射，不要检查容器内同名路径                  |
-| 飞书凭据检查通过但登录失败   | 检查 user ID 权限、可信域名、redirect URL、应用发布和可用范围，再从飞书实际登录          |
+| 现象                        | 先检查什么                                                                        |
+| --------------------------- | --------------------------------------------------------------------------------- |
+| 容器不能健康启动            | `docker compose logs devboard`；检查 Public Origin、SQLite 持久卷和 migration     |
+| Web 登录/secure cookie 失败 | 检查 HTTPS Public Origin、保留的 Host 与实际代理地址是否在 `DEVBOARD_TRUST_PROXY` |
+| SSE 没有实时更新            | 关闭 `/api/v1/events` 的代理 buffering/cache，增加 read timeout                   |
+| SSH Host 测试失败           | 分别检查 DNS/TCP、Host Key 确认、SSH Agent socket/Identity File 及远端 sshd       |
+| Provider 未检测到           | 在目标 SSH Host 安装对应 CLI；DevBoard 镜像不包含这些 CLI                         |
+| Workspace/Git 状态不正确    | 核对该项目到所选 Connection 的远端绝对路径映射，不要检查容器内同名路径            |
+| 飞书凭据检查通过但登录失败  | 检查 user ID 权限、可信域名、redirect URL、应用发布和可用范围，再从飞书实际登录   |
 
 反馈问题时，请提供 image tag、架构、复现步骤和经过脱敏的日志。不要公开 App Secret、SSH Private Key、登录令牌或完整数据目录。
 

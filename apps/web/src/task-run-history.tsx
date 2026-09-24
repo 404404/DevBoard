@@ -1,7 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
-import { ExecutionApprovalDecisionSchema, type ExecutionApprovalDecision } from "@codexboard/contracts";
+import {
+  ExecutionApprovalDecisionSchema,
+  type ExecutionApprovalDecision,
+} from "@codexboard/contracts";
 
 import {
   cancelRun,
@@ -64,11 +67,14 @@ export function TaskRunHistory(props: TaskRunHistoryProps) {
   const [profileId, setProfileId] = useState("");
   const profileInitialized = useRef(false);
   const [continuationRunId, setContinuationRunId] = useState<string | null>(null);
-  const [workspace, setWorkspace] = useState("");
-  const [model, setModel] = useState("");
-  const [reasoningEffort, setReasoningEffort] = useState("");
-  const [mode, setMode] = useState("");
-  const [permissionMode, setPermissionMode] = useState("");
+  const [workspaceDraft, setWorkspaceDraft] = useState<{ key: string; value: string } | null>(null);
+  const [runOptionsDraft, setRunOptionsDraft] = useState<{
+    profileId: string;
+    model: string;
+    reasoningEffort: string;
+    mode: string;
+    permissionMode: string;
+  } | null>(null);
   const [prompt, setPrompt] = useState("");
   const [inputDrafts, setInputDrafts] = useState<Record<string, string>>({});
   const [inputErrors, setInputErrors] = useState<Record<string, string>>({});
@@ -98,28 +104,62 @@ export function TaskRunHistory(props: TaskRunHistoryProps) {
   const selectedMapping = mappings.data?.find(
     (mapping) => mapping.connectionId === selectedProfile?.connectionId,
   );
+  const workspaceKey = `${selectedProfile?.connectionId ?? ""}\u0000${selectedMapping?.path ?? ""}`;
+  const workspace =
+    workspaceDraft?.key === workspaceKey ? workspaceDraft.value : (selectedMapping?.path ?? "");
+  const setWorkspace = (value: string) => setWorkspaceDraft({ key: workspaceKey, value });
+  const runOptions =
+    selectedProfile && runOptionsDraft?.profileId === selectedProfile.id
+      ? runOptionsDraft
+      : {
+          profileId: selectedProfile?.id ?? "",
+          model: selectedProfile?.defaultModel ?? "",
+          reasoningEffort: selectedProfile?.defaultReasoningEffort ?? "",
+          mode: selectedProfile?.defaultMode ?? "",
+          permissionMode: "",
+        };
+  const updateRunOptions = (patch: Partial<Omit<typeof runOptions, "profileId">>) => {
+    if (!selectedProfile) return;
+    setRunOptionsDraft((current) => ({
+      profileId: selectedProfile.id,
+      model:
+        current?.profileId === selectedProfile.id
+          ? current.model
+          : (selectedProfile.defaultModel ?? ""),
+      reasoningEffort:
+        current?.profileId === selectedProfile.id
+          ? current.reasoningEffort
+          : (selectedProfile.defaultReasoningEffort ?? ""),
+      mode:
+        current?.profileId === selectedProfile.id
+          ? current.mode
+          : (selectedProfile.defaultMode ?? ""),
+      permissionMode: current?.profileId === selectedProfile.id ? current.permissionMode : "",
+      ...patch,
+    }));
+  };
+  const model = runOptions.model;
+  const reasoningEffort = runOptions.reasoningEffort;
+  const mode = runOptions.mode;
+  const permissionMode = runOptions.permissionMode;
+  const setModel = (value: string) => updateRunOptions({ model: value });
+  const setReasoningEffort = (value: string) => updateRunOptions({ reasoningEffort: value });
+  const setMode = (value: string) => updateRunOptions({ mode: value });
+  const setPermissionMode = (value: string) => updateRunOptions({ permissionMode: value });
   useEffect(() => {
     if (profileInitialized.current || projectDefault.isPending || !profiles.data?.length) return;
     setProfileId(projectDefault.data?.profileId ?? profiles.data[0]?.id ?? "");
     profileInitialized.current = true;
   }, [profiles.data, projectDefault.data?.profileId, projectDefault.isPending]);
-  useEffect(() => {
-    setWorkspace(selectedMapping?.path ?? "");
-  }, [selectedProfile?.connectionId, selectedMapping?.path]);
-  useEffect(() => {
-    if (!selectedProfile) return;
-    setModel(selectedProfile.defaultModel ?? "");
-    setReasoningEffort(selectedProfile.defaultReasoningEffort ?? "");
-    setMode(selectedProfile.defaultMode ?? "");
-    setPermissionMode("");
-  }, [selectedProfile?.id, selectedProfile?.defaultModel, selectedProfile?.defaultMode, selectedProfile?.defaultReasoningEffort]);
-
   const activeRun = runs.data?.find((run) => activeStatus(run.status));
   const continuationRun = runs.data?.find((run) => run.id === continuationRunId);
   const approvals = useQuery({
     queryKey: ["run-approvals", activeRun?.id],
     queryFn: () => listRunApprovals(activeRun?.id ?? ""),
-    enabled: Boolean(activeRun && (activeRun.status === "waiting_approval" || activeRun.status === "waiting_input")),
+    enabled: Boolean(
+      activeRun &&
+      (activeRun.status === "waiting_approval" || activeRun.status === "waiting_input"),
+    ),
     refetchInterval: 1_000,
   });
   const start = useMutation({
@@ -154,7 +194,9 @@ export function TaskRunHistory(props: TaskRunHistoryProps) {
     mutationFn: (nextProfileId: string | null) =>
       setProjectDefaultProfile(props.projectId, nextProfileId, props.csrfToken),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["project-execution-profile", props.projectId] });
+      void queryClient.invalidateQueries({
+        queryKey: ["project-execution-profile", props.projectId],
+      });
     },
   });
   const saveMapping = useMutation({
@@ -173,15 +215,16 @@ export function TaskRunHistory(props: TaskRunHistoryProps) {
     },
   });
   const createMapping = useMutation({
-    mutationFn: () => createRemoteWorkspaceMapping(
-      props.projectId,
-      {
-        connectionId: selectedProfile?.connectionId ?? "",
-        path: workspace.trim(),
-        isDefault: true,
-      },
-      props.csrfToken,
-    ),
+    mutationFn: () =>
+      createRemoteWorkspaceMapping(
+        props.projectId,
+        {
+          connectionId: selectedProfile?.connectionId ?? "",
+          path: workspace.trim(),
+          isDefault: true,
+        },
+        props.csrfToken,
+      ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["workspace-mappings", props.projectId] });
     },
@@ -193,7 +236,10 @@ export function TaskRunHistory(props: TaskRunHistoryProps) {
     },
   });
   const respond = useMutation({
-    mutationFn: (input: { readonly approvalId: string; readonly decision: ExecutionApprovalDecision }) =>
+    mutationFn: (input: {
+      readonly approvalId: string;
+      readonly decision: ExecutionApprovalDecision;
+    }) =>
       respondToRunApproval(activeRun?.id ?? "", input.approvalId, input.decision, props.csrfToken),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["task-runs", props.taskId] });
@@ -231,11 +277,12 @@ export function TaskRunHistory(props: TaskRunHistoryProps) {
     Boolean(continuationRun?.providerThreadId || profileId || projectDefault.data?.profileId) &&
     Boolean(
       continuationRun?.providerThreadId ||
-        (selectedMapping && workspace.trim() === selectedMapping.path),
+      (selectedMapping && workspace.trim() === selectedMapping.path),
     ) &&
     Boolean(prompt.trim()) &&
     !activeRun;
-  const pendingApprovals = approvals.data?.filter((approval) => approval.status === "pending") ?? [];
+  const pendingApprovals =
+    approvals.data?.filter((approval) => approval.status === "pending") ?? [];
 
   return (
     <section className="task-run-history" aria-labelledby="task-run-history-title">
@@ -244,7 +291,12 @@ export function TaskRunHistory(props: TaskRunHistoryProps) {
           <h2 id="task-run-history-title">Run 控制台</h2>
           <p>统一启动 Provider、查看事件，并处理审批</p>
         </div>
-        <button className="button" type="button" disabled={runs.isFetching} onClick={() => void runs.refetch()}>
+        <button
+          className="button"
+          type="button"
+          disabled={runs.isFetching}
+          onClick={() => void runs.refetch()}
+        >
           {runs.isFetching ? "刷新中…" : "刷新"}
         </button>
       </header>
@@ -254,21 +306,32 @@ export function TaskRunHistory(props: TaskRunHistoryProps) {
           <span>Execution Profile</span>
           <select
             value={profileId}
-            disabled={!props.mutationsEnabled || !props.canExecute || profiles.isPending || Boolean(activeRun)}
+            disabled={
+              !props.mutationsEnabled ||
+              !props.canExecute ||
+              profiles.isPending ||
+              Boolean(activeRun)
+            }
             onChange={(event) => setProfileId(event.target.value)}
           >
-            <option value="">使用项目默认（{projectDefault.data?.profileId ? "已配置" : "未配置"}）</option>
-            {(profiles.data ?? []).filter((profile) => profile.enabled).map((profile) => (
-              <option value={profile.id} key={profile.id}>
-                {profile.name} · {profile.providerKind} · {profile.connectionName}
-              </option>
-            ))}
+            <option value="">
+              使用项目默认（{projectDefault.data?.profileId ? "已配置" : "未配置"}）
+            </option>
+            {(profiles.data ?? [])
+              .filter((profile) => profile.enabled)
+              .map((profile) => (
+                <option value={profile.id} key={profile.id}>
+                  {profile.name} · {profile.providerKind} · {profile.connectionName}
+                </option>
+              ))}
           </select>
           <div className="task-run-launch__profile-actions">
             <button
               className="button"
               type="button"
-              disabled={!profileId || !props.canManageProject || setDefault.isPending || Boolean(activeRun)}
+              disabled={
+                !profileId || !props.canManageProject || setDefault.isPending || Boolean(activeRun)
+              }
               onClick={() => setDefault.mutate(profileId || null)}
             >
               {projectDefault.data?.profileId === profileId ? "项目默认" : "设为项目默认"}
@@ -280,7 +343,12 @@ export function TaskRunHistory(props: TaskRunHistoryProps) {
             ) : null}
           </div>
         </label>
-        {continuationRun ? <p className="task-run-history__continuation">将继续 {continuationRun.executionProfileName ?? continuationRun.providerKind} 的已有 session。</p> : null}
+        {continuationRun ? (
+          <p className="task-run-history__continuation">
+            将继续 {continuationRun.executionProfileName ?? continuationRun.providerKind} 的已有
+            session。
+          </p>
+        ) : null}
         <label>
           <span>项目 Workspace Mapping</span>
           <input
@@ -299,7 +367,14 @@ export function TaskRunHistory(props: TaskRunHistoryProps) {
           <button
             className="button button--compact"
             type="button"
-            disabled={!props.mutationsEnabled || !props.canManageProject || !selectedProfile?.connectionId || !workspace.trim().startsWith("/") || saveMapping.isPending || Boolean(activeRun)}
+            disabled={
+              !props.mutationsEnabled ||
+              !props.canManageProject ||
+              !selectedProfile?.connectionId ||
+              !workspace.trim().startsWith("/") ||
+              saveMapping.isPending ||
+              Boolean(activeRun)
+            }
             onClick={() => saveMapping.mutate()}
           >
             {saveMapping.isPending ? "保存中…" : "保存 Workspace Mapping"}
@@ -307,16 +382,33 @@ export function TaskRunHistory(props: TaskRunHistoryProps) {
           <button
             className="button button--compact"
             type="button"
-            disabled={!props.mutationsEnabled || !props.canManageProject || !selectedProfile?.connectionId || !workspace.trim().startsWith("/") || createMapping.isPending || Boolean(activeRun)}
+            disabled={
+              !props.mutationsEnabled ||
+              !props.canManageProject ||
+              !selectedProfile?.connectionId ||
+              !workspace.trim().startsWith("/") ||
+              createMapping.isPending ||
+              Boolean(activeRun)
+            }
             onClick={() => {
-              const confirmed = window.confirm(`将在 ${selectedProfile?.connectionName ?? "SSH Host"} 上创建目录并绑定到当前项目：\n\n${workspace.trim()}`);
+              const confirmed = window.confirm(
+                `将在 ${selectedProfile?.connectionName ?? "SSH Host"} 上创建目录并绑定到当前项目：\n\n${workspace.trim()}`,
+              );
               if (confirmed) createMapping.mutate();
             }}
           >
             {createMapping.isPending ? "远端创建中…" : "远端创建目录并映射"}
           </button>
         </div>
-        {saveMapping.isError || createMapping.isError ? <small className="task-run-history__error">{saveMapping.error instanceof Error ? saveMapping.error.message : createMapping.error instanceof Error ? createMapping.error.message : "Workspace Mapping 保存失败，请检查远端 SSH 和绝对路径。"}</small> : null}
+        {saveMapping.isError || createMapping.isError ? (
+          <small className="task-run-history__error">
+            {saveMapping.error instanceof Error
+              ? saveMapping.error.message
+              : createMapping.error instanceof Error
+                ? createMapping.error.message
+                : "Workspace Mapping 保存失败，请检查远端 SSH 和绝对路径。"}
+          </small>
+        ) : null}
         {selectedProfile?.capabilities.models ? (
           <label>
             <span>Model</span>
@@ -382,10 +474,20 @@ export function TaskRunHistory(props: TaskRunHistoryProps) {
           disabled={!canStart || start.isPending || continueRun.isPending}
           onClick={() => (continuationRun ? continueRun.mutate() : start.mutate())}
         >
-          {start.isPending || continueRun.isPending ? "启动中…" : continuationRun ? "继续 Run" : "启动 Run"}
+          {start.isPending || continueRun.isPending
+            ? "启动中…"
+            : continuationRun
+              ? "继续 Run"
+              : "启动 Run"}
         </button>
-        {profiles.isError ? <p className="task-run-history__error">执行配置加载失败，请到设置中检查。</p> : null}
-        {start.isError || continueRun.isError ? <p className="task-run-history__error">执行失败，请检查 Workspace、Connection、Provider 状态或 session 是否仍可恢复。</p> : null}
+        {profiles.isError ? (
+          <p className="task-run-history__error">执行配置加载失败，请到设置中检查。</p>
+        ) : null}
+        {start.isError || continueRun.isError ? (
+          <p className="task-run-history__error">
+            执行失败，请检查 Workspace、Connection、Provider 状态或 session 是否仍可恢复。
+          </p>
+        ) : null}
       </div>
 
       {activeRun ? (
@@ -420,13 +522,18 @@ export function TaskRunHistory(props: TaskRunHistoryProps) {
                       <textarea
                         rows={3}
                         value={inputDrafts[approval.id] ?? ""}
-                        placeholder={"{\"question-id\":[\"answer\"]}"}
+                        placeholder={'{"question-id":["answer"]}'}
                         onChange={(event) =>
-                          setInputDrafts((previous) => ({ ...previous, [approval.id]: event.target.value }))
+                          setInputDrafts((previous) => ({
+                            ...previous,
+                            [approval.id]: event.target.value,
+                          }))
                         }
                       />
                     </label>
-                    {inputErrors[approval.id] ? <small className="task-run-history__error">{inputErrors[approval.id]}</small> : null}
+                    {inputErrors[approval.id] ? (
+                      <small className="task-run-history__error">{inputErrors[approval.id]}</small>
+                    ) : null}
                     <button
                       className="button button--primary"
                       type="button"
@@ -441,7 +548,9 @@ export function TaskRunHistory(props: TaskRunHistoryProps) {
                     className="button button--primary"
                     type="button"
                     disabled={respond.isPending}
-                    onClick={() => respond.mutate({ approvalId: approval.id, decision: { type: "approve" } })}
+                    onClick={() =>
+                      respond.mutate({ approvalId: approval.id, decision: { type: "approve" } })
+                    }
                   >
                     允许
                   </button>
@@ -463,7 +572,9 @@ export function TaskRunHistory(props: TaskRunHistoryProps) {
                   className="button"
                   type="button"
                   disabled={respond.isPending}
-                  onClick={() => respond.mutate({ approvalId: approval.id, decision: { type: "cancel" } })}
+                  onClick={() =>
+                    respond.mutate({ approvalId: approval.id, decision: { type: "cancel" } })
+                  }
                 >
                   取消
                 </button>
@@ -482,11 +593,13 @@ export function TaskRunHistory(props: TaskRunHistoryProps) {
               <div className="task-run-history__run">
                 <div>
                   <strong>{run.executionProfileName ?? run.providerKind}</strong>
-                  <small>{run.connectionName ?? "未绑定连接"} · {run.workspace ?? "未记录工作区"}</small>
+                  <small>
+                    {run.connectionName ?? "未绑定连接"} · {run.workspace ?? "未记录工作区"}
+                  </small>
                 </div>
-              <div>
-                <span>{statusLabel(run.status)}</span>
-                {run.providerThreadId && !activeStatus(run.status) ? (
+                <div>
+                  <span>{statusLabel(run.status)}</span>
+                  {run.providerThreadId && !activeStatus(run.status) ? (
                     <button
                       className="button button--compact"
                       type="button"
@@ -503,33 +616,38 @@ export function TaskRunHistory(props: TaskRunHistoryProps) {
                       继续
                     </button>
                   ) : null}
-                {run.status === "interrupted" && !run.providerThreadId ? (
-                  <button
-                    className="button button--compact"
-                    type="button"
-                    disabled={!props.mutationsEnabled || !props.canExecute || Boolean(activeRun)}
-                    onClick={() => {
-                      setContinuationRunId(null);
-                      setProfileId(run.executionProfileId ?? "");
-                      setWorkspace(run.workspace ?? "");
-                      setModel(run.model ?? "");
-                      setReasoningEffort(run.reasoningEffort ?? "");
-                      setMode(run.mode ?? "");
-                      setPermissionMode(run.permissionMode ?? "");
-                      setPrompt("");
-                    }}
-                  >
-                    新建 Retry
-                  </button>
-                ) : null}
-              </div>
+                  {run.status === "interrupted" && !run.providerThreadId ? (
+                    <button
+                      className="button button--compact"
+                      type="button"
+                      disabled={!props.mutationsEnabled || !props.canExecute || Boolean(activeRun)}
+                      onClick={() => {
+                        setContinuationRunId(null);
+                        setProfileId(run.executionProfileId ?? "");
+                        setWorkspace(run.workspace ?? "");
+                        setModel(run.model ?? "");
+                        setReasoningEffort(run.reasoningEffort ?? "");
+                        setMode(run.mode ?? "");
+                        setPermissionMode(run.permissionMode ?? "");
+                        setPrompt("");
+                      }}
+                    >
+                      新建 Retry
+                    </button>
+                  ) : null}
+                </div>
               </div>
               {run.status === "interrupted" ? (
                 <p className="task-run-history__error">
-                  服务重启后 Run 未自动重放。{run.providerThreadId ? "可显式 Continue；若远端 session 不可恢复，请新建 Retry。" : "请检查上轮影响后输入新的 prompt 并启动 Retry。"}
+                  服务重启后 Run 未自动重放。
+                  {run.providerThreadId
+                    ? "可显式 Continue；若远端 session 不可恢复，请新建 Retry。"
+                    : "请检查上轮影响后输入新的 prompt 并启动 Retry。"}
                 </p>
               ) : null}
-              {run.errorSummary ? <p className="task-run-history__error">{run.errorSummary}</p> : null}
+              {run.errorSummary ? (
+                <p className="task-run-history__error">{run.errorSummary}</p>
+              ) : null}
               {run.events.length ? (
                 <ul className="task-run-history__events">
                   {run.events.slice(-4).map((event) => (

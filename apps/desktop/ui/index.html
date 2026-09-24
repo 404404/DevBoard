@@ -253,7 +253,8 @@
           <summary><h2 id="connections-title">飞书应用与公网访问</h2></summary>
           <form id="connections-form" autocomplete="off">
             <p class="hint">
-              DevBoard 将项目看板、飞书入口和 Web 账号连接到同一套执行数据。公网入口可使用内置 FRP、外部反向代理或仅本机访问。
+              DevBoard 将项目看板、飞书入口和 Web 账号连接到同一套执行数据。公网入口可使用内置
+              FRP、外部反向代理或仅本机访问。
             </p>
             <div class="connection-fields">
               <div>
@@ -267,13 +268,24 @@
               </div>
               <div>
                 <label for="public-origin">Public Origin</label>
-                <input id="public-origin" spellcheck="false" placeholder="https://devboard.example.com" />
+                <input
+                  id="public-origin"
+                  spellcheck="false"
+                  placeholder="https://devboard.example.com"
+                />
                 <p class="hint">仅外部反向代理模式填写；不要填写路径、账号或密钥。</p>
               </div>
               <div>
                 <label for="listen-address">Caddy 监听地址</label>
-                <input id="listen-address" spellcheck="false" value="127.0.0.1" placeholder="127.0.0.1" />
-                <p class="hint">外部代理在其他局域网主机时才改为本机 LAN IP；管理 API 始终只监听本机。</p>
+                <input
+                  id="listen-address"
+                  spellcheck="false"
+                  value="127.0.0.1"
+                  placeholder="127.0.0.1"
+                />
+                <p class="hint">
+                  外部代理在其他局域网主机时才改为本机 LAN IP；管理 API 始终只监听本机。
+                </p>
               </div>
             </div>
             <div id="feishu-connection-fields" class="connection-fields">

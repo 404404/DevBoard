@@ -72,14 +72,19 @@ export function ProjectMilestones({
               <div>
                 <strong>{milestone.title}</strong>
                 <small>
-                  {milestoneStatusLabel(milestone.status)} · {milestone.completedTaskCount}/{milestone.taskCount} 个任务
+                  {milestoneStatusLabel(milestone.status)} · {milestone.completedTaskCount}/
+                  {milestone.taskCount} 个任务
                 </small>
               </div>
-              {milestone.targetDate ? <time dateTime={milestone.targetDate}>{milestone.targetDate}</time> : null}
+              {milestone.targetDate ? (
+                <time dateTime={milestone.targetDate}>{milestone.targetDate}</time>
+              ) : null}
             </li>
           ))}
         </ul>
-      ) : milestones.data ? <p className="project-milestones__empty">还没有 Milestone。</p> : null}
+      ) : milestones.data ? (
+        <p className="project-milestones__empty">还没有 Milestone。</p>
+      ) : null}
       <form
         className="project-milestones__form"
         onSubmit={(event) => {
@@ -101,7 +106,11 @@ export function ProjectMilestones({
           placeholder="新建 Milestone"
           aria-label="Milestone 标题"
         />
-        <button className="button" type="submit" disabled={!writable || !title.trim() || create.isPending}>
+        <button
+          className="button"
+          type="submit"
+          disabled={!writable || !title.trim() || create.isPending}
+        >
           {create.isPending ? "创建中…" : "添加"}
         </button>
       </form>

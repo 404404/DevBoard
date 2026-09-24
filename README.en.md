@@ -14,11 +14,11 @@ Docker Compose is the primary deployment. The target image is `ghcr.io/404404/de
 
 ## Access methods
 
-|          | Web                                                 | Lark                                                 |
-| -------- | --------------------------------------------------- | ---------------------------------------------------- |
-| Open in  | Desktop or mobile browser                           | Lark desktop or mobile client                        |
-| Identity | Web account                                         | Lark user within the custom app's availability scope |
-| Setup    | External HTTPS reverse proxy                       | Lark custom app and external HTTPS                   |
+|          | Web                          | Lark                                                 |
+| -------- | ---------------------------- | ---------------------------------------------------- |
+| Open in  | Desktop or mobile browser    | Lark desktop or mobile client                        |
+| Identity | Web account                  | Lark user within the custom app's availability scope |
+| Setup    | External HTTPS reverse proxy | Lark custom app and external HTTPS                   |
 
 Both methods can remain enabled and share the same control plane, projects, and Runs.
 
@@ -112,13 +112,13 @@ Update the container image and recreate the service while preserving the `devboa
 
 ## Troubleshooting
 
-| Symptom | What to check first |
-| --- | --- |
-| Container is unhealthy | Check `docker compose logs devboard`, `/api/health`, and write access to the data volume. An offline SSH Host does not make the control plane unhealthy. |
-| Login redirects loop or Secure cookie is missing | Check that Public Origin is the external HTTPS URL and `DEVBOARD_TRUST_PROXY` contains only the reverse proxy's actual source address/CIDR. |
-| Lark callback or H5 page fails | Check Public Origin, the HTTPS proxy route, Lark redirect/allowed domains, app publication, and availability scope. |
-| SSE stops behind the proxy | Disable buffering for `/api/v1/events/stream` and increase the proxy read timeout; see [reverse-proxy.md](docs/reverse-proxy.md). |
-| SSH connection fails | Check TCP/22, the confirmed Host Key fingerprint, selected key/agent, remote username, and Provider installation on that Host. |
+| Symptom                                          | What to check first                                                                                                                                      |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Container is unhealthy                           | Check `docker compose logs devboard`, `/api/health`, and write access to the data volume. An offline SSH Host does not make the control plane unhealthy. |
+| Login redirects loop or Secure cookie is missing | Check that Public Origin is the external HTTPS URL and `DEVBOARD_TRUST_PROXY` contains only the reverse proxy's actual source address/CIDR.              |
+| Lark callback or H5 page fails                   | Check Public Origin, the HTTPS proxy route, Lark redirect/allowed domains, app publication, and availability scope.                                      |
+| SSE stops behind the proxy                       | Disable buffering for `/api/v1/events/stream` and increase the proxy read timeout; see [reverse-proxy.md](docs/reverse-proxy.md).                        |
+| SSH connection fails                             | Check TCP/22, the confirmed Host Key fingerprint, selected key/agent, remote username, and Provider installation on that Host.                           |
 
 When reporting an issue, include the image tag/digest, container logs with secrets removed, and steps to reproduce it. Never publish an App Secret, private key, login token, or complete data volume.
 

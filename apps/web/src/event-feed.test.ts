@@ -35,6 +35,7 @@ describe("event feed cache invalidation", () => {
     expect(eventInvalidationKeys(projectId, event("task.updated", { projectId }))).toEqual([
       ["board", projectId],
       ["dashboard", projectId],
+      ["project-milestones", projectId],
       ["task", taskId],
       ["workspace", taskId],
       ["lifecycle", taskId],
@@ -47,6 +48,7 @@ describe("event feed cache invalidation", () => {
     ).toEqual([
       ["board", projectId],
       ["dashboard", projectId],
+      ["project-milestones", projectId],
       ["task", taskId],
       ["workspace", taskId],
       ["lifecycle", taskId],
@@ -59,6 +61,7 @@ describe("event feed cache invalidation", () => {
     ).toEqual([
       ["board", projectId],
       ["dashboard", projectId],
+      ["project-milestones", projectId],
       ["task", taskId],
       ["jobs", taskId],
       ["workspace", taskId],
@@ -99,6 +102,7 @@ describe("event feed cache invalidation", () => {
     ).toEqual([
       ["board", projectId],
       ["dashboard", projectId],
+      ["project-milestones", projectId],
       ["task", taskId],
       ["jobs", taskId],
       ["workspace", taskId],
@@ -144,6 +148,10 @@ describe("event feed cache invalidation", () => {
       ["workspace"],
       ["jobs"],
       ["interactions"],
+      ["task-runs"],
+      ["run-approvals"],
+      ["project-milestones"],
+      ["project-execution-profile"],
     ]);
   });
 });

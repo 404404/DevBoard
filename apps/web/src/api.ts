@@ -261,11 +261,15 @@ export async function updateProject(
   csrfToken: string,
 ): Promise<ProjectView> {
   return (
-    await apiRequest(`/api/v1/projects/${encodeURIComponent(projectId)}`, ProjectMutationResponseSchema, {
-      method: "PATCH",
-      headers: mutationHeaders(csrfToken, newIdempotencyKey()),
-      body: JSON.stringify(input),
-    })
+    await apiRequest(
+      `/api/v1/projects/${encodeURIComponent(projectId)}`,
+      ProjectMutationResponseSchema,
+      {
+        method: "PATCH",
+        headers: mutationHeaders(csrfToken, newIdempotencyKey()),
+        body: JSON.stringify(input),
+      },
+    )
   ).data;
 }
 
@@ -804,7 +808,6 @@ export async function deleteGitResource(
   );
 }
 
-
 const ExecutionSettingsResponseSchema = z.object({ data: ExecutionSettingsViewSchema });
 const ConnectionListResponseSchema = z.object({ data: z.array(ConnectionViewSchema) });
 const ConnectionMutationResponseSchema = z.object({
@@ -841,7 +844,10 @@ const ApprovalListResponseSchema = z.object({ data: z.array(ExecutionApprovalVie
 const ApprovalResponseSchema = z.object({ data: ExecutionApprovalViewSchema });
 const ProjectExecutionProfileResponseSchema = z.object({ data: ProjectExecutionProfileViewSchema });
 const ProjectExecutionProfileMutationResponseSchema = z.object({
-  data: z.object({ setting: ProjectExecutionProfileViewSchema, revision: z.number().int().positive() }),
+  data: z.object({
+    setting: ProjectExecutionProfileViewSchema,
+    revision: z.number().int().positive(),
+  }),
 });
 
 export async function readExecutionSettings(): Promise<ExecutionSettingsView> {
@@ -1125,17 +1131,12 @@ export async function createMilestone(
 
 export async function listTaskRuns(taskId: string): Promise<readonly RunView[]> {
   return (
-    await apiRequest(
-      "/api/v1/tasks/" + encodeURIComponent(taskId) + "/runs",
-      RunListResponseSchema,
-    )
+    await apiRequest("/api/v1/tasks/" + encodeURIComponent(taskId) + "/runs", RunListResponseSchema)
   ).data;
 }
 
 export async function readRun(runId: string): Promise<RunView> {
-  return (
-    await apiRequest("/api/v1/runs/" + encodeURIComponent(runId), RunResponseSchema)
-  ).data;
+  return (await apiRequest("/api/v1/runs/" + encodeURIComponent(runId), RunResponseSchema)).data;
 }
 export interface StartTaskRunInput {
   readonly executionProfileId?: string | null;
@@ -1170,28 +1171,20 @@ export async function continueTaskRun(
   csrfToken: string,
 ): Promise<RunView> {
   return (
-    await apiRequest(
-      "/api/v1/runs/" + encodeURIComponent(runId) + "/continue",
-      RunResponseSchema,
-      {
-        method: "POST",
-        headers: mutationHeaders(csrfToken, newIdempotencyKey()),
-        body: JSON.stringify({ prompt }),
-      },
-    )
+    await apiRequest("/api/v1/runs/" + encodeURIComponent(runId) + "/continue", RunResponseSchema, {
+      method: "POST",
+      headers: mutationHeaders(csrfToken, newIdempotencyKey()),
+      body: JSON.stringify({ prompt }),
+    })
   ).data;
 }
 
 export async function cancelRun(runId: string, csrfToken: string): Promise<RunView> {
   return (
-    await apiRequest(
-      "/api/v1/runs/" + encodeURIComponent(runId) + "/cancel",
-      RunResponseSchema,
-      {
-        method: "POST",
-        headers: mutationHeaders(csrfToken, newIdempotencyKey()),
-      },
-    )
+    await apiRequest("/api/v1/runs/" + encodeURIComponent(runId) + "/cancel", RunResponseSchema, {
+      method: "POST",
+      headers: mutationHeaders(csrfToken, newIdempotencyKey()),
+    })
   ).data;
 }
 
@@ -1212,7 +1205,11 @@ export async function respondToRunApproval(
 ): Promise<ExecutionApprovalView> {
   return (
     await apiRequest(
-      "/api/v1/runs/" + encodeURIComponent(runId) + "/approvals/" + encodeURIComponent(approvalId) + "/respond",
+      "/api/v1/runs/" +
+        encodeURIComponent(runId) +
+        "/approvals/" +
+        encodeURIComponent(approvalId) +
+        "/respond",
       ApprovalResponseSchema,
       {
         method: "POST",

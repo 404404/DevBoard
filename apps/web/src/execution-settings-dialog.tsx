@@ -60,11 +60,15 @@ export function ExecutionSettingsDialog({
   const [identityRef, setIdentityRef] = useState("");
   const [scannedHostKeys, setScannedHostKeys] = useState<{
     readonly connectionId: string;
-    readonly keys: readonly { readonly algorithm: string; readonly fingerprint: string; readonly trusted: boolean }[];
+    readonly keys: readonly {
+      readonly algorithm: string;
+      readonly fingerprint: string;
+      readonly trusted: boolean;
+    }[];
   } | null>(null);
   const [profileName, setProfileName] = useState("SSH Codex");
   const [profileProviderKind, setProfileProviderKind] = useState("codex");
-  const [profileConnectionId, setProfileConnectionId] = useState("");
+  const [profileConnectionChoice, setProfileConnectionChoice] = useState("");
   const [profileDefaultModel, setProfileDefaultModel] = useState("");
   const [profileDefaultMode, setProfileDefaultMode] = useState("");
   const [profileDefaultReasoningEffort, setProfileDefaultReasoningEffort] = useState("");
@@ -74,8 +78,7 @@ export function ExecutionSettingsDialog({
     refetchInterval: 15_000,
   });
   const createProfile = useMutation({
-    mutationFn: (input: CreateExecutionProfileCommand) =>
-      createExecutionProfile(input, csrfToken),
+    mutationFn: (input: CreateExecutionProfileCommand) => createExecutionProfile(input, csrfToken),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["execution-settings"] });
       setProfileName("SSH Codex");
@@ -85,8 +88,7 @@ export function ExecutionSettingsDialog({
     },
   });
   const create = useMutation({
-    mutationFn: (input: CreateConnectionCommand) =>
-      createExecutionConnection(input, csrfToken),
+    mutationFn: (input: CreateConnectionCommand) => createExecutionConnection(input, csrfToken),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["execution-settings"] });
       setName("SSH Host");
@@ -98,7 +100,8 @@ export function ExecutionSettingsDialog({
     },
   });
 
-  const invalidateSettings = () => void queryClient.invalidateQueries({ queryKey: ["execution-settings"] });
+  const invalidateSettings = () =>
+    void queryClient.invalidateQueries({ queryKey: ["execution-settings"] });
   const toggleConnection = useMutation({
     mutationFn: (connection: ConnectionView) =>
       updateExecutionConnection(
@@ -125,10 +128,16 @@ export function ExecutionSettingsDialog({
     mutationFn: (input: { connection: ConnectionView; fingerprint: string }) =>
       trustSSHHostKey(input.connection.id, input.fingerprint, csrfToken),
     onSuccess: async (trusted, input) => {
-      setScannedHostKeys((current) => current?.connectionId !== input.connection.id ? current : {
-        ...current,
-        keys: current.keys.map((key) => key.fingerprint === trusted.fingerprint ? trusted : key),
-      });
+      setScannedHostKeys((current) =>
+        current?.connectionId !== input.connection.id
+          ? current
+          : {
+              ...current,
+              keys: current.keys.map((key) =>
+                key.fingerprint === trusted.fingerprint ? trusted : key,
+              ),
+            },
+      );
       await queryClient.invalidateQueries({ queryKey: ["execution-settings"] });
     },
   });
@@ -158,7 +167,10 @@ export function ExecutionSettingsDialog({
   const promptConnectionEdit = (connection: ConnectionView) => {
     const nextName = window.prompt("连接名称", connection.name);
     if (nextName === null || !nextName.trim()) return;
-    const patch: UpdateConnectionCommand = { expectedVersion: connection.version, name: nextName.trim() };
+    const patch: UpdateConnectionCommand = {
+      expectedVersion: connection.version,
+      name: nextName.trim(),
+    };
     const host = window.prompt("SSH Host", connection.host ?? "");
     const username = window.prompt("SSH 用户名", connection.username ?? "");
     const port = window.prompt("SSH 端口（留空使用默认）", connection.port?.toString() ?? "");
@@ -174,13 +186,13 @@ export function ExecutionSettingsDialog({
     if (nextName === null || !nextName.trim()) return;
     const model = profile.capabilities.models
       ? window.prompt("默认模型（留空清除）", profile.defaultModel ?? "")
-      : profile.defaultModel ?? "";
+      : (profile.defaultModel ?? "");
     const mode = profile.capabilities.modes
       ? window.prompt("默认模式（留空清除）", profile.defaultMode ?? "")
-      : profile.defaultMode ?? "";
+      : (profile.defaultMode ?? "");
     const effort = profile.capabilities.reasoningEffort
       ? window.prompt("默认 reasoning / effort（留空清除）", profile.defaultReasoningEffort ?? "")
-      : profile.defaultReasoningEffort ?? "";
+      : (profile.defaultReasoningEffort ?? "");
     if (model === null || mode === null || effort === null) return;
     editProfile.mutate({
       profile,
@@ -195,23 +207,23 @@ export function ExecutionSettingsDialog({
   };
 
   const profileConnections = (query.data?.connections ?? []).filter(
-      (connection) => connection.enabled,
+    (connection) => connection.enabled,
   );
+  const profileConnectionId = profileConnections.some(
+    (connection) => connection.id === profileConnectionChoice,
+  )
+    ? profileConnectionChoice
+    : (profileConnections[0]?.id ?? "");
 
   useEffect(() => {
-    const availableConnections = (query.data?.connections ?? []).filter(
-      (connection) => connection.enabled,
-    );
-    if (!availableConnections.some((connection) => connection.id === profileConnectionId))
-      setProfileConnectionId(availableConnections[0]?.id ?? "");
-  }, [profileConnectionId, profileProviderKind, query.data?.connections]);
-
-  useEffect(() => {
-    dialog.current?.showModal();
-    return () => dialog.current?.close();
+    const element = dialog.current;
+    element?.showModal();
+    return () => element?.close();
   }, []);
 
-  const selectedProvider = query.data?.providers.find((provider) => provider.kind === profileProviderKind);
+  const selectedProvider = query.data?.providers.find(
+    (provider) => provider.kind === profileProviderKind,
+  );
 
   const submitProfile = (event: FormEvent) => {
     event.preventDefault();
@@ -227,7 +239,6 @@ export function ExecutionSettingsDialog({
       enabled: true,
     });
   };
-
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -254,7 +265,8 @@ export function ExecutionSettingsDialog({
         if (!create.isPending && !createProfile.isPending) onClose();
       }}
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !create.isPending && !createProfile.isPending) onClose();
+        if (event.target === event.currentTarget && !create.isPending && !createProfile.isPending)
+          onClose();
       }}
     >
       <section className="tag-manager-dialog execution-settings-dialog">
@@ -286,7 +298,10 @@ export function ExecutionSettingsDialog({
         ) : null}
         {createProfile.error ? (
           <Notice
-            message={userErrorMessage(createProfile.error, "执行配置创建失败，请检查 Provider 和连接。")}
+            message={userErrorMessage(
+              createProfile.error,
+              "执行配置创建失败，请检查 Provider 和连接。",
+            )}
             eventKey={createProfile.error}
           />
         ) : null}
@@ -296,13 +311,30 @@ export function ExecutionSettingsDialog({
             eventKey={create.error}
           />
         ) : null}
-        {toggleConnection.error || editConnection.error || testConnection.error || removeConnection.error || scanHostKeys.error || trustHostKey.error ? (
+        {toggleConnection.error ||
+        editConnection.error ||
+        testConnection.error ||
+        removeConnection.error ||
+        scanHostKeys.error ||
+        trustHostKey.error ? (
           <Notice
             message={userErrorMessage(
-              toggleConnection.error ?? editConnection.error ?? testConnection.error ?? removeConnection.error ?? scanHostKeys.error ?? trustHostKey.error,
+              toggleConnection.error ??
+                editConnection.error ??
+                testConnection.error ??
+                removeConnection.error ??
+                scanHostKeys.error ??
+                trustHostKey.error,
               "连接管理操作失败，请刷新后重试。",
             )}
-            eventKey={toggleConnection.error ?? editConnection.error ?? testConnection.error ?? removeConnection.error ?? scanHostKeys.error ?? trustHostKey.error}
+            eventKey={
+              toggleConnection.error ??
+              editConnection.error ??
+              testConnection.error ??
+              removeConnection.error ??
+              scanHostKeys.error ??
+              trustHostKey.error
+            }
           />
         ) : null}
         {toggleProfile.error || editProfile.error || removeProfile.error ? (
@@ -357,7 +389,8 @@ export function ExecutionSettingsDialog({
                     <div>
                       <strong>{connection.name}</strong>
                       <small>
-                        {connection.host ?? "Host 未配置"} · {connection.username ?? "User 未配置"} · {connection.authMode}
+                        {connection.host ?? "Host 未配置"} · {connection.username ?? "User 未配置"}{" "}
+                        · {connection.authMode}
                         {connection.authMode === "identity_file" && connection.identityRef
                           ? ` · ${connection.identityRef}`
                           : ""}
@@ -376,7 +409,9 @@ export function ExecutionSettingsDialog({
                         disabled={editConnection.isPending}
                         onChange={(event) => {
                           const selected = event.target.value;
-                          const patch: UpdateConnectionCommand = { expectedVersion: connection.version };
+                          const patch: UpdateConnectionCommand = {
+                            expectedVersion: connection.version,
+                          };
                           if (selected === "agent") {
                             patch.authMode = "agent";
                             patch.identityRef = null;
@@ -409,10 +444,9 @@ export function ExecutionSettingsDialog({
                             value={`identity:${identity.id}`}
                             disabled={!identity.usable}
                           >
-                            {identity.id}{identity.algorithm ? ` · ${identity.algorithm}` : ""}
-                            {identity.usable
-                              ? ""
-                              : `（不可用：${identity.warning ?? "检查失败"}）`}
+                            {identity.id}
+                            {identity.algorithm ? ` · ${identity.algorithm}` : ""}
+                            {identity.usable ? "" : `（不可用：${identity.warning ?? "检查失败"}）`}
                           </option>
                         ))}
                         <option value="agent" disabled={!query.data.sshAgentAvailable}>
@@ -458,7 +492,11 @@ export function ExecutionSettingsDialog({
                         type="button"
                         disabled={removeConnection.isPending}
                         onClick={() => {
-                          if (window.confirm("删除这个连接？正在使用它的 Execution Profile 会阻止删除。")) {
+                          if (
+                            window.confirm(
+                              "删除这个连接？正在使用它的 Execution Profile 会阻止删除。",
+                            )
+                          ) {
                             removeConnection.mutate(connection);
                           }
                         }}
@@ -468,12 +506,20 @@ export function ExecutionSettingsDialog({
                     </div>
                     {scannedHostKeys?.connectionId === connection.id ? (
                       <div className="execution-host-key-list">
-                        <p>请先在目标主机可信终端核对指纹，再确认信任；扫描结果本身不会自动受信任。</p>
-                        {scannedHostKeys.keys.length === 0 ? <p>没有获取到 Host Key，请检查 DNS/TCP。</p> : null}
+                        <p>
+                          请先在目标主机可信终端核对指纹，再确认信任；扫描结果本身不会自动受信任。
+                        </p>
+                        {scannedHostKeys.keys.length === 0 ? (
+                          <p>没有获取到 Host Key，请检查 DNS/TCP。</p>
+                        ) : null}
                         {scannedHostKeys.keys.map((key) => (
                           <div key={key.fingerprint}>
-                            <code>{key.algorithm} · {key.fingerprint}</code>
-                            {key.trusted ? <span>已信任</span> : (
+                            <code>
+                              {key.algorithm} · {key.fingerprint}
+                            </code>
+                            {key.trusted ? (
+                              <span>已信任</span>
+                            ) : (
                               <button
                                 className="button button--compact"
                                 type="button"
@@ -482,7 +528,11 @@ export function ExecutionSettingsDialog({
                                   const confirmed = window.confirm(
                                     `确认已通过可信渠道核对 ${connection.host} 的 ${key.algorithm} 指纹：\n\n${key.fingerprint}\n\n只有确认指纹匹配后才继续。`,
                                   );
-                                  if (confirmed) trustHostKey.mutate({ connection, fingerprint: key.fingerprint });
+                                  if (confirmed)
+                                    trustHostKey.mutate({
+                                      connection,
+                                      fingerprint: key.fingerprint,
+                                    });
                                 }}
                               >
                                 确认并信任
@@ -530,7 +580,9 @@ export function ExecutionSettingsDialog({
                         type="button"
                         disabled={removeProfile.isPending}
                         onClick={() => {
-                          if (window.confirm("删除这个 Execution Profile？运行中的任务会阻止删除。")) {
+                          if (
+                            window.confirm("删除这个 Execution Profile？运行中的任务会阻止删除。")
+                          ) {
                             removeProfile.mutate(profile);
                           }
                         }}
@@ -547,7 +599,12 @@ export function ExecutionSettingsDialog({
               <form className="execution-connection-form" onSubmit={submit}>
                 <label>
                   名称
-                  <input value={name} maxLength={160} required onChange={(event) => setName(event.target.value)} />
+                  <input
+                    value={name}
+                    maxLength={160}
+                    required
+                    onChange={(event) => setName(event.target.value)}
+                  />
                 </label>
                 <button
                   className="button button--compact"
@@ -562,15 +619,33 @@ export function ExecutionSettingsDialog({
                 </button>
                 <label>
                   SSH Host
-                  <input value={host} maxLength={255} required onChange={(event) => setHost(event.target.value)} placeholder="host.docker.internal 或远端 DNS/IP" />
+                  <input
+                    value={host}
+                    maxLength={255}
+                    required
+                    onChange={(event) => setHost(event.target.value)}
+                    placeholder="host.docker.internal 或远端 DNS/IP"
+                  />
                 </label>
                 <label>
                   用户名
-                  <input value={username} maxLength={160} required onChange={(event) => setUsername(event.target.value)} />
+                  <input
+                    value={username}
+                    maxLength={160}
+                    required
+                    onChange={(event) => setUsername(event.target.value)}
+                  />
                 </label>
                 <label>
                   SSH 端口
-                  <input type="number" min="1" max="65535" value={port} placeholder="22" onChange={(event) => setPort(event.target.value)} />
+                  <input
+                    type="number"
+                    min="1"
+                    max="65535"
+                    value={port}
+                    placeholder="22"
+                    onChange={(event) => setPort(event.target.value)}
+                  />
                 </label>
                 <label>
                   认证方式
@@ -599,15 +674,25 @@ export function ExecutionSettingsDialog({
                       <option value="">选择已挂载的 SSH Identity</option>
                       {(query.data.sshIdentities ?? []).map((identity) => (
                         <option key={identity.id} value={identity.id} disabled={!identity.usable}>
-                          {identity.name}{identity.algorithm ? ` · ${identity.algorithm}` : ""}
+                          {identity.name}
+                          {identity.algorithm ? ` · ${identity.algorithm}` : ""}
                           {identity.fingerprint ? ` · ${identity.fingerprint}` : ""}
                           {identity.usable ? "" : `（不可用：${identity.warning ?? "检查失败"}）`}
                         </option>
                       ))}
                     </select>
                   </label>
-                ) : <p>Agent 模式使用容器运行环境显式注入的 SSH_AUTH_SOCK；DevBoard 不读取或保存 Agent 私钥。</p>}
-                <button className="button button--primary" type="submit" disabled={create.isPending || createProfile.isPending}>
+                ) : (
+                  <p>
+                    Agent 模式使用容器运行环境显式注入的 SSH_AUTH_SOCK；DevBoard 不读取或保存 Agent
+                    私钥。
+                  </p>
+                )}
+                <button
+                  className="button button--primary"
+                  type="submit"
+                  disabled={create.isPending || createProfile.isPending}
+                >
                   {create.isPending ? "保存中…" : "保存连接"}
                 </button>
               </form>
@@ -617,11 +702,19 @@ export function ExecutionSettingsDialog({
               <form className="execution-connection-form" onSubmit={submitProfile}>
                 <label>
                   名称
-                  <input value={profileName} maxLength={160} required onChange={(event) => setProfileName(event.target.value)} />
+                  <input
+                    value={profileName}
+                    maxLength={160}
+                    required
+                    onChange={(event) => setProfileName(event.target.value)}
+                  />
                 </label>
                 <label>
                   Provider
-                  <select value={profileProviderKind} onChange={(event) => setProfileProviderKind(event.target.value)}>
+                  <select
+                    value={profileProviderKind}
+                    onChange={(event) => setProfileProviderKind(event.target.value)}
+                  >
                     {(query.data.providers ?? []).map((provider) => (
                       <option value={provider.kind} key={provider.kind}>
                         {provider.displayName} ({provider.kind})
@@ -631,7 +724,11 @@ export function ExecutionSettingsDialog({
                 </label>
                 <label>
                   Connection
-                  <select value={profileConnectionId} required onChange={(event) => setProfileConnectionId(event.target.value)}>
+                  <select
+                    value={profileConnectionId}
+                    required
+                    onChange={(event) => setProfileConnectionChoice(event.target.value)}
+                  >
                     <option value="">选择连接</option>
                     {profileConnections.map((connection) => (
                       <option value={connection.id} key={connection.id}>
@@ -643,22 +740,41 @@ export function ExecutionSettingsDialog({
                 {selectedProvider?.capabilities.models ? (
                   <label>
                     默认模型
-                    <input value={profileDefaultModel} maxLength={200} placeholder="Provider 模型 ID" onChange={(event) => setProfileDefaultModel(event.target.value)} />
+                    <input
+                      value={profileDefaultModel}
+                      maxLength={200}
+                      placeholder="Provider 模型 ID"
+                      onChange={(event) => setProfileDefaultModel(event.target.value)}
+                    />
                   </label>
                 ) : null}
                 {selectedProvider?.capabilities.modes ? (
                   <label>
                     默认模式
-                    <input value={profileDefaultMode} maxLength={80} placeholder="Provider mode" onChange={(event) => setProfileDefaultMode(event.target.value)} />
+                    <input
+                      value={profileDefaultMode}
+                      maxLength={80}
+                      placeholder="Provider mode"
+                      onChange={(event) => setProfileDefaultMode(event.target.value)}
+                    />
                   </label>
                 ) : null}
                 {selectedProvider?.capabilities.reasoningEffort ? (
                   <label>
                     默认 reasoning / effort
-                    <input value={profileDefaultReasoningEffort} maxLength={80} placeholder="例如 medium" onChange={(event) => setProfileDefaultReasoningEffort(event.target.value)} />
+                    <input
+                      value={profileDefaultReasoningEffort}
+                      maxLength={80}
+                      placeholder="例如 medium"
+                      onChange={(event) => setProfileDefaultReasoningEffort(event.target.value)}
+                    />
                   </label>
                 ) : null}
-                <button className="button button--primary" type="submit" disabled={create.isPending || createProfile.isPending || !profileConnectionId}>
+                <button
+                  className="button button--primary"
+                  type="submit"
+                  disabled={create.isPending || createProfile.isPending || !profileConnectionId}
+                >
                   {createProfile.isPending ? "保存中…" : "保存 Execution Profile"}
                 </button>
               </form>

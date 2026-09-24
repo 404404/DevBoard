@@ -147,7 +147,10 @@ export function createSetupController({
         const currentInput = fingerprint(input);
         savedAtCheck = fingerprint(saved);
         const checkKey =
-          currentInput + ":" + (input.accessMode || "feishu") + ":" +
+          currentInput +
+          ":" +
+          (input.accessMode || "feishu") +
+          ":" +
           (input.publicAccessMode || "builtin-frp");
         if (checkKey !== lastInput || section === "all") state.results = [];
         else state.results = state.results.filter((item) => item.section !== section);
