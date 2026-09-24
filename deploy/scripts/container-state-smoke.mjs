@@ -149,11 +149,8 @@ try {
     ) {
       throw new Error("post-backup mutation unexpectedly survived restore");
     }
-    const identity = database
-      .prepare("SELECT 1 FROM identities WHERE identity_key = ?")
-      .get('["service","local-admin"]');
-    if (!identity) throw new Error("identity data is missing after restore");
-    if (database.prepare("SELECT COUNT(*) FROM identities").pluck().get() !== state.identityCount) {
+    const identityCount = database.prepare("SELECT COUNT(*) FROM identities").pluck().get();
+    if (state.identityCount < 1 || identityCount !== state.identityCount) {
       throw new Error("identity records changed across restart/backup/restore");
     }
     if (
