@@ -187,7 +187,7 @@ describe("DirectoryIdentityRegistry", () => {
     const directory = createDirectory();
     const socketPath = join(directory, "agent.sock");
     const net = await import("node:net");
-    const server = net.createServer();
+    const server = net.createServer((socket) => socket.destroy());
     await new Promise<void>((resolve, reject) => {
       server.once("error", reject);
       server.listen(socketPath, resolve);

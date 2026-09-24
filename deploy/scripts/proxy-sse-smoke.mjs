@@ -55,7 +55,9 @@ if (typeof csrfToken !== "string" || !csrfToken) {
   throw new Error("login did not return a CSRF token");
 }
 
-const projectKey = `P${randomUUID().replaceAll("-", "").slice(0, 4).toUpperCase()}`;
+const projectKey = `P${Array.from(randomUUID().replaceAll("-", "").slice(0, 4), (digit) =>
+  String.fromCharCode(65 + Number.parseInt(digit, 16)),
+).join("")}`;
 const projectResponse = await request("/api/v1/projects", {
   method: "POST",
   headers: {
@@ -67,7 +69,9 @@ const projectResponse = await request("/api/v1/projects", {
   body: JSON.stringify({ projectKey, name: "Proxy SSE fixture", description: "ephemeral CI data" }),
 });
 if (projectResponse.status !== 201) {
-  throw new Error(`proxied Project API failed (HTTP ${projectResponse.status})`);
+  throw new Error(
+    `proxied Project API failed (HTTP ${projectResponse.status}): ${await projectResponse.text()}`,
+  );
 }
 const projectId = (await projectResponse.json()).data?.id;
 if (typeof projectId !== "string") throw new Error("Project API did not return an id");
