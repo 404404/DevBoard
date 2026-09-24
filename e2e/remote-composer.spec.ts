@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./helpers/remote-test";
 
 test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
@@ -509,7 +509,7 @@ test("pastes clipboard images as attachments, keeps the draft and allows upload 
           error: { code: "INVALID_REQUEST", message: "模拟图片上传失败", requestId: "paste" },
         },
       });
-    return route.continue();
+    return route.fallback();
   });
   const paste = () =>
     input.evaluate((element) => {
@@ -740,7 +740,7 @@ test("video uploads use small binary chunks and recover a dropped segment", asyn
       dropped = true;
       return route.abort("connectionreset");
     }
-    return route.continue();
+    return route.fallback();
   });
   await page
     .getByLabel("上传文件")
@@ -1041,7 +1041,7 @@ test("running conversations can queue attachments without waiting for the curren
         body: JSON.stringify({ error: { code: "INVALID_REQUEST", message: "测试：引导失败" } }),
       });
     }
-    return route.continue();
+    return route.fallback();
   });
   await queued.getByRole("button").click();
   await menu.getByRole("button", { name: "改为引导" }).click();
@@ -1071,7 +1071,7 @@ test("connection failures show a Chinese refresh action without a dismiss cross"
   await page.route("**/api/v1/remote/threads/*", (route) =>
     unavailable && route.request().method() === "GET"
       ? route.abort("connectionreset")
-      : route.continue(),
+      : route.fallback(),
   );
   const alert = page.getByRole("alert").filter({ hasText: "网络连接中断" });
   await expect(alert).toBeVisible();
@@ -1242,7 +1242,7 @@ test("Feishu native album includes recordings and stays quiet until selection co
   await page.route("**/api/v1/remote/uploads**", async (route) => {
     uploads++;
     await ready;
-    await route.continue();
+    await route.fallback();
   });
   await page.route("**/api/v1/auth/feishu/jsapi-config?**", (route) =>
     route.fulfill({

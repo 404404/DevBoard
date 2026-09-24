@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./helpers/remote-test";
 
 test("desktop has no Remote entry even when the mobile route is requested", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -558,7 +558,7 @@ test.describe("mobile Remote", () => {
       .toBeLessThan(4);
   });
 
-  test("creates, sends, approves, resumes and stops via the real isolated bridge", async ({
+  test("creates, sends, approves, resumes and stops through the isolated Remote API fixture", async ({
     page,
   }, testInfo) => {
     const errors: string[] = [];
@@ -642,7 +642,7 @@ test.describe("mobile Remote", () => {
     await page.getByLabel("发送给 Codex").fill("保留这份草稿");
     const originalUrl = page.url();
     await page.route("**/api/v1/remote/threads/*", async (route) => {
-      if (route.request().method() !== "GET") return route.continue();
+      if (route.request().method() !== "GET") return route.fallback();
       return route.fulfill({
         status: 409,
         contentType: "application/json",

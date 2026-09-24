@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./helpers/remote-test";
 test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const qid = '["request_user_input_async","question",0]';

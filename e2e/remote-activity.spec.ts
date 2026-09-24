@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./helpers/remote-test";
 import type { RemoteThread } from "@codexboard/contracts";
 
 test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });

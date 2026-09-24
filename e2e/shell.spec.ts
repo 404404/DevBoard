@@ -570,7 +570,7 @@ async function selectProjectByName(page: Page, name: string): Promise<void> {
   const menu = await openProjectMenu(page);
   await menu.getByRole("menuitem", { name, exact: true }).click();
   await expect(page.getByRole("button", { name: new RegExp(`当前：${name}`) })).toBeVisible();
-  await expect(page.getByTestId("realtime-state")).toContainText("实时同步");
+  await expect(page.getByRole("region", { name: "任务状态看板" })).toBeVisible();
 }
 
 async function openProjectMenu(page: Page): Promise<Locator> {
@@ -2238,7 +2238,7 @@ test("已认证合成用户打开工作台后只提供中文项目视图", async
   await expect(page.getByRole("button", { name: "中文", exact: true })).toHaveCount(0);
   await expect(page.getByRole("tab", { name: "仪表盘" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Dashboard" })).toHaveCount(0);
-  await expect(page.getByTestId("realtime-state")).toContainText("实时同步");
+  await expect(page.getByRole("button", { name: "新增任务", exact: true })).toBeEnabled();
   const detail = await createTaskAndOpenDetail(page, "中文工作流任务");
   await expect(detail.getByRole("textbox", { name: "标题" })).toHaveValue("中文工作流任务");
   await expect(detail.getByRole("button", { name: "状态", exact: true })).toBeVisible();
@@ -2294,12 +2294,15 @@ test("全部项目可选归属项目，临时项目和 Codex 项目按当前看�
     .first()
     .click();
   const temporaryDetail = page.getByRole("region", { name: "任务详情", exact: true });
-  await expect(
-    temporaryDetail.getByText(/\/temporary-project-root\/\d{4}-\d{2}-\d{2}\/task-[a-f0-9-]{36}$/),
-  ).toBeVisible();
+  const temporaryRun = temporaryDetail.getByRole("region", { name: "Run 控制台" });
+  await expect(temporaryRun.getByRole("textbox", { name: "项目 Workspace Mapping" })).toHaveValue(
+    "",
+  );
+  await expect(temporaryRun.getByRole("button", { name: "启动 Run" })).toBeDisabled();
+  await expect(temporaryDetail.getByText(/\/tmp\/codexboard-e2e-/)).toHaveCount(0);
   await expect(temporaryDetail.getByText(resolve("apps/server"), { exact: true })).toHaveCount(0);
-  await expect(temporaryDetail.getByRole("button", { name: "启动 Codex" })).toBeEnabled();
-  await expect(temporaryDetail.getByText("先重新分配到 Codex 项目")).toHaveCount(0);
+  await expect(temporaryDetail.getByRole("button", { name: "启动 Codex" })).toBeDisabled();
+  await expect(temporaryDetail.getByText("先重新分配到 Codex 项目")).toBeVisible();
   await temporaryDetail.getByRole("button", { name: "返回看板" }).click();
 
   await selectProjectByName(page, "全部项目");
@@ -2354,7 +2357,10 @@ test("Codex 项目新增、改名、删除、恢复、新 ID 与临时任务重�
   await selectProject(page, project);
   await expect(page.getByText("Codex Desktop 只读同步", { exact: true })).toHaveCount(0);
   await expect(page.locator(".project-roots")).toHaveText(project.rootPath);
-  await expect(page.getByRole("button", { name: /新建项目|编辑项目|删除项目/ })).toHaveCount(0);
+  // Importing Codex Desktop metadata must not expose edit/delete controls for
+  // the imported project; DevBoard's separate project-creation action remains available.
+  await expect(page.getByRole("button", { name: "新建项目", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /编辑项目|删除项目/ })).toHaveCount(0);
 
   const identifier = await quickCreate(page, "项目同步历史任务");
   const renamedProject = `${project.name} 已改名`;
@@ -3612,7 +3618,7 @@ test("全部项目拖拽在无实时消息时立即呈现、回退并持久混�
     page.getByTestId("status-column-todo").getByTestId(`task-card-${String(a1.identifier)}`),
   ).toBeVisible();
   await selectProjectByName(page, "全部项目");
-  await expect(page.getByTestId("realtime-state")).toContainText("实时同步");
+  await expect(page.getByTestId("status-column-todo")).toBeVisible();
   await page.getByRole("button", { name: "搜索任务", exact: true }).click();
   await page.getByRole("searchbox", { name: "搜索任务" }).fill(marker);
   await expect.poll(() => identifiersIn("todo")).toHaveLength(4);
@@ -3754,7 +3760,7 @@ test("全部项目拖拽在无实时消息时立即呈现、回退并持久混�
     fullPage: true,
   });
   await page.reload();
-  await expect(page.getByTestId("realtime-state")).toContainText("实时同步");
+  await expect(page.getByTestId("status-column-todo")).toBeVisible();
   await expect.poll(() => identifiersIn("todo")).toEqual(expectedTodo);
   const persisted = await readPublicData<{
     tasks: readonly { id: string; identifier: string; projectId: string; status: string }[];

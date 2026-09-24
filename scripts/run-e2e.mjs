@@ -1,4 +1,4 @@
-import { spawnSync, fork } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -52,20 +52,7 @@ async function allocateLoopbackPorts(count) {
 const [publicPort, adminPort, webPort] = await allocateLoopbackPorts(3);
 
 const fakeCodexHome = join(dataDirectory, "codex-home");
-const desktop = fork(resolve("scripts/fake-codex-desktop.mjs"), [], {
-  env: {
-    ...testEnvironment,
-    FAKE_CODEX_HOME: fakeCodexHome,
-    FAKE_CODEX_INTERRUPT_DELAY_MS: "1500",
-  },
-  stdio: ["ignore", "inherit", "inherit", "ipc"],
-});
 try {
-  await new Promise((resolveReady, rejectReady) => {
-    desktop.once("message", resolveReady);
-    desktop.once("error", rejectReady);
-    desktop.once("exit", () => rejectReady(new Error("Fake Desktop exited before ready")));
-  });
   const result = spawnSync(
     process.execPath,
     [resolve("node_modules/@playwright/test/cli.js"), "test", ...process.argv.slice(2)],
@@ -76,6 +63,9 @@ try {
         FAKE_CODEX_HOME: fakeCodexHome,
         CODEXBOARD_ENV: "test",
         CODEXBOARD_AUTH_MODE: "development",
+        // The desktop-era shell E2E fixtures exercise the optional project-sync
+        // importer. Keep it explicitly enabled here; production defaults it off.
+        CODEXBOARD_CODEX_PROJECT_IMPORT_ENABLED: "true",
         CODEXBOARD_HOST: "127.0.0.1",
         CODEXBOARD_ADMIN_HOST: "127.0.0.1",
         CODEXBOARD_CODEX_TRANSPORT: "managed-unix",
@@ -98,8 +88,5 @@ try {
   }
   process.exitCode = result.status ?? 1;
 } finally {
-  const exited = new Promise((resolveExit) => desktop.once("exit", resolveExit));
-  desktop.kill("SIGTERM");
-  if (desktop.exitCode === null) await exited;
   rmSync(dataDirectory, { recursive: true, force: true });
 }

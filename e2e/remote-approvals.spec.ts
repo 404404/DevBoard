@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./helpers/remote-test";
 import { describeRemoteApproval } from "../packages/contracts/src/remote-approvals";
 
 test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
