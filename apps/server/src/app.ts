@@ -44,8 +44,8 @@ import {
   TaskGitFinalizer,
   TaskWorkspace,
 } from "./modules/taskboard/index.js";
-import { ProjectRegistry } from "./modules/project-registry/index.js";
-import { ProjectSyncService } from "./modules/project-sync/index.js";
+import { ProjectAdministration, ProjectRegistry } from "./modules/project-registry/index.js";
+import { ProjectSnapshotWatcher, ProjectSyncService } from "./modules/project-sync/index.js";
 import {
   BackupService,
   createLoggerOptions,
@@ -182,7 +182,9 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
     identityDirectory: options.config.CODEXBOARD_SSH_IDENTITY_DIR,
     onRevisionCommitted: (revision) => eventFeed.notifyCommitted(revision),
   });
-  const projectAdministration = new ProjectAdministration(options.database, undefined, (revision) => eventFeed.notifyCommitted(revision));
+  const projectAdministration = new ProjectAdministration(options.database, undefined, (revision) =>
+    eventFeed.notifyCommitted(revision),
+  );
   const projectSync = new ProjectSyncService({
     database: options.database,
     onRevisionCommitted: (revision) => eventFeed.notifyCommitted(revision),
@@ -192,13 +194,14 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
     onRevisionCommitted: (revision) => eventFeed.notifyCommitted(revision),
   });
   const remoteOnly = options.config.CODEXBOARD_ENV === "production";
-  const projectSnapshotWatcher = !remoteOnly && options.config.CODEXBOARD_CODEX_PROJECT_IMPORT_ENABLED
-    ? new ProjectSnapshotWatcher({
-        snapshotFile: options.config.CODEXBOARD_CODEX_PROJECT_SNAPSHOT_FILE,
-        service: projectSync,
-        reconcileMs: options.config.CODEXBOARD_PROJECT_SYNC_RECONCILE_MS,
-      })
-    : undefined;
+  const projectSnapshotWatcher =
+    !remoteOnly && options.config.CODEXBOARD_CODEX_PROJECT_IMPORT_ENABLED
+      ? new ProjectSnapshotWatcher({
+          snapshotFile: options.config.CODEXBOARD_CODEX_PROJECT_SNAPSHOT_FILE,
+          service: projectSync,
+          reconcileMs: options.config.CODEXBOARD_PROJECT_SYNC_RECONCILE_MS,
+        })
+      : undefined;
   const taskboard = new Taskboard({
     database: options.database,
     identityService,
@@ -377,7 +380,6 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
     taskLifecycle,
     workspace,
     attachments,
-    projectRegistry,
     projectAdministration,
   });
   registerGitManagementRoutes(app, {

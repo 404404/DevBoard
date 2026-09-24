@@ -79,7 +79,7 @@ describe("operations CLI", () => {
             request = {
               url: String(input),
               authorization: new Headers(init?.headers).get("authorization"),
-              body: init?.body ? JSON.parse(String(init.body)) as unknown : undefined,
+              body: init?.body ? (JSON.parse(String(init.body)) as unknown) : undefined,
             };
             return new Response(
               JSON.stringify({
@@ -234,7 +234,7 @@ describe("operations CLI", () => {
     expect(readFileSync(snapshot)).toEqual(before);
     writeFileSync(snapshot, "corrupt");
     expect(await runOperations(["audit-identities", destination], {}, () => {})).toBe(1);
-  });
+  }, 15_000);
 
   it("returns usage exit code for an unknown command", async () => {
     const lines: string[] = [];

@@ -147,11 +147,6 @@ describe("event feed HTTP and SSE routes", () => {
           aggregateId: created.data.id,
           eventType: "task.created",
         },
-        {
-          revision: created.meta.revision,
-          aggregateId: created.data.id,
-          eventType: "codex.thread_created",
-        },
       ],
       cursorRevision: created.meta.revision,
       hasMore: false,

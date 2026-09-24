@@ -1,5 +1,6 @@
 import { identityKey } from "@codexboard/contracts";
 import { seedFeishuTestActor, TEST_FEISHU_IDENTITY } from "./helpers/identity.js";
+import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -13,6 +14,7 @@ import { loadConfig } from "../src/config.js";
 import type { CodexExecutionCallbacks, CodexExecutor } from "../src/modules/execution/index.js";
 import { initializeDatabase, type SqliteDatabase } from "../src/modules/database/index.js";
 import { ProjectAdministration, ProjectRegistry } from "../src/modules/project-registry/index.js";
+import { ProjectSyncService } from "../src/modules/project-sync/index.js";
 import { FakeThreadProvisioner } from "./fake-thread-provisioner.js";
 
 const openApps: FastifyInstance[] = [];
@@ -149,6 +151,7 @@ async function setup(executor?: CodexExecutor, projectCount = 1) {
   const administration = new ProjectAdministration(database);
   const registry = new ProjectRegistry(database, [root]);
   const projects = [];
+  const repositories: string[] = [];
   for (let index = 0; index < projectCount; index += 1) {
     const repository = join(root, `repository-${index + 1}`);
     mkdirSync(repository);
@@ -168,7 +171,18 @@ async function setup(executor?: CodexExecutor, projectCount = 1) {
       expectedVersion: project.version,
     });
     projects.push(project);
+    repositories.push(repository);
   }
+  new ProjectSyncService({ database }).reconcile({
+    schemaVersion: 1,
+    generatedAt: new Date().toISOString(),
+    projects: repositories.map((repository, position) => ({
+      codexProjectId: randomUUID(),
+      name: `Codex HTTP ${position + 1}`,
+      rootPaths: [repository],
+      position,
+    })),
+  });
   const config = loadConfig({
     CODEXBOARD_ENV: "test",
     CODEXBOARD_WORKSPACE_ROOTS: root,
@@ -204,7 +218,7 @@ async function setup(executor?: CodexExecutor, projectCount = 1) {
       },
       payload: { projectId: project.id, title: `执行 HTTP 纵切 ${index + 1}`, status: "todo" },
     });
-    tasks.push(created.json().data as { id: string });
+    tasks.push(created.json().data as { id: string; identifier: string });
   }
   return {
     app,
@@ -393,7 +407,9 @@ describe("Codex execution HTTP routes", () => {
       expect(response.json().data.status).toBe("succeeded");
     });
     expect(executor.continuedThreadIds).toEqual(["thread-draft-1", "thread-draft-1"]);
-    expect(executor.continuedPrompts[0]).toContain("请完成任务 CXA-001：执行 HTTP 纵切 1");
+    expect(executor.continuedPrompts[0]).toContain(
+      `请完成任务 ${task.identifier}：执行 HTTP 纵切 1`,
+    );
   });
 
   it("cancels a queued start idempotently without invoking an executor", async () => {

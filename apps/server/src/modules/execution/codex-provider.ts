@@ -51,7 +51,11 @@ function safeValue(value: unknown, depth = 0): unknown {
   if (value && typeof value === "object") {
     const result: Record<string, unknown> = {};
     for (const [key, entry] of Object.entries(value as Record<string, unknown>).slice(0, 100)) {
-      if (/token|secret|password|credential|authorization|private.?key|api.?key|environment/i.test(key))
+      if (
+        /token|secret|password|credential|authorization|private.?key|api.?key|environment/i.test(
+          key,
+        )
+      )
         continue;
       result[key] = safeValue(entry, depth + 1);
     }
@@ -62,13 +66,21 @@ function safeValue(value: unknown, depth = 0): unknown {
 
 function safeRecord(value: unknown): Record<string, unknown> {
   const safe = safeValue(value);
-  return safe && typeof safe === "object" && !Array.isArray(safe) ? (safe as Record<string, unknown>) : {};
+  return safe && typeof safe === "object" && !Array.isArray(safe)
+    ? (safe as Record<string, unknown>)
+    : {};
 }
 
 function toInteractionDecision(decision: ExecutionApprovalDecision): InteractionDecision {
   if (decision.type === "approve") return { type: "accept" };
   if (decision.type === "cancel") return { type: "cancel" };
-  if (decision.type === "input") return { type: "input", answers: decision.answers };
+  if (decision.type === "input")
+    return {
+      type: "input",
+      answers: Object.fromEntries(
+        Object.entries(decision.answers).map(([key, values]) => [key, [...values]]),
+      ),
+    };
   return { type: "decline" };
 }
 
@@ -121,46 +133,79 @@ export class CodexProvider implements ExecutionProvider {
   readonly #remoteByRun = new Map<string, RemoteCodexRuntime>();
   readonly #remoteByThread = new Map<string, RemoteCodexRuntime>();
 
-  async capabilities(_context: ExecutionCapabilitiesContext): Promise<ProviderCapability> {
+  async capabilities(): Promise<ProviderCapability> {
     return CODEX_CAPABILITIES;
   }
 
   async health(context: ExecutionCapabilitiesContext): Promise<ProviderHealth> {
-    if (!context.connection.host || !context.connection.username) return {
-      status: "unknown", version: null, message: "请先配置 SSH Host 与用户名",
-      checkedAt: new Date().toISOString(), latencyMs: null,
-    };
-    if (context.connection.authMode === "agent" && !(await isSshAgentAvailable())) return {
-      status: "authentication_required", version: null,
-      message: "SSH Agent 不可用：请检查可访问的 SSH_AUTH_SOCK socket，或改用 Identity File",
-      checkedAt: new Date().toISOString(), latencyMs: 0,
-    };
+    if (!context.connection.host || !context.connection.username)
+      return {
+        status: "unknown",
+        version: null,
+        message: "请先配置 SSH Host 与用户名",
+        checkedAt: new Date().toISOString(),
+        latencyMs: null,
+      };
+    if (context.connection.authMode === "agent" && !(await isSshAgentAvailable()))
+      return {
+        status: "authentication_required",
+        version: null,
+        message: "SSH Agent 不可用：请检查可访问的 SSH_AUTH_SOCK socket，或改用 Identity File",
+        checkedAt: new Date().toISOString(),
+        latencyMs: 0,
+      };
     const started = Date.now();
-    const result = await runProcessCommand("ssh", buildSshArguments({
-      host: context.connection.host,
-      username: context.connection.username,
-      port: context.connection.port,
-      identity: context.connection.identityFilePath,
-      authMode: context.connection.authMode,
-      knownHostsFile: context.connection.knownHostsFile,
-      executable: "codex",
-      args: ["--version"],
-      cwd: context.workspace ?? "/",
-    }));
-    if (result.exitCode === 0) return {
-      status: "ready", version: result.stdout.trim().split(/\r?\n/, 1)[0]?.slice(0, 200) ?? null,
-      message: null, checkedAt: new Date().toISOString(), latencyMs: Date.now() - started,
-    };
+    const result = await runProcessCommand(
+      "ssh",
+      buildSshArguments({
+        host: context.connection.host,
+        username: context.connection.username,
+        port: context.connection.port,
+        identity: context.connection.identityFilePath,
+        authMode: context.connection.authMode,
+        knownHostsFile: context.connection.knownHostsFile,
+        executable: "codex",
+        args: ["--version"],
+        cwd: context.workspace ?? "/",
+      }),
+    );
+    if (result.exitCode === 0)
+      return {
+        status: "ready",
+        version: result.stdout.trim().split(/\r?\n/, 1)[0]?.slice(0, 200) ?? null,
+        message: null,
+        checkedAt: new Date().toISOString(),
+        latencyMs: Date.now() - started,
+      };
     const output = `${result.stdout} ${result.stderr}`;
     const keyChanged = /REMOTE HOST IDENTIFICATION HAS CHANGED|offending key/i.test(output);
-    const keyUntrusted = /host key verification failed|known_hosts|no .* host key is known/i.test(output);
+    const keyUntrusted = /host key verification failed|known_hosts|no .* host key is known/i.test(
+      output,
+    );
     const authentication = /permission denied|publickey|authentication failed/i.test(output);
     const passphrase = /passphrase|SSH_KEY_PASSPHRASE_REQUIRED/i.test(output);
     return {
-      status: passphrase ? "key_passphrase_required" : keyChanged ? "host_key_changed" : keyUntrusted ? "host_key_untrusted" : authentication ? "authentication_required" : "not_installed",
+      status: passphrase
+        ? "key_passphrase_required"
+        : keyChanged
+          ? "host_key_changed"
+          : keyUntrusted
+            ? "host_key_untrusted"
+            : authentication
+              ? "authentication_required"
+              : "not_installed",
       version: null,
-      message: keyChanged ? "SSH Host Key 已改变，连接已阻止" : keyUntrusted ? "Host Key 未受信任" : passphrase ? "请使用 ssh-agent 加载带口令的私钥" : authentication ? "SSH 认证失败，请检查 Identity File 或 Agent" : "远端 Codex CLI 未安装或不可用",
-      checkedAt: new Date().toISOString(), latencyMs: Date.now() - started,
+      message: keyChanged
+        ? "SSH Host Key 已改变，连接已阻止"
+        : keyUntrusted
+          ? "Host Key 未受信任"
+          : passphrase
+            ? "请使用 ssh-agent 加载带口令的私钥"
+            : authentication
+              ? "SSH 认证失败，请检查 Identity File 或 Agent"
+              : "远端 Codex CLI 未安装或不可用",
+      checkedAt: new Date().toISOString(),
+      latencyMs: Date.now() - started,
     };
   }
 
@@ -184,7 +229,9 @@ export class CodexProvider implements ExecutionProvider {
       const result = await remote.executor.createDraft({
         cwd: input.workspace,
         name: "DevBoard run",
-        ...(input.model ? { modelOptions: { model: input.model, effort: "medium", serviceTier: null } } : {}),
+        ...(input.model
+          ? { modelOptions: { model: input.model, effort: "medium", serviceTier: null } }
+          : {}),
       });
       return {
         id: result.threadId,
@@ -214,7 +261,8 @@ export class CodexProvider implements ExecutionProvider {
   async execute(input: ExecutionInput, callbacks: ExecutionCallbacks): Promise<ExecutionResult> {
     const runId = typeof input.metadata?.runId === "string" ? input.metadata.runId : undefined;
     if (!input.connection) throw new Error("SSH Connection is required");
-    const remote = this.#createRemoteRuntime(input.connection, input.workspace);
+    const connection = input.connection;
+    const remote = this.#createRemoteRuntime(connection, input.workspace);
     if (runId) this.#remoteByRun.set(runId, remote);
     if (input.session) {
       remote.threadIds.add(input.session.id);
@@ -225,7 +273,7 @@ export class CodexProvider implements ExecutionProvider {
     const session = (): ExecutionSession => ({
       id: threadId,
       providerKind: this.kind,
-      connectionId: input.connection.id,
+      connectionId: connection.id,
       workspace: input.workspace,
       resumable: true,
       ...(runId ? { metadata: { runId } } : {}),
@@ -246,7 +294,8 @@ export class CodexProvider implements ExecutionProvider {
       onEvent: (event) => callbacks.onEvent(mapEvent(event)),
       onInteraction: async (request) => {
         const requestView = fromCodexRequest(request);
-        const handler = requestView.type === "user_input" ? callbacks.onUserInput : callbacks.onApproval;
+        const handler =
+          requestView.type === "user_input" ? callbacks.onUserInput : callbacks.onApproval;
         const decision = await handler?.(requestView);
         if (!decision) return { type: "decline" };
         return toInteractionDecision(decision);
@@ -320,7 +369,10 @@ export class CodexProvider implements ExecutionProvider {
     await remote.executor.interrupt(input.session.id, input.providerSessionId);
   }
 
-  #createRemoteRuntime(connection: ProviderConnectionContext, workspace: string): RemoteCodexRuntime {
+  #createRemoteRuntime(
+    connection: ProviderConnectionContext,
+    workspace: string,
+  ): RemoteCodexRuntime {
     if (!connection.host || !connection.username) throw new Error("SSH Host 与用户名尚未配置");
     const transport = new SSHProcessTransport({
       host: connection.host,

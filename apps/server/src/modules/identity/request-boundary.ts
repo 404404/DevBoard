@@ -24,9 +24,10 @@ export function registerRequestBoundary(app: FastifyInstance, config: AppConfig)
     }
 
     if (
+      config.CODEXBOARD_ENV === "production" &&
       request.url !== "/api/health" &&
       new URL(config.CODEXBOARD_ORIGIN).protocol === "https:" &&
-      request.protocol !== "https:"
+      request.protocol !== "https"
     ) {
       throw new AppError("FORBIDDEN", 403, "请通过配置的 HTTPS 反向代理访问 DevBoard");
     }

@@ -69,12 +69,12 @@ describe("HTTP application", () => {
       snapshotFile,
       `${JSON.stringify({
         schemaVersion: 1,
-        generatedAt: "2026-09-01T12:00:00.000Z",
+        generatedAt: new Date().toISOString(),
         projects: [
           {
             codexProjectId: "11111111-1111-4111-8111-111111111111",
             name: "论文",
-            rootPaths: ["/Users/test/Projects/codex-paper"],
+            rootPaths: [directory],
             position: 0,
           },
         ],
@@ -85,6 +85,8 @@ describe("HTTP application", () => {
       config: loadConfig({
         CODEXBOARD_ENV: "test",
         CODEXBOARD_CODEX_PROJECT_SNAPSHOT_FILE: snapshotFile,
+        CODEXBOARD_CODEX_PROJECT_IMPORT_ENABLED: "true",
+        CODEXBOARD_WORKSPACE_ROOTS: directory,
       }),
       database: initializeDatabase(":memory:"),
     });

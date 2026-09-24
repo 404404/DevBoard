@@ -12,6 +12,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    maxWorkers: 2,
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],

@@ -7,15 +7,14 @@ import type { ProviderConnectionContext } from "../src/modules/execution/executi
 
 const enabled = Boolean(
   process.env.DEVBOARD_SSH_FIXTURE_HOST &&
-    process.env.DEVBOARD_SSH_FIXTURE_PORT &&
-    process.env.DEVBOARD_SSH_FIXTURE_KEY &&
-    process.env.DEVBOARD_SSH_FIXTURE_KNOWN_HOSTS,
+  process.env.DEVBOARD_SSH_FIXTURE_PORT &&
+  process.env.DEVBOARD_SSH_FIXTURE_KEY &&
+  process.env.DEVBOARD_SSH_FIXTURE_KNOWN_HOSTS,
 );
 
 describe.skipIf(!enabled)("Codex over disposable SSH Host", () => {
   function connection(
-    knownHostsFile =
-      process.env.DEVBOARD_SSH_FIXTURE_KNOWN_HOSTS ?? "/nonexistent/known_hosts",
+    knownHostsFile = process.env.DEVBOARD_SSH_FIXTURE_KNOWN_HOSTS ?? "/nonexistent/known_hosts",
   ): ProviderConnectionContext {
     return {
       id: "ssh-fixture-connection",

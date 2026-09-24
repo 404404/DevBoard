@@ -66,9 +66,14 @@ describe("Project Registry module", () => {
       name: "远程项目",
       description: "",
     });
-    const registry = new ProjectRegistry(database, ["/path/that/exists/only/on/the/host"], undefined, {
-      remoteOnly: true,
-    });
+    const registry = new ProjectRegistry(
+      database,
+      ["/path/that/exists/only/on/the/host"],
+      undefined,
+      {
+        remoteOnly: true,
+      },
+    );
 
     await expect(registry.resolveExecutionContext(project.id)).rejects.toThrow(
       "SSH Host Connection 和 Project Workspace Mapping",

@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -26,9 +26,6 @@ describe("production web hosting", () => {
     writeFileSync(join(webRoot, "index.html"), "<!doctype html><title>生产看板</title>");
     writeFileSync(join(webRoot, "assets", "app.js"), "globalThis.__PRODUCTION_WEB__ = true;");
     writeFileSync(join(webRoot, "package.json"), '{"privateMarker":"inside-web-root"}');
-    const codexTokenFile = join(webRoot, "codex-ws-token");
-    writeFileSync(codexTokenFile, "test-token\n");
-    chmodSync(codexTokenFile, 0o600);
     const config = loadConfig({
       CODEXBOARD_ENV: "production",
       CODEXBOARD_AUTH_MODE: "feishu",
@@ -36,13 +33,16 @@ describe("production web hosting", () => {
       CODEXBOARD_FEISHU_APP_SECRET: "test-secret",
       CODEXBOARD_ORIGIN: "https://tasks.example.com",
       CODEXBOARD_ALLOWED_HOSTS: "tasks.example.com",
+      CODEXBOARD_TRUST_PROXY: "127.0.0.1",
       CODEXBOARD_WEB_ROOT: webRoot,
-      CODEXBOARD_CODEX_TRANSPORT: "websocket",
-      CODEXBOARD_CODEX_TOKEN_FILE: codexTokenFile,
     });
     const app = createApp({ config, database: initializeDatabase(":memory:") });
     apps.push(app);
-    const headers = { host: "tasks.example.com", origin: "https://tasks.example.com" };
+    const headers = {
+      host: "tasks.example.com",
+      origin: "https://tasks.example.com",
+      "x-forwarded-proto": "https",
+    };
 
     const root = await app.inject({ method: "GET", url: "/", headers });
     const unknownRoute = await app.inject({ method: "GET", url: "/projects/OPS", headers });

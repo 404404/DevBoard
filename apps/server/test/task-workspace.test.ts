@@ -135,6 +135,10 @@ describe("TaskWorkspace", () => {
       createCommand(firstProject.id, "评论任务"),
       mutation("workspace-task-0001"),
     ).task;
+    const revisionBeforeComments = database
+      .prepare("SELECT max(revision) FROM change_events")
+      .pluck()
+      .get() as number;
 
     const created = workspace.createComment(
       task.id,
@@ -175,7 +179,18 @@ describe("TaskWorkspace", () => {
       avatarUrl: "https://example.com/admin.png",
     });
     expect(database.prepare("SELECT count(*) FROM activities").pluck().get()).toBe(5);
-    expect(database.prepare("SELECT count(*) FROM change_events").pluck().get()).toBe(5);
+    const commentEvents = database
+      .prepare("SELECT event_type FROM change_events WHERE revision > ? ORDER BY revision")
+      .all(revisionBeforeComments) as { event_type: string }[];
+    expect(commentEvents.map((event) => event.event_type)).toEqual([
+      "task.comment_pending",
+      "comment.created",
+      "comment.updated",
+      "comment.deleted",
+    ]);
+    expect(database.prepare("SELECT max(revision) FROM change_events").pluck().get()).toBe(
+      revisionBeforeComments + commentEvents.length,
+    );
     expect(revisions).toEqual([created.revision, updated.revision, deleted.revision]);
   });
 

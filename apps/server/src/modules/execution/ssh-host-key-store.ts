@@ -72,8 +72,10 @@ function openManagedFile(file: string, flags: number, mode?: number): number {
   }
 }
 
-function readEntries(file: string, host: string): readonly { algorithm: string; keyData: string }[] {
-  let content = "";
+function readEntries(
+  file: string,
+  host: string,
+): readonly { algorithm: string; keyData: string }[] {
   let descriptor: number;
   try {
     descriptor = openManagedFile(file, constants.O_RDONLY);
@@ -81,6 +83,7 @@ function readEntries(file: string, host: string): readonly { algorithm: string; 
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     return [];
   }
+  let content: string;
   try {
     content = readFileSync(descriptor, "utf8");
   } finally {
@@ -111,7 +114,7 @@ export class SSHHostKeyStore {
     const args = ["-T", "5"];
     if (target.port !== null) args.push("-p", String(target.port));
     args.push(target.host);
-    let stdout = "";
+    let stdout: string;
     try {
       const result = await execFileAsync(this.#scanner, args, {
         timeout: 7_000,
@@ -131,9 +134,12 @@ export class SSHHostKeyStore {
       if (parts.length < 3 || line.startsWith("#")) continue;
       const algorithm = parts[1] ?? "";
       const keyData = parts[2] ?? "";
-      if (!/^[A-Za-z0-9@._+-]+$/.test(algorithm) || !/^[A-Za-z0-9+/]+={0,2}$/.test(keyData)) continue;
+      if (!/^[A-Za-z0-9@._+-]+$/.test(algorithm) || !/^[A-Za-z0-9+/]+={0,2}$/.test(keyData))
+        continue;
       const keyFingerprint = fingerprint(keyData);
-      const trusted = existing.some((key) => key.algorithm === algorithm && key.keyData === keyData);
+      const trusted = existing.some(
+        (key) => key.algorithm === algorithm && key.keyData === keyData,
+      );
       found.set(keyFingerprint, {
         targetId: target.id,
         hostEntry: entry,
@@ -144,7 +150,8 @@ export class SSHHostKeyStore {
         expiresAt: Date.now() + CANDIDATE_TTL_MS,
       });
     }
-    for (const candidate of found.values()) this.#candidates.set(`${target.id}:${candidate.fingerprint}`, candidate);
+    for (const candidate of found.values())
+      this.#candidates.set(`${target.id}:${candidate.fingerprint}`, candidate);
     return [...found.values()].map(({ algorithm, fingerprint: keyFingerprint, trusted }) => ({
       algorithm,
       fingerprint: keyFingerprint,
@@ -167,7 +174,11 @@ export class SSHHostKeyStore {
       (entry) => entry.algorithm === candidate.algorithm,
     );
     if (existing.length > 0 && !existing.some((entry) => entry.keyData === candidate.keyData)) {
-      throw new AppError("HOST_KEY_CHANGED", 409, "该 SSH Host 的同算法密钥与已信任密钥不同；为避免中间人攻击，未覆盖 known_hosts");
+      throw new AppError(
+        "HOST_KEY_CHANGED",
+        409,
+        "该 SSH Host 的同算法密钥与已信任密钥不同；为避免中间人攻击，未覆盖 known_hosts",
+      );
     }
     if (existing.length === 0) {
       const descriptor = openManagedFile(

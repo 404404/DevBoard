@@ -25,19 +25,20 @@ it("clears stored paths and marks key-based Connections for explicit reconfigura
 
     migrateSshIdentityReferences(database);
 
-    const columns = (database.pragma("table_info(connections)") as Array<{ name: string }>)
-      .map((column) => column.name);
+    const columns = (database.pragma("table_info(connections)") as Array<{ name: string }>).map(
+      (column) => column.name,
+    );
     expect(columns).toContain("identity_ref");
     expect(columns).not.toContain("identity");
-    expect(
-      database.prepare("SELECT * FROM connections WHERE id = 'key-host'").get(),
-    ).toMatchObject({
-      identity_ref: null,
-      status: "configuration_required",
-      last_health_json: null,
-      enabled: 0,
-      version: 5,
-    });
+    expect(database.prepare("SELECT * FROM connections WHERE id = 'key-host'").get()).toMatchObject(
+      {
+        identity_ref: null,
+        status: "configuration_required",
+        last_health_json: null,
+        enabled: 0,
+        version: 5,
+      },
+    );
     expect(
       database.prepare("SELECT * FROM connections WHERE id = 'agent-host'").get(),
     ).toMatchObject({
@@ -80,16 +81,21 @@ it("drops legacy identity paths when a draft database has both columns", () => {
 
     migrateSshIdentityReferences(database);
 
-    const columns = (database.pragma("table_info(connections)") as Array<{ name: string }>)
-      .map((column) => column.name);
+    const columns = (database.pragma("table_info(connections)") as Array<{ name: string }>).map(
+      (column) => column.name,
+    );
     expect(columns).not.toContain("identity");
-    expect(database.prepare("SELECT * FROM connections WHERE id = 'key-host'").get()).toMatchObject({
-      identity_ref: null,
-      status: "configuration_required",
-      enabled: 0,
-      version: 5,
-    });
-    expect(database.prepare("SELECT * FROM connections WHERE id = 'configured-host'").get()).toMatchObject({
+    expect(database.prepare("SELECT * FROM connections WHERE id = 'key-host'").get()).toMatchObject(
+      {
+        identity_ref: null,
+        status: "configuration_required",
+        enabled: 0,
+        version: 5,
+      },
+    );
+    expect(
+      database.prepare("SELECT * FROM connections WHERE id = 'configured-host'").get(),
+    ).toMatchObject({
       identity_ref: "host_ed25519",
       status: "online",
       enabled: 1,
@@ -120,14 +126,14 @@ it("clears unsafe values in a draft identity_ref-only database", () => {
 
     migrateSshIdentityReferences(database);
 
-    expect(
-      database.prepare("SELECT * FROM connections WHERE id = 'key-host'").get(),
-    ).toMatchObject({
-      identity_ref: null,
-      status: "configuration_required",
-      enabled: 0,
-      version: 4,
-    });
+    expect(database.prepare("SELECT * FROM connections WHERE id = 'key-host'").get()).toMatchObject(
+      {
+        identity_ref: null,
+        status: "configuration_required",
+        enabled: 0,
+        version: 4,
+      },
+    );
   } finally {
     database.close();
   }

@@ -1,4 +1,9 @@
-import { AcpProvider, CURSOR_CAPABILITIES, GROK_CAPABILITIES, OPENCODE_CAPABILITIES } from "./acp-provider.js";
+import {
+  AcpProvider,
+  CURSOR_CAPABILITIES,
+  GROK_CAPABILITIES,
+  OPENCODE_CAPABILITIES,
+} from "./acp-provider.js";
 
 export class CursorProvider extends AcpProvider {
   constructor() {

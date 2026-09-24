@@ -10,7 +10,6 @@ import {
   UpdateProjectExecutionProfileCommandSchema,
   UpdateExecutionProfileCommandSchema,
   type PrincipalView,
-  type ExecutionApprovalDecision,
 } from "@codexboard/contracts";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -24,16 +23,21 @@ import {
 } from "../identity/index.js";
 import type { Taskboard } from "../taskboard/index.js";
 import type { ExecutionPlatformService } from "./execution-platform-service.js";
+import type { ExecutionApprovalDecision } from "./execution-provider.js";
 
 const ProjectParamsSchema = z.object({ projectId: EntityIdSchema });
 const TaskParamsSchema = z.object({ taskId: EntityIdSchema });
 const ConnectionParamsSchema = z.object({ connectionId: EntityIdSchema });
-const TrustHostKeyBodySchema = z.object({ fingerprint: z.string().regex(/^SHA256:[A-Za-z0-9+/]+$/) });
+const TrustHostKeyBodySchema = z.object({
+  fingerprint: z.string().regex(/^SHA256:[A-Za-z0-9+/]+$/),
+});
 const ProfileParamsSchema = z.object({ profileId: EntityIdSchema });
 const MappingParamsSchema = z.object({ projectId: EntityIdSchema, mappingId: EntityIdSchema });
 const RunParamsSchema = z.object({ runId: EntityIdSchema });
 const ApprovalParamsSchema = z.object({ runId: EntityIdSchema, approvalId: EntityIdSchema });
-const TestConnectionBodySchema = z.object({ workspace: z.string().trim().min(1).max(4_096).optional() });
+const TestConnectionBodySchema = z.object({
+  workspace: z.string().trim().min(1).max(4_096).optional(),
+});
 const InspectWorkspaceQuerySchema = z.object({ path: z.string().trim().min(1).max(4_096) });
 const StartRunBodySchema = z.strictObject({
   executionProfileId: EntityIdSchema.nullable().optional(),
@@ -114,7 +118,9 @@ export function registerExecutionPlatformRoutes(
   app.post("/api/v1/execution/connections", async (request, reply) => {
     const actor = authorizeMutation(request, config, identityService);
     identityService.assertBoardAccess(actor);
-    const result = service.createConnection(CreateConnectionCommandSchema.parse(request.body ?? {}));
+    const result = service.createConnection(
+      CreateConnectionCommandSchema.parse(request.body ?? {}),
+    );
     await reply.code(201).send({ data: result });
   });
 
@@ -255,15 +261,12 @@ export function registerExecutionPlatformRoutes(
     await reply.code(201).send({ data: result });
   });
 
-  app.delete(
-    "/api/v1/projects/:projectId/workspace-mappings/:mappingId",
-    async (request) => {
-      const actor = authorizeMutation(request, config, identityService);
-      const { projectId, mappingId } = MappingParamsSchema.parse(request.params);
-      authorizeProject(identityService, actor, projectId, "write");
-      return { data: service.deleteMapping(mappingId, projectId) };
-    },
-  );
+  app.delete("/api/v1/projects/:projectId/workspace-mappings/:mappingId", async (request) => {
+    const actor = authorizeMutation(request, config, identityService);
+    const { projectId, mappingId } = MappingParamsSchema.parse(request.params);
+    authorizeProject(identityService, actor, projectId, "write");
+    return { data: service.deleteMapping(mappingId, projectId) };
+  });
 
   app.get("/api/v1/projects/:projectId/milestones", async (request) => {
     const current = authenticate(request, config, identityService);
@@ -288,7 +291,10 @@ export function registerExecutionPlatformRoutes(
     const task = taskboard.readTask(taskId, actor);
     assertTaskExecution(task);
     const body = StartRunBodySchema.parse(request.body ?? {});
-    const executionProfileId = service.resolveExecutionProfile(task.projectId, body.executionProfileId);
+    const executionProfileId = service.resolveExecutionProfile(
+      task.projectId,
+      body.executionProfileId,
+    );
     const workspace = service.resolveWorkspace(task.projectId, executionProfileId);
     const run = service.createRun({
       taskId,
@@ -341,7 +347,25 @@ export function registerExecutionPlatformRoutes(
     assertTaskExecution(task);
     const approval = service.readApproval(approvalId);
     if (approval.runId !== runId) throw new AppError("NOT_FOUND", 404, "Execution Approval 不存在");
-    const decision = ExecutionApprovalDecisionSchema.parse(request.body ?? {}) as ExecutionApprovalDecision;
+    const parsedDecision = ExecutionApprovalDecisionSchema.parse(request.body ?? {});
+    let decision: ExecutionApprovalDecision;
+    switch (parsedDecision.type) {
+      case "approve":
+        decision = { type: "approve" };
+        break;
+      case "cancel":
+        decision = { type: "cancel" };
+        break;
+      case "input":
+        decision = { type: "input", answers: parsedDecision.answers };
+        break;
+      case "reject":
+        decision =
+          parsedDecision.reason === undefined
+            ? { type: "reject" }
+            : { type: "reject", reason: parsedDecision.reason };
+        break;
+    }
     return { data: service.resolveApproval(approvalId, decision, identityKey(actor.identity)) };
   });
 
@@ -359,5 +383,4 @@ export function registerExecutionPlatformRoutes(
     taskboard.readTask(run.taskId, current.actor);
     return { data: run };
   });
-
 }

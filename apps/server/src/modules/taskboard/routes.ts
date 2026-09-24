@@ -11,13 +11,11 @@ import {
   EntityIdSchema,
   IdempotencyKeySchema,
   MoveTaskCommandSchema,
-  ProjectTaskCreationOptionsViewSchema,
   ReassignTaskCommandSchema,
   RestoreTaskCommandSchema,
   UpdateProjectCommandSchema,
   UpdateTaskCommandSchema,
   UpdateCommentCommandSchema,
-  TEMPORARY_PROJECT_ID,
   TaskLifecycleCommandSchema,
 } from "@codexboard/contracts";
 import type { FastifyInstance, FastifyRequest } from "fastify";
@@ -31,7 +29,6 @@ import {
   type IdentityService,
   type SessionContext,
 } from "../identity/index.js";
-import type { ProjectRegistry } from "../project-registry/index.js";
 import type { ProjectAdministration } from "../project-registry/project-administration.js";
 import type { TaskWorkspace } from "./task-workspace.js";
 import type { TaskCreationService } from "./task-creation-service.js";
@@ -64,7 +61,6 @@ interface TaskboardRoutesOptions {
   readonly taskLifecycle: TaskLifecycleService;
   readonly workspace: TaskWorkspace;
   readonly attachments: AttachmentService;
-  readonly projectRegistry: ProjectRegistry;
   readonly projectAdministration: ProjectAdministration;
 }
 
@@ -110,7 +106,6 @@ export function registerTaskboardRoutes(
     taskLifecycle,
     workspace,
     attachments,
-    projectRegistry,
     projectAdministration,
   } = options;
 
@@ -122,7 +117,9 @@ export function registerTaskboardRoutes(
   app.post("/api/v1/projects", async (request, reply) => {
     const context = mutationContext(request, config, identityService);
     identityService.assertBoardAccess(context.actor);
-    const project = projectAdministration.createProject(CreateProjectCommandSchema.parse(request.body ?? {}));
+    const project = projectAdministration.createProject(
+      CreateProjectCommandSchema.parse(request.body ?? {}),
+    );
     await reply.code(201).send({ data: taskboard.readBoard(project.id, context.actor).project });
   });
 
@@ -130,7 +127,10 @@ export function registerTaskboardRoutes(
     const context = mutationContext(request, config, identityService);
     const { projectId } = ProjectParamsSchema.parse(request.params);
     identityService.authorizeProject(context.actor, projectId, "write");
-    const project = projectAdministration.updateProject(projectId, UpdateProjectCommandSchema.parse(request.body ?? {}));
+    const project = projectAdministration.updateProject(
+      projectId,
+      UpdateProjectCommandSchema.parse(request.body ?? {}),
+    );
     return { data: taskboard.readBoard(project.id, context.actor).project };
   });
 
@@ -138,7 +138,10 @@ export function registerTaskboardRoutes(
     const context = mutationContext(request, config, identityService);
     const { projectId } = ProjectParamsSchema.parse(request.params);
     identityService.authorizeProject(context.actor, projectId, "write");
-    const project = projectAdministration.archiveProject(projectId, ArchiveProjectCommandSchema.parse(request.body ?? {}));
+    const project = projectAdministration.archiveProject(
+      projectId,
+      ArchiveProjectCommandSchema.parse(request.body ?? {}),
+    );
     return { data: taskboard.readBoard(project.id, context.actor).project };
   });
 
@@ -154,30 +157,7 @@ export function registerTaskboardRoutes(
     const optionsView = taskboard.readTaskCreationOptions(projectId, session.actor, () => [], {
       attachmentMaxBytes: config.CODEXBOARD_ATTACHMENT_MAX_BYTES,
     });
-    if (projectId === TEMPORARY_PROJECT_ID || taskboard.projectSourceKind(projectId, session.actor) === "legacy") {
-      return { data: optionsView };
-    }
-    const executionContext = await projectRegistry.resolveExecutionContext(projectId);
-    const developmentContexts = executionContext.headSha
-      ? (await projectRegistry.scanDevelopmentContexts(projectId)).filter(
-          (context) =>
-            context.active &&
-            context.executable &&
-            context.worktreeRealpath !== null &&
-            context.branch !== executionContext.branch,
-        )
-      : [];
-    return {
-      data: ProjectTaskCreationOptionsViewSchema.parse({
-        ...optionsView,
-        developmentContexts,
-        defaultDevelopmentContext: {
-          id: null,
-          label: executionContext.branch ?? "无",
-          branch: executionContext.branch,
-        },
-      }),
-    };
+    return { data: optionsView };
   });
 
   app.get("/api/v1/projects/:projectId/dashboard", async (request) => {
@@ -207,7 +187,11 @@ export function registerTaskboardRoutes(
         : taskCreation
           ? await taskCreation.create(command, context)
           : (() => {
-              throw new AppError("UPSTREAM_ERROR", 503, "Codex App Server 当前不可用，无法创建任务");
+              throw new AppError(
+                "UPSTREAM_ERROR",
+                503,
+                "Codex App Server 当前不可用，无法创建任务",
+              );
             })();
     await reply.code(201).send({ data: result.task, meta: { revision: result.revision } });
   });

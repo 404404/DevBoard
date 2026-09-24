@@ -4,14 +4,14 @@ DevBoard 把项目、任务、执行配置和一次实际执行统一到同一�
 
 ## 核心对象
 
-| 对象 | 作用 |
-| --- | --- |
-| Project / Task | 项目与待办任务；Task 可以关联 Milestone。 |
-| Connection | SSH Host 连接方式：主机、端口、用户、key/agent 认证与可信主机密钥引用；不保存私钥内容。 |
-| Execution Profile | Provider + SSH Connection + 默认模型/模式/推理强度。 |
-| Workspace Mapping | Project 到 SSH Host 上绝对路径的映射；路径只在目标 Host 上检查。 |
-| Run | 一次执行的状态、Provider session、错误、事件和审批记录。 |
-| Milestone | 一组任务的交付边界与完成度。 |
+| 对象              | 作用                                                                                    |
+| ----------------- | --------------------------------------------------------------------------------------- |
+| Project / Task    | 项目与待办任务；Task 可以关联 Milestone。                                               |
+| Connection        | SSH Host 连接方式：主机、端口、用户、key/agent 认证与可信主机密钥引用；不保存私钥内容。 |
+| Execution Profile | Provider + SSH Connection + 默认模型/模式/推理强度。                                    |
+| Workspace Mapping | Project 到 SSH Host 上绝对路径的映射；路径只在目标 Host 上检查。                        |
+| Run               | 一次执行的状态、Provider session、错误、事件和审批记录。                                |
+| Milestone         | 一组任务的交付边界与完成度。                                                            |
 
 Provider 与 Connection 是有意分离的：Provider 表示协议，Connection 表示运行主机。所有当前执行连接都通过 SSH，不提供容器本地执行模式。
 

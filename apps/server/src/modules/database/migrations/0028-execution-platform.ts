@@ -191,6 +191,11 @@ END;
 
 CREATE TRIGGER change_events_no_delete
 BEFORE DELETE ON change_events
+WHEN NOT EXISTS (
+  SELECT 1 FROM task_delete_authorizations
+  WHERE task_delete_authorizations.resource_id = OLD.aggregate_id
+    OR json_extract(OLD.safe_payload_json, '$.taskId') = task_delete_authorizations.task_id
+)
 BEGIN
   SELECT RAISE(ABORT, 'change_events are append-only');
 END;
@@ -257,9 +262,18 @@ export function migrateExecutionPlatform(database: Database.Database): void {
     .run(
       LEGACY_UNCONFIGURED_PROFILE_ID,
       LEGACY_UNCONFIGURED_CONNECTION_ID,
-      JSON.stringify({ streaming: false, approvals: false, userInput: false, cancel: false,
-        resume: false, models: false, reasoningEffort: false, modes: false,
-        permissionModes: false, workspace: false }),
+      JSON.stringify({
+        streaming: false,
+        approvals: false,
+        userInput: false,
+        cancel: false,
+        resume: false,
+        models: false,
+        reasoningEffort: false,
+        modes: false,
+        permissionModes: false,
+        workspace: false,
+      }),
       timestamp,
       timestamp,
     );
@@ -282,7 +296,7 @@ export function migrateExecutionPlatform(database: Database.Database): void {
       id, task_id, execution_profile_id, provider_kind, connection_id, workspace, model,
       mode, permission_mode, reasoning_effort, provider_thread_id, provider_session_id, status, error_code, error_summary, legacy_job_id,
       created_at, started_at, finished_at, updated_at
-    ) VALUES (?, ?, ?, 'codex', ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, 'codex', ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   const updateJob = database.prepare("UPDATE jobs SET run_id = ? WHERE id = ?");
   const insertEvent = database.prepare(

@@ -761,7 +761,7 @@ describe("SQLite foundation", () => {
   });
 
   it("creates a consistent pre-migration backup before upgrading an existing database", async () => {
-    const directory = mkdtempSync(join("/private/tmp", "codexboard-migration-backup-"));
+    const directory = mkdtempSync(join(tmpdir(), "codexboard-migration-backup-"));
     temporaryDirectories.push(directory);
     const database = track(openDatabase(join(directory, "taskboard.sqlite")));
     runMigrations(database, CORE_MIGRATIONS.slice(0, 4));
@@ -928,7 +928,7 @@ describe("SQLite foundation", () => {
   });
 
   it("does not start a migration until its pre-migration backup is durably published", async () => {
-    const directory = mkdtempSync(join("/private/tmp", "codexboard-migration-order-"));
+    const directory = mkdtempSync(join(tmpdir(), "codexboard-migration-order-"));
     temporaryDirectories.push(directory);
     const events: string[] = [];
     const database = track(

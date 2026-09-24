@@ -69,7 +69,17 @@ const ConnectionRowSchema = z.object({
   authMode: z.enum(["identity_file", "agent"]),
   identityRef: z.string().nullable(),
   knownHostReference: z.string(),
-  status: z.enum(["unknown", "checking", "online", "offline", "authentication_required", "error", "configuration_required", "host_key_untrusted", "host_key_changed"]),
+  status: z.enum([
+    "unknown",
+    "checking",
+    "online",
+    "offline",
+    "authentication_required",
+    "error",
+    "configuration_required",
+    "host_key_untrusted",
+    "host_key_changed",
+  ]),
   capabilitiesJson: z.string(),
   lastHealthJson: z.string().nullable(),
   enabled: z.number().int(),
@@ -206,7 +216,9 @@ function connectionContext(
 }
 
 function redactErrorSummary(value: string): string {
-  return value.replace(/(?:token|secret|password|api.?key)\s*[:=]\s*\S+/gi, "[redacted]").slice(0, 2_000);
+  return value
+    .replace(/(?:token|secret|password|api.?key)\s*[:=]\s*\S+/gi, "[redacted]")
+    .slice(0, 2_000);
 }
 
 function safeProviderValue(value: unknown, depth = 0): unknown {
@@ -214,11 +226,15 @@ function safeProviderValue(value: unknown, depth = 0): unknown {
   if (value === null || typeof value === "boolean") return value;
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") return value.slice(0, 10_000);
-  if (Array.isArray(value)) return value.slice(0, 100).map((entry) => safeProviderValue(entry, depth + 1));
+  if (Array.isArray(value))
+    return value.slice(0, 100).map((entry) => safeProviderValue(entry, depth + 1));
   if (!value || typeof value !== "object") return null;
   const result: Record<string, unknown> = {};
   for (const [key, entry] of Object.entries(value as Record<string, unknown>).slice(0, 100)) {
-    if (/token|secret|password|credential|authorization|private.?key|api.?key|environment/i.test(key)) continue;
+    if (
+      /token|secret|password|credential|authorization|private.?key|api.?key|environment/i.test(key)
+    )
+      continue;
     result[key] = safeProviderValue(entry, depth + 1);
   }
   return result;
@@ -252,9 +268,9 @@ export class ExecutionPlatformService {
     this.#database = options.database;
     this.#providers = options.providers;
     this.#knownHostsFile = options.knownHostsFile ?? "/var/lib/devboard/ssh/known_hosts";
-    this.#identityRegistry = options.identityRegistry ?? new DirectoryIdentityRegistry(
-      options.identityDirectory ?? "/run/devboard/ssh/identities",
-    );
+    this.#identityRegistry =
+      options.identityRegistry ??
+      new DirectoryIdentityRegistry(options.identityDirectory ?? "/run/devboard/ssh/identities");
     this.#hostKeys = new SSHHostKeyStore(this.#knownHostsFile);
     this.#now = options.now ?? (() => new Date());
     this.#onRevisionCommitted = options.onRevisionCommitted;
@@ -327,7 +343,10 @@ export class ExecutionPlatformService {
       .map((row) => this.#connectionView(ConnectionRowSchema.parse(row)));
   }
 
-  createConnection(command: CreateConnectionCommand): { readonly connection: ConnectionView; readonly revision: number } {
+  createConnection(command: CreateConnectionCommand): {
+    readonly connection: ConnectionView;
+    readonly revision: number;
+  } {
     const input = CreateConnectionCommandSchema.parse(command);
     this.#validateConnectionInput(input);
     const id = randomUUID();
@@ -353,7 +372,13 @@ export class ExecutionPlatformService {
           timestamp,
           timestamp,
         );
-      return this.#recordChange("connection", id, "connection.created", { connectionId: id }, timestamp);
+      return this.#recordChange(
+        "connection",
+        id,
+        "connection.created",
+        { connectionId: id },
+        timestamp,
+      );
     });
     this.#notify(revision);
     return { connection: this.#readConnection(id), revision };
@@ -400,8 +425,15 @@ export class ExecutionPlatformService {
           id,
           input.expectedVersion,
         );
-      if (result.changes !== 1) throw new AppError("VERSION_CONFLICT", 409, "连接版本已变化，请重新加载");
-      return this.#recordChange("connection", id, "connection.updated", { connectionId: id }, timestamp);
+      if (result.changes !== 1)
+        throw new AppError("VERSION_CONFLICT", 409, "连接版本已变化，请重新加载");
+      return this.#recordChange(
+        "connection",
+        id,
+        "connection.updated",
+        { connectionId: id },
+        timestamp,
+      );
     });
     this.#notify(revision);
     return { connection: this.#readConnection(id), revision };
@@ -417,13 +449,22 @@ export class ExecutionPlatformService {
     const revision = withTransaction(this.#database, () => {
       const result = this.#database.prepare("DELETE FROM connections WHERE id = ?").run(id);
       if (result.changes !== 1) throw new AppError("NOT_FOUND", 404, "连接不存在");
-      return this.#recordChange("connection", id, "connection.deleted", { connectionId: id }, timestamp);
+      return this.#recordChange(
+        "connection",
+        id,
+        "connection.deleted",
+        { connectionId: id },
+        timestamp,
+      );
     });
     this.#notify(revision);
     return { revision };
   }
 
-  async testConnection(id: string, workspace = "/"): Promise<{ readonly connection: ConnectionView; readonly health: ProviderHealth }> {
+  async testConnection(
+    id: string,
+    workspace = "/",
+  ): Promise<{ readonly connection: ConnectionView; readonly health: ProviderHealth }> {
     const connection = this.#readConnection(id);
     if (!isAbsolute(workspace))
       throw new AppError("WORKSPACE_NOT_FOUND", 400, "Connection 检查的 Workspace 必须是绝对路径");
@@ -436,13 +477,13 @@ export class ExecutionPlatformService {
           ? "authentication_required"
           : health.status === "offline"
             ? "offline"
-          : health.status === "host_key_untrusted"
-            ? "host_key_untrusted"
-            : health.status === "host_key_changed"
-              ? "host_key_changed"
-              : health.status === "unknown"
-                ? "unknown"
-                : "error";
+            : health.status === "host_key_untrusted"
+              ? "host_key_untrusted"
+              : health.status === "host_key_changed"
+                ? "host_key_changed"
+                : health.status === "unknown"
+                  ? "unknown"
+                  : "error";
     this.#database
       .prepare(
         "UPDATE connections SET status = ?, last_health_json = ?, updated_at = ? WHERE id = ?",
@@ -482,7 +523,9 @@ export class ExecutionPlatformService {
       .map((row) => this.#profileView(ProfileRowSchema.parse(row)));
   }
 
-  async createProfile(command: CreateExecutionProfileCommand): Promise<{ readonly profile: ExecutionProfileView; readonly revision: number }> {
+  async createProfile(
+    command: CreateExecutionProfileCommand,
+  ): Promise<{ readonly profile: ExecutionProfileView; readonly revision: number }> {
     const input = CreateExecutionProfileCommandSchema.parse(command);
     const provider = this.#providers.get(input.providerKind);
     if (!provider) throw new AppError("PROVIDER_NOT_INSTALLED", 409, "Provider adapter 未安装");
@@ -515,7 +558,13 @@ export class ExecutionPlatformService {
           timestamp,
           timestamp,
         );
-      return this.#recordChange("execution_profile", id, "execution_profile.created", { profileId: id }, timestamp);
+      return this.#recordChange(
+        "execution_profile",
+        id,
+        "execution_profile.created",
+        { profileId: id },
+        timestamp,
+      );
     });
     this.#notify(revision);
     return { profile: this.#readProfile(id), revision };
@@ -551,7 +600,9 @@ export class ExecutionPlatformService {
           nextConnectionId,
           input.defaultModel === undefined ? current.defaultModel : input.defaultModel,
           input.defaultMode === undefined ? current.defaultMode : input.defaultMode,
-          input.defaultReasoningEffort === undefined ? current.defaultReasoningEffort : input.defaultReasoningEffort,
+          input.defaultReasoningEffort === undefined
+            ? current.defaultReasoningEffort
+            : input.defaultReasoningEffort,
           JSON.stringify(input.environmentRefs ?? current.environmentRefs),
           JSON.stringify(capabilities),
           (input.enabled ?? current.enabled) ? 1 : 0,
@@ -559,8 +610,15 @@ export class ExecutionPlatformService {
           id,
           input.expectedVersion,
         );
-      if (result.changes !== 1) throw new AppError("VERSION_CONFLICT", 409, "Execution Profile 版本已变化，请重新加载");
-      return this.#recordChange("execution_profile", id, "execution_profile.updated", { profileId: id }, timestamp);
+      if (result.changes !== 1)
+        throw new AppError("VERSION_CONFLICT", 409, "Execution Profile 版本已变化，请重新加载");
+      return this.#recordChange(
+        "execution_profile",
+        id,
+        "execution_profile.updated",
+        { profileId: id },
+        timestamp,
+      );
     });
     this.#notify(revision);
     return { profile: this.#readProfile(id), revision };
@@ -569,14 +627,22 @@ export class ExecutionPlatformService {
   deleteProfile(id: string): { readonly revision: number } {
     this.#readProfile(id);
     const active = this.#database
-      .prepare("SELECT 1 FROM runs WHERE execution_profile_id = ? AND status IN ('queued', 'starting', 'running', 'waiting_approval', 'waiting_input') LIMIT 1")
+      .prepare(
+        "SELECT 1 FROM runs WHERE execution_profile_id = ? AND status IN ('queued', 'starting', 'running', 'waiting_approval', 'waiting_input') LIMIT 1",
+      )
       .get(id);
     if (active) throw new AppError("INVALID_REQUEST", 409, "执行配置仍有活动 Run");
     const timestamp = this.#now().toISOString();
     const revision = withTransaction(this.#database, () => {
       const result = this.#database.prepare("DELETE FROM execution_profiles WHERE id = ?").run(id);
       if (result.changes !== 1) throw new AppError("NOT_FOUND", 404, "Execution Profile 不存在");
-      return this.#recordChange("execution_profile", id, "execution_profile.deleted", { profileId: id }, timestamp);
+      return this.#recordChange(
+        "execution_profile",
+        id,
+        "execution_profile.deleted",
+        { profileId: id },
+        timestamp,
+      );
     });
     this.#notify(revision);
     return { revision };
@@ -587,7 +653,10 @@ export class ExecutionPlatformService {
     const row = this.#database
       .prepare("SELECT default_execution_profile_id AS profileId FROM projects WHERE id = ?")
       .get(projectId) as { profileId: string | null } | undefined;
-    return ProjectExecutionProfileViewSchema.parse({ projectId, profileId: row?.profileId ?? null });
+    return ProjectExecutionProfileViewSchema.parse({
+      projectId,
+      profileId: row?.profileId ?? null,
+    });
   }
 
   setProjectDefaultProfile(
@@ -624,7 +693,11 @@ export class ExecutionPlatformService {
     }
     const setting = this.readProjectDefaultProfile(projectId);
     if (!setting.profileId)
-      throw new AppError("INVALID_REQUEST", 409, "请先为该项目设置默认 Execution Profile，或在任务中选择执行配置");
+      throw new AppError(
+        "INVALID_REQUEST",
+        409,
+        "请先为该项目设置默认 Execution Profile，或在任务中选择执行配置",
+      );
     this.#readProfile(setting.profileId);
     return setting.profileId;
   }
@@ -640,18 +713,28 @@ export class ExecutionPlatformService {
         WHERE mappings.project_id = ? ORDER BY mappings.is_default DESC, connections.name COLLATE NOCASE`,
       )
       .all(projectId)
-      .map((row) => WorkspaceMappingViewSchema.parse(this.#mappingView(MappingRowSchema.parse(row))));
+      .map((row) =>
+        WorkspaceMappingViewSchema.parse(this.#mappingView(MappingRowSchema.parse(row))),
+      );
   }
 
-  async createMapping(command: CreateWorkspaceMappingCommand): Promise<{ readonly mapping: WorkspaceMappingView; readonly revision: number }> {
+  async createMapping(
+    command: CreateWorkspaceMappingCommand,
+  ): Promise<{ readonly mapping: WorkspaceMappingView; readonly revision: number }> {
     const input = CreateWorkspaceMappingCommandSchema.parse(command);
-    if (!isAbsolute(input.path)) throw new AppError("WORKSPACE_NOT_FOUND", 400, "Workspace path 必须是绝对路径");
+    if (!isAbsolute(input.path))
+      throw new AppError("WORKSPACE_NOT_FOUND", 400, "Workspace path 必须是绝对路径");
     this.#assertProject(input.projectId);
     const connection = this.#readConnection(input.connectionId);
     const remote = await this.#inspectRemoteWorkspace(connection, input.path);
-    if (!remote.exists) throw new AppError("WORKSPACE_NOT_FOUND", 404, "目标 Connection 上不存在该目录；可显式选择‘远端创建并映射’");
+    if (!remote.exists)
+      throw new AppError(
+        "WORKSPACE_NOT_FOUND",
+        404,
+        "目标 Connection 上不存在该目录；可显式选择‘远端创建并映射’",
+      );
     const remotePath = remote.canonicalPath;
-    let mappingId = randomUUID();
+    let mappingId: string = randomUUID();
     const timestamp = this.#now().toISOString();
     const revision = withTransaction(this.#database, () => {
       const existing = this.#database
@@ -659,13 +742,23 @@ export class ExecutionPlatformService {
         .get(input.projectId, input.connectionId) as { id: string } | undefined;
       mappingId = existing?.id ?? mappingId;
       if (input.isDefault) {
-        this.#database.prepare("UPDATE workspace_mappings SET is_default = 0 WHERE project_id = ?").run(input.projectId);
+        this.#database
+          .prepare("UPDATE workspace_mappings SET is_default = 0 WHERE project_id = ?")
+          .run(input.projectId);
       }
       if (existing) {
         this.#database
-          .prepare("UPDATE workspace_mappings SET path = ?, is_default = ?, updated_at = ? WHERE id = ?")
+          .prepare(
+            "UPDATE workspace_mappings SET path = ?, is_default = ?, updated_at = ? WHERE id = ?",
+          )
           .run(remotePath, input.isDefault ? 1 : 0, timestamp, mappingId);
-        return this.#recordChange("workspace_mapping", mappingId, "workspace_mapping.updated", { projectId: input.projectId }, timestamp);
+        return this.#recordChange(
+          "workspace_mapping",
+          mappingId,
+          "workspace_mapping.updated",
+          { projectId: input.projectId },
+          timestamp,
+        );
       }
       this.#database
         .prepare(
@@ -673,16 +766,33 @@ export class ExecutionPlatformService {
             id, project_id, connection_id, path, is_default, created_at, updated_at
           ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
         )
-        .run(mappingId, input.projectId, input.connectionId, remotePath, input.isDefault ? 1 : 0, timestamp, timestamp);
-      return this.#recordChange("workspace_mapping", mappingId, "workspace_mapping.created", { projectId: input.projectId }, timestamp);
+        .run(
+          mappingId,
+          input.projectId,
+          input.connectionId,
+          remotePath,
+          input.isDefault ? 1 : 0,
+          timestamp,
+          timestamp,
+        );
+      return this.#recordChange(
+        "workspace_mapping",
+        mappingId,
+        "workspace_mapping.created",
+        { projectId: input.projectId },
+        timestamp,
+      );
     });
     this.#notify(revision);
     return { mapping: this.#mappingViewById(mappingId), revision };
   }
 
-  async createRemoteWorkspaceMapping(command: CreateWorkspaceMappingCommand): Promise<{ readonly mapping: WorkspaceMappingView; readonly revision: number }> {
+  async createRemoteWorkspaceMapping(
+    command: CreateWorkspaceMappingCommand,
+  ): Promise<{ readonly mapping: WorkspaceMappingView; readonly revision: number }> {
     const input = CreateWorkspaceMappingCommandSchema.parse(command);
-    if (!isAbsolute(input.path)) throw new AppError("WORKSPACE_NOT_FOUND", 400, "Workspace path 必须是绝对路径");
+    if (!isAbsolute(input.path))
+      throw new AppError("WORKSPACE_NOT_FOUND", 400, "Workspace path 必须是绝对路径");
     this.#assertProject(input.projectId);
     const connection = this.#readConnection(input.connectionId);
     const result = await this.#runRemoteShell(
@@ -696,7 +806,10 @@ export class ExecutionPlatformService {
     return this.createMapping({ ...input, path: canonicalPath });
   }
 
-  async inspectWorkspace(connectionId: string, path: string): Promise<{
+  async inspectWorkspace(
+    connectionId: string,
+    path: string,
+  ): Promise<{
     readonly path: string;
     readonly exists: boolean;
     readonly isGitRepository: boolean;
@@ -704,24 +817,35 @@ export class ExecutionPlatformService {
     readonly branch: string | null;
     readonly origin: string | null;
   }> {
-    if (!isAbsolute(path)) throw new AppError("WORKSPACE_NOT_FOUND", 400, "Workspace path 必须是绝对路径");
+    if (!isAbsolute(path))
+      throw new AppError("WORKSPACE_NOT_FOUND", 400, "Workspace path 必须是绝对路径");
     const connection = this.#readConnection(connectionId);
-    const result = await this.#runRemoteShell(connection,
+    const result = await this.#runRemoteShell(
+      connection,
       'if [ ! -d "$1" ]; then printf "MISSING\\n"; exit 3; fi; cd -- "$1" || exit 4; printf "EXISTS\\n"; pwd -P; if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then printf "GIT\\n"; git rev-parse --show-toplevel; git branch --show-current; git remote get-url origin 2>/dev/null || true; else printf "NOGIT\\n"; fi',
       [path],
       true,
     );
     const lines = result.stdout.trim().split(/\r?\n/);
-    if (lines[0] === "MISSING") return { path, exists: false, isGitRepository: false, gitRoot: null, branch: null, origin: null };
+    if (lines[0] === "MISSING")
+      return {
+        path,
+        exists: false,
+        isGitRepository: false,
+        gitRoot: null,
+        branch: null,
+        origin: null,
+      };
     const existsAt = lines.indexOf("EXISTS");
-    if (existsAt < 0) throw new AppError("WORKSPACE_NOT_FOUND", 409, "无法读取目标 Host 上的 Workspace");
+    if (existsAt < 0)
+      throw new AppError("WORKSPACE_NOT_FOUND", 409, "无法读取目标 Host 上的 Workspace");
     const canonicalPath = lines[existsAt + 1] ?? path;
     const gitAt = lines.indexOf("GIT");
     return {
       path: canonicalPath,
       exists: true,
       isGitRepository: gitAt >= 0,
-      gitRoot: gitAt >= 0 ? lines[gitAt + 1] ?? null : null,
+      gitRoot: gitAt >= 0 ? (lines[gitAt + 1] ?? null) : null,
       branch: gitAt >= 0 ? lines[gitAt + 2] || null : null,
       origin: gitAt >= 0 ? lines[gitAt + 3] || null : null,
     };
@@ -729,13 +853,22 @@ export class ExecutionPlatformService {
 
   deleteMapping(id: string, expectedProjectId?: string): { readonly revision: number } {
     const mapping = this.#database
-      .prepare("SELECT project_id AS projectId FROM workspace_mappings WHERE id = ? AND (? IS NULL OR project_id = ?)")
-      .get(id, expectedProjectId ?? null, expectedProjectId ?? null) as { projectId: string } | undefined;
+      .prepare(
+        "SELECT project_id AS projectId FROM workspace_mappings WHERE id = ? AND (? IS NULL OR project_id = ?)",
+      )
+      .get(id, expectedProjectId ?? null, expectedProjectId ?? null) as
+      { projectId: string } | undefined;
     if (!mapping) throw new AppError("NOT_FOUND", 404, "Workspace Mapping 不存在");
     const timestamp = this.#now().toISOString();
     const revision = withTransaction(this.#database, () => {
       this.#database.prepare("DELETE FROM workspace_mappings WHERE id = ?").run(id);
-      return this.#recordChange("workspace_mapping", id, "workspace_mapping.deleted", { projectId: mapping.projectId }, timestamp);
+      return this.#recordChange(
+        "workspace_mapping",
+        id,
+        "workspace_mapping.deleted",
+        { projectId: mapping.projectId },
+        timestamp,
+      );
     });
     this.#notify(revision);
     return { revision };
@@ -757,15 +890,19 @@ export class ExecutionPlatformService {
       )
       .all(projectId)
       .map((row) => {
+        const raw = row as Record<string, unknown>;
         const value = MilestoneRowSchema.parse({
-          ...row,
-          completedTaskCount: Number((row as { completedTaskCount?: number }).completedTaskCount ?? 0),
+          ...raw,
+          completedTaskCount: Number(raw.completedTaskCount ?? 0),
         });
         return MilestoneViewSchema.parse(value);
       });
   }
 
-  createMilestone(command: CreateMilestoneCommand): { readonly milestone: MilestoneView; readonly revision: number } {
+  createMilestone(command: CreateMilestoneCommand): {
+    readonly milestone: MilestoneView;
+    readonly revision: number;
+  } {
     const input = CreateMilestoneCommandSchema.parse(command);
     this.#assertProject(input.projectId);
     const id = randomUUID();
@@ -776,8 +913,23 @@ export class ExecutionPlatformService {
           `INSERT INTO milestones (id, project_id, title, description, status, target_date, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         )
-        .run(id, input.projectId, input.title, input.description, input.status, input.targetDate, timestamp, timestamp);
-      return this.#recordChange("milestone", id, "milestone.created", { projectId: input.projectId }, timestamp);
+        .run(
+          id,
+          input.projectId,
+          input.title,
+          input.description,
+          input.status,
+          input.targetDate,
+          timestamp,
+          timestamp,
+        );
+      return this.#recordChange(
+        "milestone",
+        id,
+        "milestone.created",
+        { projectId: input.projectId },
+        timestamp,
+      );
     });
     this.#notify(revision);
     return { milestone: this.#readMilestone(id), revision };
@@ -815,7 +967,9 @@ export class ExecutionPlatformService {
         providerEvent:
           (row as { providerEvent: string | null }).providerEvent === null
             ? null
-            : safeProviderPayload(parseJson((row as { providerEvent: string | null }).providerEvent, {})),
+            : safeProviderPayload(
+                parseJson((row as { providerEvent: string | null }).providerEvent, {}),
+              ),
       }));
     return RunViewSchema.parse({ ...run.data, events });
   }
@@ -828,7 +982,11 @@ export class ExecutionPlatformService {
     return ids.map((id) => this.readRun(id));
   }
 
-  resolveWorkspace(projectId: string, executionProfileId: string, requested?: string | null): string {
+  resolveWorkspace(
+    projectId: string,
+    executionProfileId: string,
+    requested?: string | null,
+  ): string {
     this.#assertProject(projectId);
     const profile = this.#readProfile(executionProfileId);
     const mapping = this.#database
@@ -837,10 +995,18 @@ export class ExecutionPlatformService {
       )
       .get(projectId, profile.connectionId) as { path: string } | undefined;
     if (!mapping || !isAbsolute(mapping.path))
-      throw new AppError("WORKSPACE_NOT_FOUND", 400, "请先为该项目和 SSH Connection 配置 Workspace Mapping");
+      throw new AppError(
+        "WORKSPACE_NOT_FOUND",
+        400,
+        "请先为该项目和 SSH Connection 配置 Workspace Mapping",
+      );
     if (requested !== undefined && requested !== null) {
       if (requested !== mapping.path)
-        throw new AppError("FORBIDDEN", 403, "Run Workspace 必须来自该项目与 SSH Connection 的 Workspace Mapping");
+        throw new AppError(
+          "FORBIDDEN",
+          403,
+          "Run Workspace 必须来自该项目与 SSH Connection 的 Workspace Mapping",
+        );
     }
     return mapping.path;
   }
@@ -868,7 +1034,11 @@ export class ExecutionPlatformService {
       .prepare("SELECT path FROM workspace_mappings WHERE project_id = ? AND connection_id = ?")
       .get(project.projectId, profile.connectionId) as { path: string } | undefined;
     if (!mapping || mapping.path !== input.workspace)
-      throw new AppError("FORBIDDEN", 403, "新 Run 的 Workspace 必须匹配该项目与 Connection 的 Workspace Mapping");
+      throw new AppError(
+        "FORBIDDEN",
+        403,
+        "新 Run 的 Workspace 必须匹配该项目与 Connection 的 Workspace Mapping",
+      );
     return this.#insertRun({
       taskId: input.taskId,
       projectId: project.projectId,
@@ -923,7 +1093,13 @@ export class ExecutionPlatformService {
           timestamp,
         );
       this.#appendRunEvent(id, "run.started", "Run 已进入队列", {}, null, timestamp);
-      return this.#recordChange("run", id, "run.created", { projectId: input.projectId, taskId: input.taskId }, timestamp);
+      return this.#recordChange(
+        "run",
+        id,
+        "run.created",
+        { projectId: input.projectId, taskId: input.taskId },
+        timestamp,
+      );
     });
     this.#notify(revision);
     return this.readRun(id);
@@ -941,32 +1117,65 @@ export class ExecutionPlatformService {
     const timestamp = this.#now().toISOString();
     const projectId = this.#projectIdForRun(runId);
     const revision = withTransaction(this.#database, () => {
-      this.#appendRunEvent(runId, input.type, input.summary, input.payload ?? {}, input.providerEvent ?? null, timestamp);
+      this.#appendRunEvent(
+        runId,
+        input.type,
+        input.summary,
+        input.payload ?? {},
+        input.providerEvent ?? null,
+        timestamp,
+      );
       const status =
         input.type === "run.completed"
           ? "succeeded"
           : input.type === "run.interrupted"
             ? "interrupted"
-          : input.type === "run.failed"
-            ? "failed"
-            : input.type === "run.cancelled"
-              ? "canceled"
-              : input.type === "approval.requested"
-                ? "waiting_approval"
-                : input.type === "user.input.requested"
-                  ? "waiting_input"
-                  : input.type === "approval.resolved" || input.type === "user.input.resolved"
-                    ? "running"
-                    : input.type === "run.progress" || input.type === "agent.message" || input.type === "agent.thinking" || input.type === "tool.started" || input.type === "tool.completed" || input.type === "command.started" || input.type === "command.completed" || input.type === "file.changed" || input.type === "artifact.created"
+            : input.type === "run.failed"
+              ? "failed"
+              : input.type === "run.cancelled"
+                ? "canceled"
+                : input.type === "approval.requested"
+                  ? "waiting_approval"
+                  : input.type === "user.input.requested"
+                    ? "waiting_input"
+                    : input.type === "approval.resolved" || input.type === "user.input.resolved"
                       ? "running"
-                      : null;
+                      : input.type === "run.progress" ||
+                          input.type === "agent.message" ||
+                          input.type === "agent.thinking" ||
+                          input.type === "tool.started" ||
+                          input.type === "tool.completed" ||
+                          input.type === "command.started" ||
+                          input.type === "command.completed" ||
+                          input.type === "file.changed" ||
+                          input.type === "artifact.created"
+                        ? "running"
+                        : null;
       if (status) {
-        const current = this.#database.prepare("SELECT status FROM runs WHERE id = ?").get(runId) as { status: string } | undefined;
-        const terminal = current && ["succeeded", "failed", "canceled", "interrupted", "disconnected"].includes(current.status);
-        if (terminal) return this.#recordChange("run", runId, "run.event_recorded", { projectId, runId }, timestamp);
+        const current = this.#database
+          .prepare("SELECT status FROM runs WHERE id = ?")
+          .get(runId) as { status: string } | undefined;
+        const terminal =
+          current &&
+          ["succeeded", "failed", "canceled", "interrupted", "disconnected"].includes(
+            current.status,
+          );
+        if (terminal)
+          return this.#recordChange(
+            "run",
+            runId,
+            "run.event_recorded",
+            { projectId, runId },
+            timestamp,
+          );
         this.#database
           .prepare("UPDATE runs SET status = ?, finished_at = ?, updated_at = ? WHERE id = ?")
-          .run(status, ["succeeded", "failed", "canceled", "interrupted"].includes(status) ? timestamp : null, timestamp, runId);
+          .run(
+            status,
+            ["succeeded", "failed", "canceled", "interrupted"].includes(status) ? timestamp : null,
+            timestamp,
+            runId,
+          );
       }
       const eventName = "run." + input.type.slice(input.type.indexOf(".") + 1);
       return this.#recordChange("run", runId, eventName, { projectId, runId }, timestamp);
@@ -975,11 +1184,9 @@ export class ExecutionPlatformService {
     return this.readRun(runId);
   }
 
-
   startRun(runId: string, prompt: string): RunView {
     const run = this.readRun(runId);
-    if (run.status !== "queued")
-      throw new AppError("INVALID_REQUEST", 409, "Run 当前状态不能启动");
+    if (run.status !== "queued") throw new AppError("INVALID_REQUEST", 409, "Run 当前状态不能启动");
     const timestamp = this.#now().toISOString();
     const projectId = this.#projectIdForRun(runId);
     const revision = withTransaction(this.#database, () => {
@@ -999,9 +1206,18 @@ export class ExecutionPlatformService {
 
   continueRun(runId: string, prompt: string): RunView {
     const previous = this.readRun(runId);
-    if (["queued", "starting", "running", "waiting_approval", "waiting_input"].includes(previous.status))
+    if (
+      ["queued", "starting", "running", "waiting_approval", "waiting_input"].includes(
+        previous.status,
+      )
+    )
       throw new AppError("INVALID_REQUEST", 409, "活动 Run 仍在执行，不能 Continue");
-    if (!previous.providerThreadId || !previous.executionProfileId || !previous.connectionId || !previous.workspace)
+    if (
+      !previous.providerThreadId ||
+      !previous.executionProfileId ||
+      !previous.connectionId ||
+      !previous.workspace
+    )
       throw new AppError("INVALID_REQUEST", 409, "该 Run 没有可恢复的 Provider session");
     const text = prompt.trim();
     if (!text) throw new AppError("INVALID_REQUEST", 400, "Continue prompt 不能为空");
@@ -1046,10 +1262,14 @@ export class ExecutionPlatformService {
       waiter.resolve({ type: "cancel" });
     }
     this.#database
-      .prepare("UPDATE run_approvals SET status = 'canceled', resolved_at = ?, resolved_by = 'system' WHERE run_id = ? AND status = 'pending'")
+      .prepare(
+        "UPDATE run_approvals SET status = 'canceled', resolved_at = ?, resolved_by = 'system' WHERE run_id = ? AND status = 'pending'",
+      )
       .run(timestamp, runId);
     const current = this.readRun(runId);
-    if (!["succeeded", "failed", "canceled", "interrupted", "disconnected"].includes(current.status)) {
+    if (
+      !["succeeded", "failed", "canceled", "interrupted", "disconnected"].includes(current.status)
+    ) {
       this.appendRunEvent(runId, {
         type: "run.cancelled",
         summary: "Run 已取消",
@@ -1118,7 +1338,8 @@ export class ExecutionPlatformService {
           "UPDATE run_approvals SET status = ?, resolved_at = ?, resolved_by = ? WHERE id = ? AND status = 'pending'",
         )
         .run(status, timestamp, resolvedBy.slice(0, 200), approvalId);
-      if (result.changes !== 1) throw new AppError("INVALID_REQUEST", 409, "Execution Approval 已经处理");
+      if (result.changes !== 1)
+        throw new AppError("INVALID_REQUEST", 409, "Execution Approval 已经处理");
       this.#appendRunEvent(
         row.data.runId,
         row.data.type === "user_input" ? "user.input.resolved" : "approval.resolved",
@@ -1161,19 +1382,23 @@ export class ExecutionPlatformService {
   #readRunContext(runId: string) {
     const run = this.readRun(runId);
     if (!run.connectionId || !run.executionProfileId)
-      throw new AppError("CONNECTION_OFFLINE", 409, "Run 没有可用的 Connection 或 Execution Profile");
+      throw new AppError(
+        "CONNECTION_OFFLINE",
+        409,
+        "Run 没有可用的 Connection 或 Execution Profile",
+      );
     const connection = this.#readConnection(run.connectionId);
     const profile = this.#readProfile(run.executionProfileId);
     if (!connection.enabled) throw new AppError("CONNECTION_OFFLINE", 409, "Connection 已禁用");
     if (!profile.enabled) throw new AppError("INVALID_REQUEST", 409, "Execution Profile 已禁用");
     if (connection.status === "configuration_required")
-      throw new AppError("CONNECTION_OFFLINE", 409, "旧版本机 Codex Profile 尚未配置，请关联 Docker Host SSH Connection");
-    if (connection.status === "authentication_required") {
       throw new AppError(
-        "SSH_AUTH_FAILED",
+        "CONNECTION_OFFLINE",
         409,
-        "Connection 需要完成认证",
+        "旧版本机 Codex Profile 尚未配置，请关联 Docker Host SSH Connection",
       );
+    if (connection.status === "authentication_required") {
+      throw new AppError("SSH_AUTH_FAILED", 409, "Connection 需要完成认证");
     }
     if (
       connection.status === "offline" ||
@@ -1297,7 +1522,9 @@ export class ExecutionPlatformService {
         callbacks,
       );
       const current = this.readRun(runId);
-      if (!["succeeded", "failed", "canceled", "interrupted", "disconnected"].includes(current.status)) {
+      if (
+        !["succeeded", "failed", "canceled", "interrupted", "disconnected"].includes(current.status)
+      ) {
         const eventType =
           result.status === "succeeded"
             ? "run.completed"
@@ -1306,7 +1533,8 @@ export class ExecutionPlatformService {
               : "run.failed";
         this.appendRunEvent(runId, {
           type: eventType,
-          summary: result.errorSummary ?? (result.status === "succeeded" ? "Run 已完成" : "Run 未完成"),
+          summary:
+            result.errorSummary ?? (result.status === "succeeded" ? "Run 已完成" : "Run 未完成"),
           payload: result.errorCode ? { errorCode: result.errorCode } : {},
         });
         if (result.errorSummary || result.errorCode)
@@ -1407,10 +1635,15 @@ export class ExecutionPlatformService {
 
   #failRun(runId: string, error: unknown): void {
     const code = this.#errorCode(error);
-    const summary = redactErrorSummary(error instanceof Error ? error.message : "Provider 执行失败");
+    const summary = redactErrorSummary(
+      error instanceof Error ? error.message : "Provider 执行失败",
+    );
     try {
       const current = this.readRun(runId);
-      if (["succeeded", "failed", "canceled", "interrupted", "disconnected"].includes(current.status)) return;
+      if (
+        ["succeeded", "failed", "canceled", "interrupted", "disconnected"].includes(current.status)
+      )
+        return;
       this.#setRunError(runId, code, summary);
       this.appendRunEvent(runId, { type: "run.failed", summary, payload: { errorCode: code } });
     } catch {
@@ -1419,14 +1652,17 @@ export class ExecutionPlatformService {
   }
 
   #errorCode(error: unknown): string {
-    const value = error && typeof error === "object" ? (error as { code?: unknown }).code : undefined;
-    if (typeof value === "string" && /^[A-Z][A-Z0-9_]*$/.test(value) && value.length <= 100) return value;
+    const value =
+      error && typeof error === "object" ? (error as { code?: unknown }).code : undefined;
+    if (typeof value === "string" && /^[A-Z][A-Z0-9_]*$/.test(value) && value.length <= 100)
+      return value;
     const message = error instanceof Error ? error.message : "";
     if (/host key|known_hosts|offending key/i.test(message)) return "HOST_KEY_FAILED";
     if (/publickey|ssh.*auth|authentication failed|permission denied.*ssh/i.test(message))
       return "SSH_AUTH_FAILED";
     if (/not found|enoent|未找到|不存在/i.test(message)) return "PROVIDER_NOT_INSTALLED";
-    if (/login|credential|unauthorized|auth required/i.test(message)) return "PROVIDER_AUTH_REQUIRED";
+    if (/login|credential|unauthorized|auth required/i.test(message))
+      return "PROVIDER_AUTH_REQUIRED";
     if (/disconnect|closed|broken pipe/i.test(message)) return "PROVIDER_DISCONNECTED";
     if (/cancel/i.test(message)) return "RUN_INTERRUPTED";
     return "PROVIDER_PROTOCOL_ERROR";
@@ -1434,17 +1670,18 @@ export class ExecutionPlatformService {
 
   async readSettings(): Promise<ExecutionSettingsView> {
     const connections = this.listConnections();
-    const selectedConnection = connections.find((connection) => connection.host && connection.enabled);
+    const selectedConnection = connections.find(
+      (connection) => connection.host && connection.enabled,
+    );
     let providerConnection: ProviderConnectionContext | undefined;
     try {
-      providerConnection = selectedConnection ? this.#connectionContext(selectedConnection) : undefined;
+      providerConnection = selectedConnection
+        ? this.#connectionContext(selectedConnection)
+        : undefined;
     } catch {
       // A stale or invalid secret reference must not make the settings page unusable.
     }
-    const providers = await this.#providers.describe(
-      providerConnection,
-      "/",
-    );
+    const providers = await this.#providers.describe(providerConnection, "/");
     const [sshIdentities, sshAgentAvailable] = await Promise.all([
       this.#identityRegistry.list(),
       isSshAgentAvailable(),
@@ -1501,7 +1738,9 @@ export class ExecutionPlatformService {
       identityRef: row.identityRef,
       knownHostReference: row.knownHostReference,
       status: row.status,
-      capabilities: ConnectionCapabilitiesSchema.parse(parseJson(row.capabilitiesJson, { providerExecutables: [], protocolModes: [] })),
+      capabilities: ConnectionCapabilitiesSchema.parse(
+        parseJson(row.capabilitiesJson, { providerExecutables: [], protocolModes: [] }),
+      ),
       lastHealth: recordToProviderHealth(row.lastHealthJson),
       enabled: row.enabled === 1,
       version: row.version,
@@ -1523,10 +1762,20 @@ export class ExecutionPlatformService {
       environmentRefs: z.array(z.string()).parse(parseJson(row.environmentRefsJson, [])),
       enabled: row.enabled === 1,
       health: recordToProviderHealth(row.healthJson),
-      capabilities: ProviderCapabilitySchema.parse(parseJson(row.capabilitiesJson, {
-        streaming: false, approvals: false, userInput: false, cancel: false, resume: false,
-        models: false, reasoningEffort: false, modes: false, permissionModes: false, workspace: false,
-      })),
+      capabilities: ProviderCapabilitySchema.parse(
+        parseJson(row.capabilitiesJson, {
+          streaming: false,
+          approvals: false,
+          userInput: false,
+          cancel: false,
+          resume: false,
+          models: false,
+          reasoningEffort: false,
+          modes: false,
+          permissionModes: false,
+          workspace: false,
+        }),
+      ),
       version: row.version,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
@@ -1564,11 +1813,15 @@ export class ExecutionPlatformService {
 
   #readConnection(id: string): ConnectionView {
     const row = ConnectionRowSchema.safeParse(
-      this.#database.prepare(`SELECT id, name, type, host, port, username,
+      this.#database
+        .prepare(
+          `SELECT id, name, type, host, port, username,
         auth_mode AS authMode, identity_ref AS identityRef, known_host_reference AS knownHostReference, status,
         capabilities_json AS capabilitiesJson, last_health_json AS lastHealthJson,
         enabled, version, created_at AS createdAt, updated_at AS updatedAt
-        FROM connections WHERE id = ?`).get(id),
+        FROM connections WHERE id = ?`,
+        )
+        .get(id),
     );
     if (!row.success) throw new AppError("NOT_FOUND", 404, "Connection 不存在");
     return this.#connectionView(row.data);
@@ -1576,7 +1829,9 @@ export class ExecutionPlatformService {
 
   #readProfile(id: string): ExecutionProfileView {
     const row = ProfileRowSchema.safeParse(
-      this.#database.prepare(`SELECT profiles.id, profiles.name, profiles.provider_kind AS providerKind,
+      this.#database
+        .prepare(
+          `SELECT profiles.id, profiles.name, profiles.provider_kind AS providerKind,
         profiles.connection_id AS connectionId, connections.name AS connectionName,
         profiles.default_model AS defaultModel, profiles.default_mode AS defaultMode,
         profiles.default_reasoning_effort AS defaultReasoningEffort,
@@ -1584,7 +1839,9 @@ export class ExecutionPlatformService {
         profiles.capabilities_json AS capabilitiesJson, profiles.health_json AS healthJson,
         profiles.enabled, profiles.version, profiles.created_at AS createdAt, profiles.updated_at AS updatedAt
         FROM execution_profiles AS profiles JOIN connections ON connections.id = profiles.connection_id
-        WHERE profiles.id = ?`).get(id),
+        WHERE profiles.id = ?`,
+        )
+        .get(id),
     );
     if (!row.success) throw new AppError("NOT_FOUND", 404, "Execution Profile 不存在");
     return this.#profileView(row.data);
@@ -1612,7 +1869,9 @@ export class ExecutionPlatformService {
   }
 
   #assertProject(id: string): void {
-    if (!this.#database.prepare("SELECT 1 FROM projects WHERE id = ? AND archived_at IS NULL").get(id))
+    if (
+      !this.#database.prepare("SELECT 1 FROM projects WHERE id = ? AND archived_at IS NULL").get(id)
+    )
       throw new AppError("NOT_FOUND", 404, "项目不存在或已归档");
   }
 
@@ -1632,7 +1891,11 @@ export class ExecutionPlatformService {
       throw new AppError("INVALID_REQUEST", 400, "SSH Host 和用户名必填");
     if (input.authMode === "identity_file") {
       if (!input.identityRef)
-        throw new AppError("SSH_IDENTITY_NOT_FOUND", 400, "Identity File 模式必须从 Identity Catalog 选择一个 key");
+        throw new AppError(
+          "SSH_IDENTITY_NOT_FOUND",
+          400,
+          "Identity File 模式必须从 Identity Catalog 选择一个 key",
+        );
       this.#identityRegistry.resolve(input.identityRef);
     } else if (input.identityRef) {
       throw new AppError("INVALID_REQUEST", 400, "SSH Agent 模式不能配置 Identity File 引用");
@@ -1640,9 +1903,10 @@ export class ExecutionPlatformService {
   }
 
   #connectionContext(connection: ConnectionView): ProviderConnectionContext {
-    const identityPath = connection.authMode === "identity_file" && connection.identityRef
-      ? this.#identityRegistry.resolve(connection.identityRef).path
-      : null;
+    const identityPath =
+      connection.authMode === "identity_file" && connection.identityRef
+        ? this.#identityRegistry.resolve(connection.identityRef).path
+        : null;
     return connectionContext(connection, this.#knownHostsFile, identityPath);
   }
 
@@ -1657,22 +1921,28 @@ export class ExecutionPlatformService {
         latencyMs: 0,
       };
     }
-    const result = await runProcessCommand("ssh", buildSshArguments({
-      host: connection.host ?? "",
-      username: connection.username,
-      port: connection.port,
-      identity: connection.authMode === "identity_file" && connection.identityRef
-        ? this.#identityRegistry.resolve(connection.identityRef).path
-        : null,
-      authMode: connection.authMode,
-      knownHostsFile: this.#knownHostsFile,
-      executable: "sh",
-      args: ["-c", "printf '%s\\n' \"$(id -un)\" \"$(uname -s)\" \"$(uname -m)\""],
-      cwd: isAbsolute(workspace) ? workspace : "/",
-    }));
+    const result = await runProcessCommand(
+      "ssh",
+      buildSshArguments({
+        host: connection.host ?? "",
+        username: connection.username,
+        port: connection.port,
+        identity:
+          connection.authMode === "identity_file" && connection.identityRef
+            ? this.#identityRegistry.resolve(connection.identityRef).path
+            : null,
+        authMode: connection.authMode,
+        knownHostsFile: this.#knownHostsFile,
+        executable: "sh",
+        args: ["-c", 'printf \'%s\\n\' "$(id -un)" "$(uname -s)" "$(uname -m)"'],
+        cwd: isAbsolute(workspace) ? workspace : "/",
+      }),
+    );
     const output = `${result.stdout}${result.stderr}`;
     const hostKeyChanged = /REMOTE HOST IDENTIFICATION HAS CHANGED|offending key/i.test(output);
-    const hostKey = /host key verification failed|known_hosts|no .* host key is known/i.test(output);
+    const hostKey = /host key verification failed|known_hosts|no .* host key is known/i.test(
+      output,
+    );
     const passphrase = /passphrase|incorrect passphrase|SSH_KEY_PASSPHRASE_REQUIRED/i.test(output);
     const auth = /permission denied|publickey|authentication failed/i.test(output);
     const status: ProviderHealth["status"] =
@@ -1703,7 +1973,7 @@ export class ExecutionPlatformService {
       status,
       version:
         result.exitCode === 0
-          ? result.stdout.trim().split(/\r?\n/, 1)[0]?.slice(0, 200) ?? null
+          ? (result.stdout.trim().split(/\r?\n/, 1)[0]?.slice(0, 200) ?? null)
           : null,
       message,
       checkedAt: new Date().toISOString(),
@@ -1736,40 +2006,68 @@ export class ExecutionPlatformService {
     if (!connection.host || !connection.username)
       throw new AppError("CONNECTION_OFFLINE", 409, "SSH Host 与用户名尚未配置");
     if (connection.authMode === "agent" && !(await isSshAgentAvailable()))
-      throw new AppError("SSH_AGENT_UNAVAILABLE", 409, "SSH Agent 不可用：请检查 socket 挂载与 SSH_AUTH_SOCK，或改用 Identity File");
-    const result = await runProcessCommand("ssh", buildSshArguments({
-      host: connection.host,
-      username: connection.username,
-      port: connection.port,
-      identity: connection.authMode === "identity_file" && connection.identityRef
-        ? this.#identityRegistry.resolve(connection.identityRef).path
-        : null,
-      authMode: connection.authMode,
-      knownHostsFile: this.#knownHostsFile,
-      executable: "sh",
-      args: ["-c", script, "devboard", ...args],
-      cwd: "/",
-    }));
-    if (result.exitCode === 0 || (allowMissingDirectory && result.stdout.trim().startsWith("MISSING"))) return result;
+      throw new AppError(
+        "SSH_AGENT_UNAVAILABLE",
+        409,
+        "SSH Agent 不可用：请检查 socket 挂载与 SSH_AUTH_SOCK，或改用 Identity File",
+      );
+    const result = await runProcessCommand(
+      "ssh",
+      buildSshArguments({
+        host: connection.host,
+        username: connection.username,
+        port: connection.port,
+        identity:
+          connection.authMode === "identity_file" && connection.identityRef
+            ? this.#identityRegistry.resolve(connection.identityRef).path
+            : null,
+        authMode: connection.authMode,
+        knownHostsFile: this.#knownHostsFile,
+        executable: "sh",
+        args: ["-c", script, "devboard", ...args],
+        cwd: "/",
+      }),
+    );
+    if (
+      result.exitCode === 0 ||
+      (allowMissingDirectory && result.stdout.trim().startsWith("MISSING"))
+    )
+      return result;
     const output = `${result.stderr}\n${result.stdout}`;
     if (/REMOTE HOST IDENTIFICATION HAS CHANGED|offending key/i.test(output))
       throw new AppError("HOST_KEY_CHANGED", 409, "SSH Host Key 已改变，连接已阻止");
     if (/host key verification failed|known_hosts|no .* host key is known/i.test(output))
       throw new AppError("HOST_KEY_UNTRUSTED", 409, "SSH Host Key 尚未确认；请扫描并人工核对指纹");
     if (/passphrase|incorrect passphrase/i.test(output))
-      throw new AppError("SSH_KEY_PASSPHRASE_REQUIRED", 409, "请使用 ssh-agent 加载带 passphrase 的私钥");
+      throw new AppError(
+        "SSH_KEY_PASSPHRASE_REQUIRED",
+        409,
+        "请使用 ssh-agent 加载带 passphrase 的私钥",
+      );
     if (/permission denied|publickey|authentication failed/i.test(output))
       throw new AppError("SSH_AUTH_FAILED", 409, "SSH 认证失败，请检查 Identity File 或 SSH Agent");
     throw new AppError("CONNECTION_OFFLINE", 409, "无法通过 SSH 在目标 Host 上完成操作");
   }
 
-  #recordChange(aggregateType: string, aggregateId: string, eventType: string, payload: Record<string, unknown>, timestamp: string): number {
+  #recordChange(
+    aggregateType: string,
+    aggregateId: string,
+    eventType: string,
+    payload: Record<string, unknown>,
+    timestamp: string,
+  ): number {
     const result = this.#database
       .prepare(
         `INSERT INTO change_events (aggregate_type, aggregate_id, event_type, safe_payload_json, created_at)
          VALUES (?, ?, ?, ?, ?)`,
       )
-      .run(aggregateType, aggregateId, eventType, JSON.stringify(safeProviderPayload(payload)), timestamp);
+      .run(
+        aggregateType,
+        aggregateId,
+        eventType,
+        JSON.stringify(safeProviderPayload(payload)),
+        timestamp,
+      );
     return Number(result.lastInsertRowid);
   }
 

@@ -2,18 +2,18 @@
 
 当前产品名称统一为 **DevBoard**，发布仓库为 `404404/DevBoard`。`CodexBoard` 仅保留在运行时兼容边界中，避免升级时丢失已有数据、浏览器会话和 Agent Skill。
 
-| 项目           | 新名称                                      |
-| -------------- | ------------------------------------------- |
-| macOS 应用     | `DevBoard.app`；升级器也接受旧的 `CodexBoard.app`        |
-| 主程序         | `codexboard-desktop`                        |
-| Bundle ID      | `cn.rocyan.codexboard.desktop`              |
-| npm 命名空间   | `@codexboard/*`                             |
-| 环境变量       | `CODEXBOARD_*`                              |
-| 随包技能       | `manage-codexboard`                         |
+| 项目           | 新名称                                                      |
+| -------------- | ----------------------------------------------------------- |
+| macOS 应用     | `DevBoard.app`；升级器也接受旧的 `CodexBoard.app`           |
+| 主程序         | `codexboard-desktop`                                        |
+| Bundle ID      | `cn.rocyan.codexboard.desktop`                              |
+| npm 命名空间   | `@codexboard/*`                                             |
+| 环境变量       | `CODEXBOARD_*`                                              |
+| 随包技能       | `manage-codexboard`                                         |
 | 默认数据目录   | `~/Library/Application Support/CodexBoard/`（稳定兼容路径） |
-| CLI 会话目录   | `~/.config/codexboard/`                     |
-| 浏览器存储前缀 | `codexboard:`                               |
-| 发布仓库       | `404404/DevBoard`                            |
+| CLI 会话目录   | `~/.config/codexboard/`                                     |
+| 浏览器存储前缀 | `codexboard:`                                               |
+| 发布仓库       | `404404/DevBoard`                                           |
 
 ## 升级与数据保留
 

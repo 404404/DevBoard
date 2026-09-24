@@ -46,8 +46,7 @@ export function migrateSshIdentityReferences(database: Database.Database): void 
       !row.identity_ref.includes("..")
         ? row.identity_ref
         : null;
-    const requiresConfiguration =
-      row.auth_mode === "identity_file" && safeReference === null;
+    const requiresConfiguration = row.auth_mode === "identity_file" && safeReference === null;
     update.run(
       row.auth_mode === "agent" ? null : safeReference,
       requiresConfiguration ? 1 : 0,

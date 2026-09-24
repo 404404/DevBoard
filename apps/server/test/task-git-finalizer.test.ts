@@ -42,9 +42,7 @@ function setup() {
 
 it("does not resolve a remote workspace against the control-plane filesystem", async () => {
   const finalizer = new TaskGitFinalizer([], undefined, { remoteOnly: true });
-  await expect(finalizer.inspect("/remote/projects/repo", "task")).rejects.toThrow(
-    "容器本地路径",
-  );
+  await expect(finalizer.inspect("/remote/projects/repo", "task")).rejects.toThrow("容器本地路径");
 });
 
 it("completes a clean main checkout without commits, archives, or delivery records", async () => {

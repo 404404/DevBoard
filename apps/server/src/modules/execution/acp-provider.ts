@@ -52,7 +52,11 @@ function textFromUpdate(update: unknown): string {
   const content = value.content;
   if (Array.isArray(content)) {
     return content
-      .flatMap((entry) => (entry && typeof entry === "object" ? [String((entry as Record<string, unknown>).text ?? "")] : []))
+      .flatMap((entry) =>
+        entry && typeof entry === "object"
+          ? [String((entry as Record<string, unknown>).text ?? "")]
+          : [],
+      )
       .join("");
   }
   return "";
@@ -65,7 +69,8 @@ function eventType(update: unknown): RunEventType {
   if (kind.includes("agent") || kind.includes("message")) return "agent.message";
   if (kind.includes("thinking") || kind.includes("reason")) return "agent.thinking";
   if (kind.includes("tool")) return kind.includes("start") ? "tool.started" : "tool.completed";
-  if (kind.includes("command")) return kind.includes("start") ? "command.started" : "command.completed";
+  if (kind.includes("command"))
+    return kind.includes("start") ? "command.started" : "command.completed";
   if (kind.includes("file") || kind.includes("diff")) return "file.changed";
   return "run.progress";
 }
@@ -74,10 +79,13 @@ function safeProviderEvent(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   const result: Record<string, unknown> = {};
   for (const [key, entry] of Object.entries(value as Record<string, unknown>).slice(0, 100)) {
-    if (/token|secret|password|credential|authorization|private.?key|api.?key|environment/i.test(key))
+    if (
+      /token|secret|password|credential|authorization|private.?key|api.?key|environment/i.test(key)
+    )
       continue;
     if (typeof entry === "string") result[key] = entry.slice(0, 10_000);
-    else if (typeof entry === "number" || typeof entry === "boolean" || entry === null) result[key] = entry;
+    else if (typeof entry === "number" || typeof entry === "boolean" || entry === null)
+      result[key] = entry;
   }
   return result;
 }
@@ -123,11 +131,11 @@ export class AcpProvider implements ExecutionProvider {
     this.#models = options.models ?? [];
   }
 
-  async capabilities(_context: ExecutionCapabilitiesContext): Promise<ProviderCapability> {
+  async capabilities(): Promise<ProviderCapability> {
     return this.#capabilities;
   }
 
-  async listModels(_context: ExecutionCapabilitiesContext): Promise<readonly ModelDescriptor[]> {
+  async listModels(): Promise<readonly ModelDescriptor[]> {
     return this.#models;
   }
 
@@ -171,7 +179,15 @@ export class AcpProvider implements ExecutionProvider {
       const passphrase = /passphrase|incorrect passphrase/i.test(output);
       const authentication = /login|auth|credential|permission denied|unauthorized/i.test(output);
       return {
-        status: passphrase ? "key_passphrase_required" : hostKeyChanged ? "host_key_changed" : hostKey ? "host_key_untrusted" : authentication ? "authentication_required" : "not_installed",
+        status: passphrase
+          ? "key_passphrase_required"
+          : hostKeyChanged
+            ? "host_key_changed"
+            : hostKey
+              ? "host_key_untrusted"
+              : authentication
+                ? "authentication_required"
+                : "not_installed",
         version: null,
         message: hostKeyChanged
           ? "SSH Host Key 已改变，连接已阻止"
@@ -180,8 +196,8 @@ export class AcpProvider implements ExecutionProvider {
             : passphrase
               ? "请使用 ssh-agent 加载带 passphrase 的私钥"
               : authentication
-            ? "Authentication required"
-            : "Provider executable not found",
+                ? "Authentication required"
+                : "Provider executable not found",
         checkedAt,
         latencyMs: Date.now() - started,
       };
@@ -229,18 +245,21 @@ export class AcpProvider implements ExecutionProvider {
   }
 
   async execute(input: ExecutionInput, callbacks: ExecutionCallbacks): Promise<ExecutionResult> {
-    const connection =
-      input.connection ?? {
-        id: String(input.metadata?.connectionId ?? "unknown"),
-        type: "ssh_host",
-        host: typeof input.metadata?.host === "string" ? input.metadata.host : null,
-        port: typeof input.metadata?.port === "number" ? input.metadata.port : null,
-        username: typeof input.metadata?.username === "string" ? input.metadata.username : null,
-        authMode: input.metadata?.authMode === "identity_file" ? "identity_file" : "agent",
-        identityFilePath: null,
-        knownHostsFile: typeof input.metadata?.knownHostsFile === "string" ? input.metadata.knownHostsFile : "/var/lib/devboard/ssh/known_hosts",
-      };
-    let session = input.session ?? (await this.createSession({ connection, workspace: input.workspace }));
+    const connection = input.connection ?? {
+      id: String(input.metadata?.connectionId ?? "unknown"),
+      type: "ssh_host",
+      host: typeof input.metadata?.host === "string" ? input.metadata.host : null,
+      port: typeof input.metadata?.port === "number" ? input.metadata.port : null,
+      username: typeof input.metadata?.username === "string" ? input.metadata.username : null,
+      authMode: input.metadata?.authMode === "identity_file" ? "identity_file" : "agent",
+      identityFilePath: null,
+      knownHostsFile:
+        typeof input.metadata?.knownHostsFile === "string"
+          ? input.metadata.knownHostsFile
+          : "/var/lib/devboard/ssh/known_hosts",
+    };
+    let session =
+      input.session ?? (await this.createSession({ connection, workspace: input.workspace }));
     if (!this.#clients.has(session.id)) {
       session = await this.resumeSession({ connection, session, workspace: input.workspace });
     }
@@ -262,7 +281,9 @@ export class AcpProvider implements ExecutionProvider {
     });
     const removePermission = handle.client.onPermission(async (request) => {
       const approval = mapApproval(request);
-      const handler = /input|question|elicitation/i.test(approval.type) ? callbacks.onUserInput : callbacks.onApproval;
+      const handler = /input|question|elicitation/i.test(approval.type)
+        ? callbacks.onUserInput
+        : callbacks.onApproval;
       const decision = await handler?.(approval);
       return approvalResult(decision ?? { type: "reject", reason: "没有可用的审批处理器" });
     });
@@ -274,7 +295,9 @@ export class AcpProvider implements ExecutionProvider {
         ...(input.mode ? { mode: input.mode } : {}),
       });
       const stopReason =
-        result && typeof result === "object" && typeof (result as Record<string, unknown>).stopReason === "string"
+        result &&
+        typeof result === "object" &&
+        typeof (result as Record<string, unknown>).stopReason === "string"
           ? String((result as Record<string, unknown>).stopReason)
           : "end_turn";
       const status = /cancel/i.test(stopReason)
@@ -283,7 +306,12 @@ export class AcpProvider implements ExecutionProvider {
           ? "failed"
           : "succeeded";
       callbacks.onEvent({
-        type: status === "succeeded" ? "run.completed" : status === "interrupted" ? "run.cancelled" : "run.failed",
+        type:
+          status === "succeeded"
+            ? "run.completed"
+            : status === "interrupted"
+              ? "run.cancelled"
+              : "run.failed",
         summary: status === "succeeded" ? "Provider 执行完成" : "Provider 执行未完成",
         payload: { stopReason, updateCount: updates.length },
       });
@@ -304,9 +332,7 @@ export class AcpProvider implements ExecutionProvider {
     readonly connection: ProviderConnectionContext;
     readonly session: ExecutionSession;
   }): Promise<ExecutionHistory | null> {
-    return this.#clients.has(input.session.id)
-      ? { session: input.session, events: [] }
-      : null;
+    return this.#clients.has(input.session.id) ? { session: input.session, events: [] } : null;
   }
 
   async dispose(): Promise<void> {

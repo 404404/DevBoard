@@ -86,7 +86,12 @@ export class ProjectAdministration {
       this.#recordAudit("project.create", id, {
         projectKey: command.projectKey,
       });
-      return this.#recordChange("project.created", id, { projectKey: command.projectKey }, timestamp);
+      return this.#recordChange(
+        "project.created",
+        id,
+        { projectKey: command.projectKey },
+        timestamp,
+      );
     });
     this.#onRevisionCommitted?.(revision);
 
@@ -210,12 +215,17 @@ export class ProjectAdministration {
       .run(randomUUID(), action, projectId, JSON.stringify(metadata));
   }
 
-  #recordChange(eventType: string, projectId: string, payload: Record<string, unknown>, createdAt: string): number {
+  #recordChange(
+    eventType: string,
+    projectId: string,
+    payload: Record<string, unknown>,
+    createdAt: string,
+  ): number {
     const result = this.#database
       .prepare(
         `INSERT INTO change_events (
           aggregate_type, aggregate_id, event_type, safe_payload_json, created_at
-        ) VALUES ('project', ?, ?, ?, ?)`
+        ) VALUES ('project', ?, ?, ?, ?)`,
       )
       .run(projectId, eventType, JSON.stringify(payload), createdAt);
     return Number(result.lastInsertRowid);

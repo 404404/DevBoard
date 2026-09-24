@@ -16,7 +16,11 @@ import { AppError } from "../src/app-error.js";
 import { SSHHostKeyStore } from "../src/modules/execution/ssh-host-key-store.js";
 
 const temporaryDirectories: string[] = [];
-const target = { id: "7b3db75b-297f-4314-980a-61b139bf1020", host: "host.example.test", port: 2222 };
+const target = {
+  id: "7b3db75b-297f-4314-980a-61b139bf1020",
+  host: "host.example.test",
+  port: 2222,
+};
 
 function makeKeyStore(keyData: string) {
   const directory = mkdtempSync(join(tmpdir(), "devboard-known-hosts-"));
@@ -24,7 +28,9 @@ function makeKeyStore(keyData: string) {
   const knownHosts = join(directory, "known_hosts");
   const scanner = join(directory, "ssh-keyscan-fixture");
   writeFileSync(knownHosts, "", { mode: 0o600 });
-  writeFileSync(scanner, `#!/bin/sh\nprintf '%s\\n' 'host ssh-ed25519 ${keyData}'\n`, { mode: 0o700 });
+  writeFileSync(scanner, `#!/bin/sh\nprintf '%s\\n' 'host ssh-ed25519 ${keyData}'\n`, {
+    mode: 0o700,
+  });
   chmodSync(scanner, 0o700);
   return { knownHosts, scanner, store: new SSHHostKeyStore(knownHosts, scanner) };
 }
@@ -34,7 +40,8 @@ function fingerprint(keyData: string): string {
 }
 
 afterEach(() => {
-  for (const directory of temporaryDirectories.splice(0)) rmSync(directory, { recursive: true, force: true });
+  for (const directory of temporaryDirectories.splice(0))
+    rmSync(directory, { recursive: true, force: true });
 });
 
 describe("SSHHostKeyStore", () => {
@@ -52,7 +59,9 @@ describe("SSHHostKeyStore", () => {
       fingerprint: fingerprint(keyData),
       trusted: true,
     });
-    expect(readFileSync(knownHosts, "utf8")).toBe(`[${target.host}]:${target.port} ssh-ed25519 ${keyData}\n`);
+    expect(readFileSync(knownHosts, "utf8")).toBe(
+      `[${target.host}]:${target.port} ssh-ed25519 ${keyData}\n`,
+    );
     expect(store.list(target)).toEqual([
       { algorithm: "ssh-ed25519", fingerprint: fingerprint(keyData), trusted: true },
     ]);
@@ -66,7 +75,9 @@ describe("SSHHostKeyStore", () => {
     store.trust(target, fingerprint(first));
     const original = readFileSync(knownHosts, "utf8");
 
-    writeFileSync(scanner, `#!/bin/sh\nprintf '%s\\n' 'host ssh-ed25519 ${second}'\n`, { mode: 0o700 });
+    writeFileSync(scanner, `#!/bin/sh\nprintf '%s\\n' 'host ssh-ed25519 ${second}'\n`, {
+      mode: 0o700,
+    });
     chmodSync(scanner, 0o700);
     await store.scan(target);
     let error: unknown;

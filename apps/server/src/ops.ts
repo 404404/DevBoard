@@ -93,9 +93,7 @@ function readAdminRuntime(config: ReturnType<typeof loadConfig>) {
 async function readSecretFromTerminal(prompt: string): Promise<string> {
   const input = process.stdin;
   if (!input.isTTY || typeof input.setRawMode !== "function") {
-    throw new Error(
-      "密码必须通过交互式 TTY 输入；不要将密码放入参数或环境变量",
-    );
+    throw new Error("密码必须通过交互式 TTY 输入；不要将密码放入参数或环境变量");
   }
   return new Promise((resolveSecret, rejectSecret) => {
     let value = "";

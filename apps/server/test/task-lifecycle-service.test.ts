@@ -266,6 +266,11 @@ it("blocks restoring another completed task while its workspace is being finaliz
   database
     .prepare("UPDATE projects SET workspace_realpath = '/tmp' WHERE id = ?")
     .run(task.projectId);
+  database
+    .prepare(
+      "INSERT INTO task_threads (id, task_id, thread_id, cwd, is_primary) VALUES (?, ?, ?, '/tmp', 1)",
+    )
+    .run("lifecycle-finalizing-thread", task.id, "thread-lifecycle-finalizing");
   const completed = taskboard.moveTask(
     task.id,
     { expectedVersion: task.version, targetStatus: "done" },
@@ -285,7 +290,7 @@ it("blocks restoring another completed task while its workspace is being finaliz
     );
   database
     .prepare(
-      "INSERT INTO task_lifecycle_resources (resource_key, operation_id) VALUES ('cwd:/private/tmp', ?)",
+      "INSERT INTO task_lifecycle_resources (resource_key, operation_id) VALUES ('cwd:/tmp', ?)",
     )
     .run(opId);
   expect(() =>

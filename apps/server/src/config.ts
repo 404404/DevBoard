@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { existsSync, lstatSync, readFileSync } from "node:fs";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 
 import { z } from "zod";
 import { isIP } from "node:net";
@@ -90,7 +90,14 @@ const AppConfigSchema = z
     CODEXBOARD_TRUST_PROXY: z
       .string()
       .default("")
-      .transform((value) => [...new Set(value.split(",").map((entry) => entry.trim()).filter(Boolean))])
+      .transform((value) => [
+        ...new Set(
+          value
+            .split(",")
+            .map((entry) => entry.trim())
+            .filter(Boolean),
+        ),
+      ])
       .pipe(z.array(z.string().refine(isProxyCidr, "可信代理必须是明确 IP 或 CIDR；不接受通配符"))),
     CODEXBOARD_DATA_DIR: z
       .string()
@@ -106,7 +113,7 @@ const AppConfigSchema = z
       .refine(isAbsolute, "SSH Identity 目录必须使用绝对路径"),
     CODEXBOARD_WORKSPACE_ROOTS: z
       .string()
-      .default("/var/lib/devboard/workspaces")
+      .default(REPOSITORY_ROOT)
       .transform((roots) =>
         [...new Set(roots.split(",").map((root) => root.trim()))].filter(Boolean),
       )
@@ -154,12 +161,6 @@ const AppConfigSchema = z
       .enum(["true", "false"])
       .default("false")
       .transform((value) => value === "true"),
-    CODEXBOARD_CODEX_TOKEN_FILE: z
-      .string()
-      .trim()
-      .min(1)
-      .refine(isAbsolute, "Codex capability token 文件必须使用绝对路径")
-      .optional(),
     CODEXBOARD_CODEX_PROJECT_SNAPSHOT_FILE: z
       .string()
       .trim()
@@ -185,10 +186,7 @@ const AppConfigSchema = z
       .transform((directory) => resolve(REPOSITORY_ROOT, directory)),
   })
   .superRefine((config, context) => {
-    if (
-      config.CODEXBOARD_HOST === config.CODEXBOARD_ADMIN_HOST &&
-      config.CODEXBOARD_PORT === config.CODEXBOARD_ADMIN_PORT
-    ) {
+    if (config.CODEXBOARD_PORT === config.CODEXBOARD_ADMIN_PORT) {
       context.addIssue({
         code: "custom",
         path: ["CODEXBOARD_ADMIN_PORT"],
@@ -249,6 +247,16 @@ const AppConfigSchema = z
           message: "飞书认证模式必须使用 HTTPS Origin 或公网域名或规范公网 IPv4 HTTP Origin",
         });
       }
+      if (
+        new URL(config.CODEXBOARD_ORIGIN).protocol === "http:" &&
+        !isPublicHttpOrigin(config.CODEXBOARD_ORIGIN)
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["CODEXBOARD_ORIGIN"],
+          message: "飞书 HTTP Origin 必须是规范公网域名或公网 IPv4 地址",
+        });
+      }
     }
 
     if (
@@ -262,7 +270,6 @@ const AppConfigSchema = z
         message: "开发身份适配器只能用于 localhost HTTP 开发环境",
       });
     }
-
   });
 
 export type AppConfig = z.infer<typeof AppConfigSchema>;
@@ -272,7 +279,7 @@ export class ConfigError extends Error {
   readonly issues: readonly string[];
 
   constructor(issues: readonly string[]) {
-    super("服务配置无效");
+    super(issues.join("; "));
     this.name = "ConfigError";
     this.issues = issues;
   }
@@ -280,6 +287,18 @@ export class ConfigError extends Error {
 
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppConfig {
   const normalizedEnvironment = normalizeCodexBoardEnvironment(environment);
+  if (normalizedEnvironment.CODEXBOARD_ENV === "production") {
+    if (normalizedEnvironment.CODEXBOARD_ORIGIN === undefined) {
+      throw new ConfigError(["DEVBOARD_PUBLIC_ORIGIN: 生产环境必须显式配置 Public Origin"]);
+    }
+    try {
+      if (new URL(normalizedEnvironment.CODEXBOARD_ORIGIN).protocol !== "https:") {
+        throw new ConfigError(["DEVBOARD_PUBLIC_ORIGIN: 生产环境必须使用 HTTPS"]);
+      }
+    } catch (error: unknown) {
+      if (error instanceof ConfigError) throw error;
+    }
+  }
   const result = AppConfigSchema.safeParse(normalizedEnvironment);
 
   if (!result.success) {

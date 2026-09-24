@@ -171,12 +171,9 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
   const registry =
     options.services?.projectRegistry ??
     options.projectRegistry ??
-    new ProjectRegistry(
-      options.database,
-      options.config.CODEXBOARD_WORKSPACE_ROOTS,
-      undefined,
-      { remoteOnly: options.config.CODEXBOARD_ENV === "production" },
-    );
+    new ProjectRegistry(options.database, options.config.CODEXBOARD_WORKSPACE_ROOTS, undefined, {
+      remoteOnly: options.config.CODEXBOARD_ENV === "production",
+    });
   const identityService =
     options.services?.identityService ??
     new IdentityService({
@@ -271,11 +268,9 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
       database: options.database,
       taskboard,
       queue,
-      gitFinalizer: new TaskGitFinalizer(
-        options.config.CODEXBOARD_WORKSPACE_ROOTS,
-        undefined,
-        { remoteOnly: options.config.CODEXBOARD_ENV === "production" },
-      ),
+      gitFinalizer: new TaskGitFinalizer(options.config.CODEXBOARD_WORKSPACE_ROOTS, undefined, {
+        remoteOnly: options.config.CODEXBOARD_ENV === "production",
+      }),
       scheduleExecution: options.scheduleExecution ?? (() => {}),
       ...revisionOption,
     });

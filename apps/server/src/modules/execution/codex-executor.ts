@@ -381,7 +381,9 @@ export class AppServerCodexExecutor implements CodexExecutor, CodexThreadProvisi
       .map((model) => ({
         id: model.model,
         name: model.displayName,
-        reasoningEfforts: model.supportedReasoningEfforts.map(({ reasoningEffort }) => reasoningEffort),
+        reasoningEfforts: model.supportedReasoningEfforts.map(
+          ({ reasoningEffort }) => reasoningEffort,
+        ),
         modes: [],
       }));
   }

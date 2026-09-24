@@ -9,7 +9,10 @@ describe("container upgrade migration acceptance", () => {
   it("preserves legacy business history and fails closed on legacy SSH paths", () => {
     const database = openDatabase(":memory:");
     try {
-      runMigrations(database, CORE_MIGRATIONS.filter(({ version }) => version <= 20));
+      runMigrations(
+        database,
+        CORE_MIGRATIONS.filter(({ version }) => version <= 20),
+      );
       database.exec(`
         INSERT INTO actors (id, tenant_key, open_id, name, role)
           VALUES (
@@ -36,10 +39,12 @@ describe("container upgrade migration acceptance", () => {
       `);
 
       database
-        .prepare(`INSERT INTO task_threads (
+        .prepare(
+          `INSERT INTO task_threads (
           id, task_id, thread_id, cwd, codex_version, is_primary,
           last_turn_id, last_event_cursor, status
-        ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, 'completed')`)
+        ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, 'completed')`,
+        )
         .run(
           "thread-row-legacy",
           "task-legacy",
@@ -50,11 +55,13 @@ describe("container upgrade migration acceptance", () => {
           "codex-cursor-legacy",
         );
       database
-        .prepare(`INSERT INTO jobs (
+        .prepare(
+          `INSERT INTO jobs (
           id, task_id, task_thread_id, kind, status, execution_key,
           idempotency_key, requested_by, work_context_json,
           queued_at, started_at, completed_at, updated_at
-        ) VALUES (?, ?, ?, 'start', 'succeeded', ?, ?, ?, ?, ?, ?, ?, ?)`)
+        ) VALUES (?, ?, ?, 'start', 'succeeded', ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
         .run(
           "job-legacy",
           "task-legacy",
@@ -72,9 +79,11 @@ describe("container upgrade migration acceptance", () => {
           "2026-09-01T00:02:00.000Z",
         );
       database
-        .prepare(`INSERT INTO job_events (
+        .prepare(
+          `INSERT INTO job_events (
           id, job_id, seq, kind, summary, safe_payload_json, created_at
-        ) VALUES (?, ?, 1, 'agent_message', ?, ?, ?)`)
+        ) VALUES (?, ?, 1, 'agent_message', ?, ?, ?)`,
+        )
         .run(
           "job-event-legacy",
           "job-legacy",
@@ -83,10 +92,12 @@ describe("container upgrade migration acceptance", () => {
           "2026-09-01T00:01:30.000Z",
         );
       database
-        .prepare(`INSERT INTO job_interactions (
+        .prepare(
+          `INSERT INTO job_interactions (
           id, job_id, server_request_id, kind, status, safe_request_json,
           decision_json, decided_by, created_at, decided_at
-        ) VALUES (?, ?, ?, 'command_approval', 'responded', ?, ?, ?, ?, ?)`)
+        ) VALUES (?, ?, ?, 'command_approval', 'responded', ?, ?, ?, ?, ?)`,
+        )
         .run(
           "job-approval-legacy",
           "job-legacy",
@@ -98,7 +109,10 @@ describe("container upgrade migration acceptance", () => {
           "2026-09-01T00:01:15.000Z",
         );
 
-      runMigrations(database, CORE_MIGRATIONS.filter(({ version }) => version <= 28));
+      runMigrations(
+        database,
+        CORE_MIGRATIONS.filter(({ version }) => version <= 28),
+      );
       database
         .prepare(
           `INSERT INTO connections (
@@ -157,8 +171,10 @@ describe("container upgrade migration acceptance", () => {
         last_event_cursor: "codex-cursor-legacy",
       });
       const migratedRun = database
-        .prepare(`SELECT id, provider_thread_id, provider_session_id, workspace, model,
-          reasoning_effort, status, legacy_job_id FROM runs WHERE legacy_job_id = ?`)
+        .prepare(
+          `SELECT id, provider_thread_id, provider_session_id, workspace, model,
+          reasoning_effort, status, legacy_job_id FROM runs WHERE legacy_job_id = ?`,
+        )
         .get("job-legacy") as Record<string, unknown> | undefined;
       expect(migratedRun).toMatchObject({
         provider_thread_id: "codex-thread-legacy",
@@ -199,8 +215,10 @@ describe("container upgrade migration acceptance", () => {
       });
       expect(
         database
-          .prepare(`SELECT filename, size_bytes, sha256, storage_key, uploader_identity_key
-            FROM attachments WHERE id = 'attachment-legacy'`)
+          .prepare(
+            `SELECT filename, size_bytes, sha256, storage_key, uploader_identity_key
+            FROM attachments WHERE id = 'attachment-legacy'`,
+          )
           .get(),
       ).toEqual({
         filename: "evidence.txt",

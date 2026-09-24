@@ -82,6 +82,8 @@ async function inspectIdentityFile(
       return { algorithm: "", fingerprint: "", encrypted: true };
     }
     // ssh-keygen diagnostics can contain paths or key material; never propagate them.
+    // The raw diagnostic may contain a private-key path or key material; never retain it.
+    // eslint-disable-next-line preserve-caught-error
     throw new Error("identity inspection failed");
   }
 }
@@ -178,19 +180,23 @@ export class DirectoryIdentityRegistry implements IdentityRegistry {
       try {
         const metadata = await this.#inspector(resolve(this.#directory, id));
         if (metadata.encrypted) {
-          result.push(descriptor(id, {
-            usable: false,
-            encrypted: true,
-            warning: "私钥需要 passphrase；请通过 SSH Agent 加载后使用",
-          }));
+          result.push(
+            descriptor(id, {
+              usable: false,
+              encrypted: true,
+              warning: "私钥需要 passphrase；请通过 SSH Agent 加载后使用",
+            }),
+          );
         } else {
           result.push(descriptor(id, { ...metadata, usable: true }));
         }
       } catch {
-        result.push(descriptor(id, {
-          usable: false,
-          warning: "无法识别为可用的 SSH Identity 文件",
-        }));
+        result.push(
+          descriptor(id, {
+            usable: false,
+            warning: "无法识别为可用的 SSH Identity 文件",
+          }),
+        );
       }
     }
     return result;

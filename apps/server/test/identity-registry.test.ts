@@ -1,11 +1,4 @@
-import {
-  chmodSync,
-  mkdirSync,
-  mkdtempSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -72,13 +65,15 @@ describe("DirectoryIdentityRegistry", () => {
     const registry = identityRegistry(directory);
     const catalog = await registry.list();
 
-    expect(catalog).toEqual([{
-      id: "host_ed25519",
-      name: "host_ed25519",
-      ...PUBLIC_METADATA,
-      usable: true,
-      warning: null,
-    }]);
+    expect(catalog).toEqual([
+      {
+        id: "host_ed25519",
+        name: "host_ed25519",
+        ...PUBLIC_METADATA,
+        usable: true,
+        warning: null,
+      },
+    ]);
     expect(JSON.stringify(catalog)).not.toContain("PRIVATE-KEY-CANARY");
     expect(JSON.stringify(catalog)).not.toContain(directory);
     expect(registry.resolve("host_ed25519").path).toBe(keyPath);
@@ -172,9 +167,13 @@ describe("DirectoryIdentityRegistry", () => {
     });
     const { connection } = service.createConnection({
       name: "Agent Host",
+      type: "ssh_host",
       host: "host.example.test",
+      port: 22,
       username: "dev",
       authMode: "agent",
+      identityRef: null,
+      capabilities: { providerExecutables: [], protocolModes: [] },
       enabled: false,
     });
     const tested = await service.testConnection(connection.id);
@@ -215,10 +214,13 @@ describe("DirectoryIdentityRegistry", () => {
     });
     const created = service.createConnection({
       name: "Remote Host",
+      type: "ssh_host",
       host: "host.example.test",
+      port: 22,
       username: "dev",
       authMode: "identity_file",
       identityRef: "host_ed25519",
+      capabilities: { providerExecutables: [], protocolModes: [] },
       enabled: false,
     });
     const storedRef = database

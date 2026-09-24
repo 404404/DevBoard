@@ -85,12 +85,16 @@ export class ExecutionProviderRegistry {
             provider.health(context),
             provider.capabilities(context),
           ]);
-          if (provider.listModels && health.status === "ready") models = await provider.listModels(context);
+          if (provider.listModels && health.status === "ready")
+            models = await provider.listModels(context);
         } catch (error: unknown) {
           health = {
             status: "error",
             version: null,
-            message: error instanceof Error ? error.message.slice(0, 2_000) : "Provider health check failed",
+            message:
+              error instanceof Error
+                ? error.message.slice(0, 2_000)
+                : "Provider health check failed",
             checkedAt: new Date().toISOString(),
             latencyMs: null,
           };
@@ -113,7 +117,11 @@ export class ExecutionProviderRegistry {
           installed: health.status === "ready" || health.status === "authentication_required",
           health,
           capabilities,
-          models,
+          models: models.map((model) => ({
+            ...model,
+            reasoningEfforts: [...model.reasoningEfforts],
+            modes: [...model.modes],
+          })),
         };
       }),
     );

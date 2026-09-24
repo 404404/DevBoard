@@ -98,9 +98,9 @@ it("resolves new Run workspaces only through the selected SSH Connection mapping
   });
 
   expect(service.resolveWorkspace(projectId, profileId)).toBe("/home/dev/projects/remote");
-  expect(() => service.resolveWorkspace(projectId, profileId, "/container/not-the-project")).toThrow(
-    "Workspace Mapping",
-  );
+  expect(() =>
+    service.resolveWorkspace(projectId, profileId, "/container/not-the-project"),
+  ).toThrow("Workspace Mapping");
 });
 
 it("does not resolve a Run workspace when a project has no SSH mapping", () => {

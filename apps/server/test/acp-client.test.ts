@@ -80,9 +80,9 @@ describe("ACP client", () => {
     await expect(
       client.loadSession({ sessionId: "old-session", cwd: "/workspace/project" }),
     ).rejects.toThrow("loadSession");
-    expect(transport.sent.some((message) => "method" in message && message.method === "session/load")).toBe(
-      false,
-    );
+    expect(
+      transport.sent.some((message) => "method" in message && message.method === "session/load"),
+    ).toBe(false);
 
     await client.close();
   });

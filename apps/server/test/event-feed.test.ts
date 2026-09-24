@@ -120,14 +120,25 @@ describe("EventFeed module", () => {
   });
 
   it("broadcasts one committed revision to multiple clients and deduplicates wakeups", async () => {
-    const { eventFeed, firstProject, taskboard } = setup();
+    const { database, eventFeed, firstProject, taskboard } = setup();
+    const cursor = Number(
+      database.prepare("SELECT coalesce(max(revision), 0) FROM change_events").pluck().get(),
+    );
     const firstController = new AbortController();
     const secondController = new AbortController();
     const firstIterator = eventFeed
-      .subscribe({ projectId: firstProject.id, afterRevision: 0, signal: firstController.signal })
+      .subscribe({
+        projectId: firstProject.id,
+        afterRevision: cursor,
+        signal: firstController.signal,
+      })
       [Symbol.asyncIterator]();
     const secondIterator = eventFeed
-      .subscribe({ projectId: firstProject.id, afterRevision: 0, signal: secondController.signal })
+      .subscribe({
+        projectId: firstProject.id,
+        afterRevision: cursor,
+        signal: secondController.signal,
+      })
       [Symbol.asyncIterator]();
     const firstWaiting = nextWithTimeout(firstIterator);
     const secondWaiting = nextWithTimeout(secondIterator);

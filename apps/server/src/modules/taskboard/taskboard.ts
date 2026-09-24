@@ -223,7 +223,10 @@ export class Taskboard {
   }
 
   projectSourceKind(projectId: string, actor: PrincipalView): LocalProjectKind {
-    return this.#readProject(projectId, actor).sourceKind;
+    const project = this.#readProject(projectId, actor);
+    if (project.kind === "codex") return "codex";
+    if (project.kind === "managed") return "legacy";
+    return "system";
   }
 
   readBoard(projectId: string, actor: PrincipalView): BoardView {
@@ -650,8 +653,7 @@ export class Taskboard {
           command.developmentContextId === undefined
             ? current.developmentContextId
             : command.developmentContextId,
-        milestoneId:
-          command.milestoneId === undefined ? current.milestoneId : command.milestoneId,
+        milestoneId: command.milestoneId === undefined ? current.milestoneId : command.milestoneId,
       };
       this.#validateDateRange(next.startAt, next.dueAt);
       if (command.assigneeIdentity !== undefined) {

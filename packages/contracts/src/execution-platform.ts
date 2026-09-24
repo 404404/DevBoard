@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-import { EntityIdSchema, EntityVersionSchema, IsoTimestampSchema, RevisionSchema } from "./common.js";
+import {
+  EntityIdSchema,
+  EntityVersionSchema,
+  IsoTimestampSchema,
+  RevisionSchema,
+} from "./common.js";
 
 /** Provider names stay open so new adapters do not change Project/Task contracts. */
 export const ProviderKindSchema = z
@@ -129,7 +134,10 @@ export const CreateConnectionCommandSchema = z.strictObject({
   username: z.string().trim().min(1).max(160),
   authMode: SSHAuthModeSchema.default("identity_file"),
   identityRef: IdentityReferenceSchema.nullable().default(null),
-  capabilities: ConnectionCapabilitiesSchema.default({ providerExecutables: [], protocolModes: [] }),
+  capabilities: ConnectionCapabilitiesSchema.default({
+    providerExecutables: [],
+    protocolModes: [],
+  }),
   enabled: z.boolean().default(true),
 });
 export type CreateConnectionCommand = z.infer<typeof CreateConnectionCommandSchema>;
@@ -342,7 +350,9 @@ export const ExecutionApprovalDecisionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("cancel") }),
   z.object({
     type: z.literal("input"),
-    answers: z.record(z.string(), z.array(z.string().max(1_000)).max(20)).max(100),
+    answers: z
+      .record(z.string(), z.array(z.string().max(1_000)).max(20))
+      .refine((answers) => Object.keys(answers).length <= 100, "Too many answers"),
   }),
 ]);
 export type ExecutionApprovalDecision = z.infer<typeof ExecutionApprovalDecisionSchema>;

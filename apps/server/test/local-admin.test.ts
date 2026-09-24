@@ -12,7 +12,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../src/app.js";
 import { loadConfig } from "../src/config.js";
-import { initializeDatabase, type SqliteDatabase } from "../src/modules/database/index.js";
+import {
+  CORE_MIGRATIONS,
+  initializeDatabase,
+  type SqliteDatabase,
+} from "../src/modules/database/index.js";
 import type { BackupRunner } from "../src/modules/operations/index.js";
 import { ProjectSyncService } from "../src/modules/project-sync/index.js";
 import { createLocalAdminApp } from "../src/transports/local-admin-http.js";
@@ -566,7 +570,7 @@ describe("local admin HTTP adapter", () => {
       backupId: expect.stringMatching(/^backup-/),
       manifest: {
         manifestVersion: 1,
-        schemaVersion: 27,
+        schemaVersion: CORE_MIGRATIONS.at(-1)!.version,
         attachments: [],
       },
     });

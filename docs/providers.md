@@ -2,12 +2,12 @@
 
 Provider 只描述如何与 Agent 的机器协议通信；Connection 描述进程运行在哪里。Provider 不读取或复制第三方私有 credential 文件，健康检查失败时显示真实的未安装、需要认证、离线或协议错误状态。
 
-| Provider | SSH Host command | Protocol | Streaming | Approval/Input | Cancel | Models |
-| --- | --- | --- | --- | --- | --- | --- |
-| Codex | `codex app-server` over SSH stdio | Codex JSON-RPC | Yes | Yes | Yes | Yes |
-| Cursor | `agent acp` over SSH stdio | ACP | Yes | ACP capability | Yes | ACP capability |
-| Grok Build | `grok agent stdio` over SSH stdio | ACP | Yes | ACP capability | Yes | ACP capability |
-| OpenCode | `opencode acp` over SSH stdio | ACP | Yes | ACP capability | Yes | ACP capability |
+| Provider   | SSH Host command                  | Protocol       | Streaming | Approval/Input | Cancel | Models         |
+| ---------- | --------------------------------- | -------------- | --------- | -------------- | ------ | -------------- |
+| Codex      | `codex app-server` over SSH stdio | Codex JSON-RPC | Yes       | Yes            | Yes    | Yes            |
+| Cursor     | `agent acp` over SSH stdio        | ACP            | Yes       | ACP capability | Yes    | ACP capability |
+| Grok Build | `grok agent stdio` over SSH stdio | ACP            | Yes       | ACP capability | Yes    | ACP capability |
+| OpenCode   | `opencode acp` over SSH stdio     | ACP            | Yes       | ACP capability | Yes    | ACP capability |
 
 ## Codex
 

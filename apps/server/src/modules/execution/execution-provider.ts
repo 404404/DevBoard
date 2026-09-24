@@ -72,12 +72,8 @@ export type ExecutionApprovalDecision =
 
 export interface ExecutionCallbacks {
   readonly onEvent: (event: ExecutionProviderEvent) => void;
-  readonly onApproval?: (
-    request: ExecutionApprovalRequest,
-  ) => Promise<ExecutionApprovalDecision>;
-  readonly onUserInput?: (
-    request: ExecutionApprovalRequest,
-  ) => Promise<ExecutionApprovalDecision>;
+  readonly onApproval?: (request: ExecutionApprovalRequest) => Promise<ExecutionApprovalDecision>;
+  readonly onUserInput?: (request: ExecutionApprovalRequest) => Promise<ExecutionApprovalDecision>;
   readonly onSession?: (session: ExecutionSession) => void;
   readonly onProviderSession?: (providerSessionId: string) => void;
 }

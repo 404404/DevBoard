@@ -347,14 +347,8 @@ describe("taskboard HTTP routes", () => {
         expect.objectContaining({ name: "Other", sortOrder: 3 }),
         expect.objectContaining({ name: "Zulu", sortOrder: 4 }),
       ],
-      developmentContexts: [
-        {
-          id: "10000000-0000-4000-8000-000000000003",
-          label: "feature/options",
-          active: true,
-        },
-      ],
-      defaultDevelopmentContext: { id: null, label: "main", branch: "main" },
+      developmentContexts: [],
+      defaultDevelopmentContext: { id: null, label: "无", branch: null },
       attachmentMaxBytes: config.CODEXBOARD_ATTACHMENT_MAX_BYTES,
       relationCandidates: [
         { id: first.id, identifier: "PICK-001", title: "候选任务一" },
@@ -379,8 +373,8 @@ describe("taskboard HTTP routes", () => {
     expect(JSON.stringify(options.json())).not.toContain(DEVELOPMENT_IDENTITY.name);
     expect(JSON.stringify(options.json())).not.toContain("失效成员");
     expect(projectRegistry.developmentContextReads).toBe(0);
-    expect(projectRegistry.developmentContextScans).toBe(1);
-    expect(projectRegistry.executionContextReads).toBe(1);
+    expect(projectRegistry.developmentContextScans).toBe(0);
+    expect(projectRegistry.executionContextReads).toBe(0);
 
     projectRegistry.developmentContextReads = 0;
     projectRegistry.developmentContextScans = 0;
@@ -392,7 +386,7 @@ describe("taskboard HTTP routes", () => {
     expect(allProject.statusCode).toBe(409);
     expect(projectRegistry.developmentContextReads).toBe(0);
     expect(projectRegistry.developmentContextScans).toBe(0);
-    expect(projectRegistry.executionContextReads).toBe(1);
+    expect(projectRegistry.executionContextReads).toBe(0);
 
     const outsiderLogin = await app.inject({
       method: "POST",
@@ -417,7 +411,7 @@ describe("taskboard HTTP routes", () => {
         .data.assignees.map((actor: { identity: IdentityRef }) => actor.identity),
     ).toEqual([outsiderLogin.json().data.actor.identity]);
     expect(projectRegistry.developmentContextReads).toBe(0);
-    expect(projectRegistry.developmentContextScans).toBe(1);
+    expect(projectRegistry.developmentContextScans).toBe(0);
   });
 
   it("creates a temporary task with one draft Thread in Codex Recent", async () => {
@@ -491,6 +485,13 @@ describe("taskboard HTTP routes", () => {
     });
     expect(created.statusCode, created.body).toBe(201);
     const task = created.json().data;
+    database
+      .prepare(
+        `INSERT INTO task_threads (
+          id, task_id, thread_id, cwd, is_primary, status
+        ) VALUES (?, ?, ?, ?, 1, 'idle')`,
+      )
+      .run("task-thread-delete-fixture", task.id, "thread-draft-1", workspace);
     const canceled = await app.inject({
       method: "POST",
       url: `/api/v1/tasks/${task.id}/move`,
@@ -521,7 +522,6 @@ describe("taskboard HTTP routes", () => {
       headers: headers("http-delete-confirm"),
       payload: { expectedVersion: canceled.json().data.version },
     });
-
     expect(deleted.statusCode, JSON.stringify(deleted.json())).toBe(200);
     expect(deleted.json().data).toMatchObject({ taskId: task.id, projectId: project.id });
     expect(provisioner.archived).toEqual(["thread-draft-1"]);
@@ -684,6 +684,7 @@ describe("taskboard HTTP routes", () => {
     expect(projects.json().data.map((entry: { kind: string }) => entry.kind)).toEqual([
       "all",
       "temporary",
+      "managed",
     ]);
     expect(projects.json().data[0]).not.toHaveProperty("workspaceRealpath");
 
@@ -816,6 +817,7 @@ describe("taskboard HTTP routes", () => {
         dueAt: null,
         recurrence: null,
         developmentContextId: null,
+        milestoneId: null,
         links: [],
         initialRelations: {
           parentTaskId: null,

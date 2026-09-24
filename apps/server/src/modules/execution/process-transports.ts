@@ -102,9 +102,13 @@ export class ChildProcessTransport implements ProcessTransport {
     for (const listener of this.#messageListeners) jsonl.onMessage(listener);
     for (const listener of this.#closeListeners) jsonl.onClose(listener);
     await new Promise<void>((resolve, reject) => {
-      let timer: NodeJS.Timeout | undefined;
+      const timer = setTimeout(() => {
+        cleanup();
+        child.kill("SIGTERM");
+        reject(new Error("进程启动超时"));
+      }, this.#startupTimeoutMs);
       const cleanup = () => {
-        if (timer) clearTimeout(timer);
+        clearTimeout(timer);
         child.off("spawn", onSpawn);
         child.off("error", onError);
       };
@@ -116,11 +120,6 @@ export class ChildProcessTransport implements ProcessTransport {
         cleanup();
         reject(error);
       };
-      timer = setTimeout(() => {
-        cleanup();
-        child.kill("SIGTERM");
-        reject(new Error("进程启动超时"));
-      }, this.#startupTimeoutMs);
       child.once("spawn", onSpawn);
       child.once("error", onError);
     });
@@ -228,7 +227,7 @@ export interface SshProcessTransportOptions {
   readonly shutdownTimeoutMs?: number;
 }
 
-function validateSshToken(value: string, name: string): string {
+function validateSshToken(value: string): string {
   if (
     !value ||
     value.includes(String.fromCharCode(0)) ||
@@ -253,7 +252,7 @@ export function buildSshRemoteCommand(
   args: readonly string[] = [],
 ): string {
   if (!isAbsolute(cwd)) throw new Error("SSH 远程工作目录必须是绝对路径");
-  validateSshToken(executable, "executable");
+  validateSshToken(executable);
   return [
     "cd",
     quotePosixShell(cwd),
@@ -265,22 +264,28 @@ export function buildSshRemoteCommand(
 }
 
 export function buildSshArguments(options: SshProcessTransportOptions): readonly string[] {
-  const host = validateSshToken(options.host, "host");
-  const destination = options.username
-    ? `${validateSshToken(options.username, "username")}@${host}`
-    : host;
+  const host = validateSshToken(options.host);
+  const destination = options.username ? `${validateSshToken(options.username)}@${host}` : host;
   const knownHostsFile = options.knownHostsFile ?? "/var/lib/devboard/ssh/known_hosts";
   if (!isAbsolute(knownHostsFile)) throw new Error("SSH known_hosts 路径必须是绝对路径");
   const args: string[] = [
     "-T",
-    "-o", "BatchMode=yes",
-    "-o", "StrictHostKeyChecking=yes",
-    "-o", `UserKnownHostsFile=${knownHostsFile}`,
-    "-o", "GlobalKnownHostsFile=/dev/null",
-    "-o", "UpdateHostKeys=no",
-    "-o", "ConnectTimeout=10",
-    "-o", "ServerAliveInterval=15",
-    "-o", "ServerAliveCountMax=3",
+    "-o",
+    "BatchMode=yes",
+    "-o",
+    "StrictHostKeyChecking=yes",
+    "-o",
+    `UserKnownHostsFile=${knownHostsFile}`,
+    "-o",
+    "GlobalKnownHostsFile=/dev/null",
+    "-o",
+    "UpdateHostKeys=no",
+    "-o",
+    "ConnectTimeout=10",
+    "-o",
+    "ServerAliveInterval=15",
+    "-o",
+    "ServerAliveCountMax=3",
   ];
   if (options.port !== null && options.port !== undefined) {
     if (!Number.isInteger(options.port) || options.port < 1 || options.port > 65_535)
@@ -288,7 +293,7 @@ export function buildSshArguments(options: SshProcessTransportOptions): readonly
     args.push("-p", String(options.port));
   }
   if (options.identity) {
-    const identity = validateSshToken(options.identity, "identity");
+    const identity = validateSshToken(options.identity);
     if (!isAbsolute(identity)) throw new Error("SSH identity 必须是绝对路径");
     args.push("-i", identity);
     args.push("-o", "IdentitiesOnly=yes");
@@ -296,7 +301,11 @@ export function buildSshArguments(options: SshProcessTransportOptions): readonly
   if (options.authMode === "identity_file" && !options.identity) {
     throw new Error("SSH Identity File must be resolved by the Identity Registry");
   }
-  args.push("--", destination, buildSshRemoteCommand(options.cwd, options.executable, options.args));
+  args.push(
+    "--",
+    destination,
+    buildSshRemoteCommand(options.cwd, options.executable, options.args),
+  );
   return args;
 }
 
@@ -305,10 +314,14 @@ export class SSHProcessTransport extends ChildProcessTransport {
     super({
       executable: options.sshExecutable ?? "ssh",
       args: buildSshArguments(options),
-      env: options.env,
       description: `ssh-process:${options.host}`,
-      startupTimeoutMs: options.startupTimeoutMs,
-      shutdownTimeoutMs: options.shutdownTimeoutMs,
+      ...(options.env === undefined ? {} : { env: options.env }),
+      ...(options.startupTimeoutMs === undefined
+        ? {}
+        : { startupTimeoutMs: options.startupTimeoutMs }),
+      ...(options.shutdownTimeoutMs === undefined
+        ? {}
+        : { shutdownTimeoutMs: options.shutdownTimeoutMs }),
     });
   }
 }

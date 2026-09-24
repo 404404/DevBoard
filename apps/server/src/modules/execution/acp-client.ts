@@ -15,7 +15,10 @@ interface PendingRequest {
 }
 
 export class AcpProtocolError extends Error {
-  constructor(message: string, readonly value?: unknown) {
+  constructor(
+    message: string,
+    readonly value?: unknown,
+  ) {
     super(message);
     this.name = "AcpProtocolError";
   }
@@ -109,7 +112,9 @@ export class AcpClient {
           : {};
       const agentCapabilities = initializedValue.agentCapabilities;
       this.#agentCapabilities =
-        agentCapabilities && typeof agentCapabilities === "object" && !Array.isArray(agentCapabilities)
+        agentCapabilities &&
+        typeof agentCapabilities === "object" &&
+        !Array.isArray(agentCapabilities)
           ? (agentCapabilities as Record<string, unknown>)
           : {};
       this.#connected = true;
@@ -127,7 +132,10 @@ export class AcpClient {
     return this.#parseSession(result, input.cwd);
   }
 
-  async loadSession(input: { readonly sessionId: string; readonly cwd: string }): Promise<AcpSession> {
+  async loadSession(input: {
+    readonly sessionId: string;
+    readonly cwd: string;
+  }): Promise<AcpSession> {
     if (!this.supportsLoadSession) {
       throw new AcpProtocolError("ACP agent does not advertise agentCapabilities.loadSession");
     }
@@ -158,7 +166,8 @@ export class AcpClient {
   }
 
   request(method: string, params: unknown): Promise<unknown> {
-    if (!this.#connected) return Promise.reject(new AcpProtocolError("ACP client is not connected"));
+    if (!this.#connected)
+      return Promise.reject(new AcpProtocolError("ACP client is not connected"));
     return this.#requestRaw(method, params);
   }
 
@@ -205,7 +214,9 @@ export class AcpClient {
       clearTimeout(pending.timeout);
       this.#pending.delete(message.id);
       if ("error" in message) {
-        pending.reject(new AcpRequestError(message.error.code, message.error.message, message.error.data));
+        pending.reject(
+          new AcpRequestError(message.error.code, message.error.message, message.error.data),
+        );
       } else {
         pending.resolve(message.result);
       }
@@ -231,11 +242,7 @@ export class AcpClient {
     }
   }
 
-  async #handleServerRequest(
-    id: string | number,
-    method: string,
-    params: unknown,
-  ): Promise<void> {
+  async #handleServerRequest(id: string | number, method: string, params: unknown): Promise<void> {
     const request: AcpServerRequest = {
       id,
       method,
@@ -249,7 +256,9 @@ export class AcpClient {
         }),
     };
     const sessionId =
-      params && typeof params === "object" && typeof (params as Record<string, unknown>).sessionId === "string"
+      params &&
+      typeof params === "object" &&
+      typeof (params as Record<string, unknown>).sessionId === "string"
         ? ((params as Record<string, unknown>).sessionId as string)
         : undefined;
     const handler = [...this.#permissions].at(-1);
@@ -260,7 +269,10 @@ export class AcpClient {
     try {
       await request.respond(await handler({ request, ...(sessionId ? { sessionId } : {}) }));
     } catch (error: unknown) {
-      await request.fail(-32603, error instanceof Error ? error.message : "ACP permission handler failed");
+      await request.fail(
+        -32603,
+        error instanceof Error ? error.message : "ACP permission handler failed",
+      );
     }
   }
 
@@ -283,7 +295,8 @@ export class AcpClient {
   }
 
   #parseSession(result: unknown, cwd: string, fallbackId?: string): AcpSession {
-    if (!result || typeof result !== "object") throw new AcpProtocolError("ACP session response is invalid", result);
+    if (!result || typeof result !== "object")
+      throw new AcpProtocolError("ACP session response is invalid", result);
     const value = result as Record<string, unknown>;
     const sessionId =
       typeof value.sessionId === "string"
@@ -335,7 +348,11 @@ export class AcpProcessSession {
     return this.#session;
   }
 
-  prompt(input: { readonly text: string; readonly model?: string | null; readonly mode?: string | null }) {
+  prompt(input: {
+    readonly text: string;
+    readonly model?: string | null;
+    readonly mode?: string | null;
+  }) {
     return this.#client.prompt({ sessionId: this.#session.sessionId, ...input });
   }
 
