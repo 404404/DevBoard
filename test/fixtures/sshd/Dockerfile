@@ -1,9 +1,11 @@
 FROM node:22-bookworm-slim
 
+# The fixture user has no usable password, but sshd rejects locked accounts before key auth.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends openssh-server git \
+  && apt-get install -y --no-install-recommends openssh-server git openssl \
   && rm -rf /var/lib/apt/lists/* \
   && useradd --create-home --shell /bin/sh devboard \
+  && usermod --password "$(openssl rand -hex 32 | openssl passwd -6 -stdin)" devboard \
   && mkdir -p /run/sshd /home/devboard/workspace /usr/local/lib/devboard \
   && chown -R devboard:devboard /home/devboard
 
