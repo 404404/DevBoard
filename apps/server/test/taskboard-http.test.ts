@@ -85,7 +85,7 @@ function isolatedTestEnvironment(prefix: string) {
   } as const;
 }
 
-async function feishuSetup() {
+async function feishuSetup(withLegacyProvisioner = true) {
   const config = loadConfig(isolatedTestEnvironment("codexboard-http-development-"));
   const database = initializeDatabase(":memory:");
   seedFeishuTestActor(database);
@@ -99,7 +99,7 @@ async function feishuSetup() {
     },
     config,
     database,
-    codexThreadProvisioner: provisioner,
+    ...(withLegacyProvisioner ? { codexThreadProvisioner: provisioner } : {}),
   });
   openApps.push(app);
   const project = new ProjectAdministration(database).createProject({
@@ -414,7 +414,7 @@ describe("taskboard HTTP routes", () => {
     expect(projectRegistry.developmentContextScans).toBe(0);
   });
 
-  it("creates a temporary task with one draft Thread in Codex Recent", async () => {
+  it("keeps the legacy injected provisioner available for temporary tasks", async () => {
     const { app, trusted, cookies, csrfToken, provisioner } = await feishuSetup();
 
     const created = await app.inject({
@@ -438,6 +438,30 @@ describe("taskboard HTTP routes", () => {
       codexThreadState: "draft",
     });
     expect(provisioner.created).toEqual([{ cwd: null, name: "TEMP-001 最近待执行任务" }]);
+  });
+
+  it("creates a temporary Task when no Agent session provisioner is configured", async () => {
+    const { app, trusted, cookies, csrfToken } = await feishuSetup(false);
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/v1/tasks",
+      headers: {
+        ...trusted,
+        cookie: cookies,
+        "x-csrf-token": csrfToken,
+        "idempotency-key": "http-create-temporary-without-provider",
+      },
+      payload: {
+        projectId: "00000000-0000-4000-8000-0000000000a2",
+        title: "纯看板任务",
+      },
+    });
+
+    expect(created.statusCode, created.body).toBe(201);
+    expect(created.json().data).toMatchObject({
+      projectName: "临时项目",
+      codexThreadState: "none",
+    });
   });
 
   it("archives the linked Codex task before permanently deleting a canceled task", async () => {
@@ -544,7 +568,6 @@ describe("taskboard HTTP routes", () => {
       },
       config,
       database,
-      codexThreadProvisioner: new FakeThreadProvisioner(),
     });
     openApps.push(app);
     const trusted = { host: "tasks.example.com", origin: "https://tasks.example.com" };
@@ -614,6 +637,10 @@ describe("taskboard HTTP routes", () => {
       payload: { projectId: paper.id, title: "保留的论文任务", status: "todo" },
     });
     expect(created.statusCode).toBe(201);
+    expect(created.json().data).toMatchObject({
+      projectName: "论文",
+      codexThreadState: "none",
+    });
     projectSync.reconcile({
       schemaVersion: 1,
       generatedAt: "2026-09-01T12:01:00.000Z",

@@ -181,18 +181,14 @@ export function registerTaskboardRoutes(
   app.post("/api/v1/tasks", async (request, reply) => {
     const context = mutationContext(request, config, identityService);
     const command = CreateTaskCommandSchema.parse(request.body);
+    // Containerized/public-server mode has no local provisioner, so Task
+    // creation remains available without starting an Agent session. Keep the
+    // optional draft-thread path only for deprecated embedded callers that
+    // explicitly inject the legacy provisioner.
     const result =
-      taskboard.projectSourceKind(command.projectId, context.actor) === "legacy"
-        ? taskboard.createTask(command, context)
-        : taskCreation
-          ? await taskCreation.create(command, context)
-          : (() => {
-              throw new AppError(
-                "UPSTREAM_ERROR",
-                503,
-                "Codex App Server 当前不可用，无法创建任务",
-              );
-            })();
+      taskCreation && taskboard.projectSourceKind(command.projectId, context.actor) !== "legacy"
+        ? await taskCreation.create(command, context)
+        : taskboard.createTask(command, context);
     await reply.code(201).send({ data: result.task, meta: { revision: result.revision } });
   });
 
