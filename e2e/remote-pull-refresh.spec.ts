@@ -67,6 +67,11 @@ test("pull refresh updates projects and tasks, preserves expansion, and waits fo
   await page.goto("/?remote=1");
   await page.getByRole("button", { name: "最近", exact: true }).click();
   await expect(page.getByRole("button", { name: "刷新前", exact: true })).toBeVisible();
+  const list = page.locator(".remote-list-body");
+  await list.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  await expect.poll(() => list.evaluate((element) => element.scrollTop)).toBe(0);
   try {
     await touch(page, "touchstart", 150);
     await touch(page, "touchmove", 190);

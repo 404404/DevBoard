@@ -4064,6 +4064,7 @@ test("跨列拖拽显示悬浮反馈且仅在合法落点发起移动", async ({
     page.getByTestId("status-column-backlog").getByTestId(`task-card-${identifier}`),
   ).toBeVisible();
   expect(moveRequests).toBe(0);
+  await expect(overlay).toHaveCount(0);
 
   await beginTaskCardDrag(page, identifier);
   const adjacentColumn = page.getByTestId("status-column-todo");
