@@ -292,7 +292,7 @@ describe("operations CLI", () => {
       let request: {
         url?: string;
         authorization?: string | undefined;
-        signal?: AbortSignal | null;
+        signal?: AbortSignal | null | undefined;
       } = {};
 
       expect(
