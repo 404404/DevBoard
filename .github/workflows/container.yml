@@ -48,7 +48,13 @@ jobs:
             rm -f "$cert_directory/fullchain.pem" "$cert_directory/privkey.pem"
             rmdir "$cert_directory" >/dev/null 2>&1 || true
           }
+          report_failure() {
+            status=$?
+            printf 'Container acceptance failed with status %s while running: %s\n' "$status" "$BASH_COMMAND" >&2
+            exit "$status"
+          }
           trap cleanup EXIT
+          trap report_failure ERR
           docker volume create "$volume" >/dev/null
           docker network create --subnet 172.30.87.0/24 "$network" >/dev/null
           mkdir -m 755 "$cert_directory"
@@ -111,14 +117,18 @@ jobs:
           published_ports="$(docker inspect --format '{{json .HostConfig.PortBindings}}' "$container")"
           if [[ "$published_ports" == *'"47824/tcp"'* ]]; then echo 'Admin API must not be published' >&2; exit 1; fi
           docker exec -i -e NODE_EXTRA_CA_CERTS=/tmp/ci-fullchain.pem "$container" node --input-type=module - < deploy/scripts/proxy-sse-smoke.mjs
+          echo "Public HTTPS, auth, Project/Task API and SSE proxy checks passed for $PLATFORM"
           docker exec -i "$container" node --input-type=module - seed < deploy/scripts/container-state-smoke.mjs
+          echo "Persistent business and identity fixture seeded for $PLATFORM"
           backup_output="$(docker exec "$container" node apps/server/dist/ops.js backup)"
-          backup_directory="$(node -e 'const r=JSON.parse(process.argv[1]);if(!r.ok)process.exit(1);process.stdout.write(r.directory)' "$backup_output")"
+          backup_directory="$(node -e 'const r=JSON.parse(process.argv[1]);if(!r.ok||typeof r.directory!=="string"){process.stderr.write("backup CLI returned an invalid result\\n");process.exit(1)}process.stdout.write(r.directory)' "$backup_output")"
           backup_id="${backup_directory##*/}"
-          test -n "$backup_id"
+          if [ -z "$backup_id" ]; then echo 'backup CLI returned an empty backup identifier' >&2; exit 1; fi
+          echo "Online backup artifact created for $PLATFORM"
           docker restart "$container" >/dev/null
           wait_healthy
           docker exec -i "$container" node --input-type=module - verify < deploy/scripts/container-state-smoke.mjs
+          echo "Restart persistence verified for $PLATFORM"
           docker exec -i "$container" node --input-type=module - mutate < deploy/scripts/container-state-smoke.mjs
           docker stop --time 30 "$container" >/dev/null
           docker rm "$container" >/dev/null
@@ -130,10 +140,13 @@ jobs:
             -e DEVBOARD_DATA_DIR=/var/lib/devboard \
             -v "$volume:/var/lib/devboard" \
             --entrypoint node devboard:smoke apps/server/dist/ops.js restore "/var/lib/devboard/backups/$backup_id"
+          echo "Backup restore command completed for $PLATFORM"
           run_app
           wait_healthy
-          test "$(docker inspect --format '{{.RestartCount}}' "$container")" = "0"
+          restart_count="$(docker inspect --format '{{.RestartCount}}' "$container")"
+          if [ "$restart_count" != "0" ]; then echo "restored container restarted unexpectedly ($restart_count)" >&2; exit 1; fi
           docker exec -i "$container" node --input-type=module - verify < deploy/scripts/container-state-smoke.mjs
+          echo "Restored business records, identities, attachments and SSH trust state verified for $PLATFORM"
           docker exec -i -e NODE_EXTRA_CA_CERTS=/tmp/ci-fullchain.pem "$container" node --input-type=module - < deploy/scripts/proxy-sse-smoke.mjs
           docker exec "$container" node apps/server/dist/ops.js verify "$backup_directory"
           echo "Container acceptance passed for $PLATFORM; business data survived restart and A→backup→mutate→restore→B verification."
