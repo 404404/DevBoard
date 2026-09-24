@@ -94,9 +94,7 @@ async function openEvents(lastEventId) {
     controller.abort();
     throw new Error(`proxied SSE endpoint returned HTTP ${response.status}`);
   }
-  if (
-    !response.headers.get("cache-control")?.includes("no-cache")
-  ) {
+  if (!response.headers.get("cache-control")?.includes("no-cache")) {
     controller.abort();
     throw new Error("SSE response is missing no-cache headers");
   }
