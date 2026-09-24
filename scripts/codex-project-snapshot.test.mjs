@@ -12,9 +12,12 @@ import {
 const PROJECT_A = "11111111-1111-4111-8111-111111111111";
 const PROJECT_B = "22222222-2222-4222-8222-222222222222";
 
-test("passes an absolute project snapshot path from the root development command", () => {
+test("keeps the optional Codex Desktop importer out of the default development command", () => {
   const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
-  assert.match(packageJson.scripts["dev:project-sync"], /--snapshot-file "\$PWD\//);
+  assert.equal(packageJson.scripts["dev:project-sync"], undefined);
+  assert.doesNotMatch(packageJson.scripts.dev, /dev:project-sync|codex-project-snapshot/);
+  assert.match(packageJson.scripts.dev, /@codexboard\/server/);
+  assert.match(packageJson.scripts.dev, /@codexboard\/web/);
 });
 
 function state(projectOrder = [PROJECT_A], overrides = {}) {

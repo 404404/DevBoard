@@ -106,6 +106,26 @@ function isEventType(eventType: string, candidates: readonly string[]): boolean 
 }
 
 export function eventInvalidationKeys(projectId: string, event: BoardEvent): QueryKey[] {
+  if (event.aggregateType === "run" || event.eventType.startsWith("run.")) {
+    const taskId =
+      typeof event.safePayload.taskId === "string" ? event.safePayload.taskId : undefined;
+    return [
+      ["board", projectId],
+      ["dashboard", projectId],
+      ["task-runs"],
+      ["run-approvals"],
+      ...(taskId ? ([["task-runs", taskId]] as const) : []),
+    ];
+  }
+  if (event.aggregateType === "milestone" || event.eventType.startsWith("milestone.")) {
+    return [
+      ["dashboard", projectId],
+      ["project-milestones", projectId],
+    ];
+  }
+  if (event.eventType === "project.execution_profile.updated") {
+    return [["project-execution-profile", projectId], ["task-runs"]];
+  }
   if (event.eventType === "task.workspace_synced") {
     const taskId = event.aggregateId;
     return [
@@ -125,6 +145,7 @@ export function eventInvalidationKeys(projectId: string, event: BoardEvent): Que
     return [
       ["board", projectId],
       ["dashboard", projectId],
+      ["project-milestones", projectId],
       ...(taskId
         ? ([
             ["task", taskId],
@@ -146,6 +167,7 @@ export function eventInvalidationKeys(projectId: string, event: BoardEvent): Que
     return [
       ["board", projectId],
       ["dashboard", projectId],
+      ["project-milestones", projectId],
       ...(taskId
         ? ([
             ["task", taskId],
@@ -188,6 +210,10 @@ export function fullRefreshQueryKeys(projectId: string): QueryKey[] {
     ["workspace"],
     ["jobs"],
     ["interactions"],
+    ["task-runs"],
+    ["run-approvals"],
+    ["project-milestones"],
+    ["project-execution-profile"],
   ];
 }
 

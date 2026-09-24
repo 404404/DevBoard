@@ -91,14 +91,19 @@ export class ProjectRegistry {
   readonly #database: SqliteDatabase;
   readonly #allowedRoots: readonly string[];
   readonly #now: () => Date;
+  readonly #remoteOnly: boolean;
 
   constructor(
     database: SqliteDatabase,
     allowedRoots: readonly string[],
     now: () => Date = () => new Date(),
+    options: { readonly remoteOnly?: boolean } = {},
   ) {
     this.#database = database;
-    this.#allowedRoots = allowedRoots.map((root) => this.#configuredRoot(root));
+    this.#remoteOnly = options.remoteOnly ?? false;
+    this.#allowedRoots = this.#remoteOnly
+      ? []
+      : allowedRoots.map((root) => this.#configuredRoot(root));
     this.#now = now;
   }
 
@@ -106,6 +111,7 @@ export class ProjectRegistry {
     projectId: string,
     command: RegisterWorkspaceCommand,
   ): Promise<WorkspaceRegistrationResult> {
+    this.#assertLocalFilesystemEnabled();
     const project = this.#readProject(projectId);
     if (this.#projectSource(projectId).sourceKind !== "legacy") {
       throw new AppError("INVALID_REQUEST", 409, "Codex 同步项目的源目录只能由 Codex Desktop 管理");
@@ -166,6 +172,7 @@ export class ProjectRegistry {
   async scanDevelopmentContexts(
     projectId: string,
   ): Promise<readonly LocalDevelopmentContextView[]> {
+    this.#assertLocalFilesystemEnabled();
     const project = this.#readProject(projectId);
     const workspaceRealpath = project.workspaceRealpath;
     if (!workspaceRealpath) {
@@ -201,6 +208,7 @@ export class ProjectRegistry {
     projectId: string,
     developmentContextId?: string,
   ): Promise<ExecutionContext> {
+    this.#assertLocalFilesystemEnabled();
     const source = this.#projectSource(projectId);
     if (source.sourceKind === "system") {
       throw new AppError("INVALID_REQUEST", 409, "系统项目不能执行任务");
@@ -303,6 +311,16 @@ export class ProjectRegistry {
       return canonical;
     } catch (cause: unknown) {
       throw new AppError("CONFIG_INVALID", 500, "工作区允许根目录不存在或不可读取", { cause });
+    }
+  }
+
+  #assertLocalFilesystemEnabled(): void {
+    if (this.#remoteOnly) {
+      throw new AppError(
+        "INVALID_REQUEST",
+        409,
+        "此部署不读取容器本地项目目录；请配置 SSH Host Connection 和 Project Workspace Mapping",
+      );
     }
   }
 

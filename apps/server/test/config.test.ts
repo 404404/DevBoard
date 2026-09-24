@@ -16,15 +16,16 @@ describe("loadConfig", () => {
       ConfigError,
     );
   });
-  it("uses localhost-safe defaults", () => {
+  it("uses a Docker-publishable public listener and loopback admin listener by default", () => {
     const config = loadConfig({});
 
     expect(config).toMatchObject({
-      CODEXBOARD_HOST: "127.0.0.1",
+      CODEXBOARD_HOST: "0.0.0.0",
       CODEXBOARD_PORT: 47_823,
       CODEXBOARD_ADMIN_HOST: "127.0.0.1",
       CODEXBOARD_ADMIN_PORT: 47_824,
       CODEXBOARD_ORIGIN: "http://localhost:5173",
+      CODEXBOARD_SSH_IDENTITY_DIR: "/run/devboard/ssh/identities",
       CODEXBOARD_EVENT_HISTORY_LIMIT: 10_000,
       CODEXBOARD_SSE_HEARTBEAT_MS: 15_000,
       CODEXBOARD_SSE_RETRY_MS: 3_000,
@@ -34,6 +35,9 @@ describe("loadConfig", () => {
     expect(config.CODEXBOARD_DATA_DIR).toBe(
       join(fileURLToPath(new URL("../../../", import.meta.url)), ".data"),
     );
+    expect(config.CODEXBOARD_WORKSPACE_ROOTS).toEqual([
+      fileURLToPath(new URL("../../../", import.meta.url)),
+    ]);
     expect(config.CODEXBOARD_CODEX_PROJECT_SNAPSHOT_FILE).toBe(
       join(config.CODEXBOARD_DATA_DIR, "run/codex-projects.json"),
     );
@@ -42,6 +46,50 @@ describe("loadConfig", () => {
   it("rejects invalid ports", () => {
     expect(() => loadConfig({ CODEXBOARD_PORT: "70000" })).toThrow(ConfigError);
     expect(() => loadConfig({ CODEXBOARD_ADMIN_PORT: "47823" })).toThrow(ConfigError);
+  });
+
+  it("accepts explicit proxy addresses and rejects wildcard proxy trust", () => {
+    expect(
+      loadConfig({ CODEXBOARD_TRUST_PROXY: "172.20.0.0/16,127.0.0.1" }).CODEXBOARD_TRUST_PROXY,
+    ).toEqual(["172.20.0.0/16", "127.0.0.1"]);
+    expect(() => loadConfig({ CODEXBOARD_TRUST_PROXY: "*" })).toThrow(ConfigError);
+    expect(() => loadConfig({ CODEXBOARD_TRUST_PROXY: "0.0.0.0/0" })).toThrow(ConfigError);
+    expect(() => loadConfig({ CODEXBOARD_TRUST_PROXY: "::/0" })).toThrow(ConfigError);
+    expect(() => loadConfig({ CODEXBOARD_TRUST_PROXY: "proxy.local" })).toThrow(ConfigError);
+  });
+
+  it("accepts the published SSH Identity directory setting and rejects relative paths", () => {
+    expect(
+      loadConfig({ DEVBOARD_SSH_IDENTITY_DIR: "/run/devboard/ssh/identities" })
+        .CODEXBOARD_SSH_IDENTITY_DIR,
+    ).toBe("/run/devboard/ssh/identities");
+    expect(() => loadConfig({ DEVBOARD_SSH_IDENTITY_DIR: "./secrets/identities" })).toThrow(
+      ConfigError,
+    );
+  });
+
+  it("requires an explicit HTTPS Public Origin in production", () => {
+    expect(() => loadConfig({ CODEXBOARD_ENV: "production" })).toThrow(/PUBLIC_ORIGIN/);
+    expect(() =>
+      loadConfig({
+        CODEXBOARD_ENV: "production",
+        DEVBOARD_PUBLIC_ORIGIN: "http://board.example.com",
+      }),
+    ).toThrow(/HTTPS/);
+    const webRoot = mkdtempSync(join(tmpdir(), "devboard-web-root-"));
+    writeFileSync(join(webRoot, "index.html"), "<!doctype html>");
+    try {
+      expect(
+        loadConfig({
+          CODEXBOARD_ENV: "production",
+          CODEXBOARD_AUTH_MODE: "web",
+          DEVBOARD_PUBLIC_ORIGIN: "https://board.example.com",
+          CODEXBOARD_WEB_ROOT: webRoot,
+        }).CODEXBOARD_ORIGIN,
+      ).toBe("https://board.example.com");
+    } finally {
+      rmSync(webRoot, { recursive: true, force: true });
+    }
   });
 
   it("rejects unsafe event feed limits and timing values", () => {
@@ -104,6 +152,7 @@ describe("loadConfig", () => {
         CODEXBOARD_FEISHU_APP_ID: "cli_test_app",
         CODEXBOARD_FEISHU_APP_SECRET: "secret",
         CODEXBOARD_ORIGIN: "https://tasks.example.com",
+        CODEXBOARD_WEB_ROOT: "/missing/devboard-web-root",
       }),
     ).toThrow(ConfigError);
   });
@@ -172,84 +221,23 @@ describe("loadConfig", () => {
     ).toThrow(ConfigError);
   });
 
-  it("accepts only an authenticated local Codex WebSocket endpoint", () => {
-    const directory = mkdtempSync(join(tmpdir(), "codexboard-codex-token-"));
-    const tokenFile = join(directory, "codex-token");
-    try {
-      writeFileSync(tokenFile, "capability-token\n", { mode: 0o600 });
-      expect(
-        loadConfig({
-          CODEXBOARD_CODEX_TRANSPORT: "websocket",
-          CODEXBOARD_CODEX_ENDPOINT: "ws://127.0.0.1:47825",
-          CODEXBOARD_CODEX_TOKEN_FILE: tokenFile,
-        }),
-      ).toMatchObject({
-        CODEXBOARD_CODEX_TRANSPORT: "websocket",
-        CODEXBOARD_CODEX_ENDPOINT: "ws://127.0.0.1:47825/",
-        CODEXBOARD_CODEX_TOKEN_FILE: tokenFile,
-      });
-
-      for (const endpoint of [
-        "ws://192.168.1.10:47825",
-        "ws://0.0.0.0:47825",
-        "wss://127.0.0.1:47825",
-        "ws://user:secret@127.0.0.1:47825",
-        "ws://127.0.0.1:0",
-        "ws://127.0.0.1:65536",
-        "ws://127.0.0.1:47826/path",
-        "ws://127.0.0.1:47826/?token=secret",
-        "ws://127.0.0.1:47826/#fragment",
-        "ws://127.0.0.1:47826/?",
-        "ws://127.0.0.1:47826/#",
-        "ws://host.docker.internal:47825",
-        "ws://docker.local:47825",
-      ]) {
-        expect(() =>
-          loadConfig({
-            CODEXBOARD_CODEX_TRANSPORT: "websocket",
-            CODEXBOARD_CODEX_ENDPOINT: endpoint,
-            CODEXBOARD_CODEX_TOKEN_FILE: tokenFile,
-          }),
-        ).toThrow(ConfigError);
-      }
-      expect(() =>
-        loadConfig({
-          CODEXBOARD_CODEX_TRANSPORT: "websocket",
-          CODEXBOARD_CODEX_ENDPOINT: "ws://127.0.0.1:47825",
-        }),
-      ).toThrow(ConfigError);
-
-      const symlink = join(directory, "codex-token-link");
-      mkdirSync(join(directory, "nested"));
-      writeFileSync(join(directory, "nested", "wide-token"), "wide", { mode: 0o644 });
-      symlinkSync(tokenFile, symlink);
-      if (existsSync(symlink)) {
-        expect(() =>
-          loadConfig({
-            CODEXBOARD_CODEX_TRANSPORT: "websocket",
-            CODEXBOARD_CODEX_TOKEN_FILE: symlink,
-          }),
-        ).toThrow(ConfigError);
-      }
-      expect(() =>
-        loadConfig({
-          CODEXBOARD_CODEX_TRANSPORT: "websocket",
-          CODEXBOARD_CODEX_TOKEN_FILE: join(directory, "nested", "wide-token"),
-        }),
-      ).toThrow(ConfigError);
-    } finally {
-      rmSync(directory, { recursive: true, force: true });
-    }
+  it("ignores legacy local Codex bridge environment variables", () => {
+    const config = loadConfig({
+      CODEXBOARD_CODEX_TRANSPORT: "embedded",
+      CODEXBOARD_CODEX_ENDPOINT: "ws://127.0.0.1:47825",
+      CODEXBOARD_CODEX_TOKEN_FILE: "/legacy/codex-app-server-token",
+    });
+    expect(config).not.toHaveProperty("CODEXBOARD_CODEX_TRANSPORT");
+    expect(config).not.toHaveProperty("CODEXBOARD_CODEX_ENDPOINT");
+    expect(config).not.toHaveProperty("CODEXBOARD_CODEX_TOKEN_FILE");
   });
 
   it("requires a built web root and a private Feishu secret file in production", () => {
     const directory = mkdtempSync(join(tmpdir(), "codexboard-production-config-"));
-    const webRoot = join(directory, "web");
+    const webRoot = join(directory, "missing-web-root");
     const secretFile = join(directory, "feishu-secret");
-    const codexTokenFile = join(directory, "codex-token");
     try {
       writeFileSync(secretFile, "secret-from-file\n", { mode: 0o600 });
-      writeFileSync(codexTokenFile, "codex-token-from-file\n", { mode: 0o600 });
       let error: unknown;
       try {
         loadConfig({
@@ -257,9 +245,6 @@ describe("loadConfig", () => {
           CODEXBOARD_AUTH_MODE: "feishu",
           CODEXBOARD_FEISHU_APP_ID: "cli_test_app",
           CODEXBOARD_FEISHU_APP_SECRET_FILE: secretFile,
-          CODEXBOARD_CODEX_TRANSPORT: "websocket",
-          CODEXBOARD_CODEX_ENDPOINT: "ws://127.0.0.1:47825",
-          CODEXBOARD_CODEX_TOKEN_FILE: codexTokenFile,
           CODEXBOARD_ORIGIN: "https://tasks.example.com",
           CODEXBOARD_ALLOWED_HOSTS: "tasks.example.com",
           CODEXBOARD_WEB_ROOT: webRoot,
@@ -274,64 +259,6 @@ describe("loadConfig", () => {
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
-  });
-});
-
-describe("embedded desktop bridge configuration", () => {
-  const directory = mkdtempSync(join(tmpdir(), "embedded-config-"));
-  const tokenFile = join(directory, "token");
-  writeFileSync(tokenFile, "test-token", { mode: 0o600 });
-  afterAll(() => rmSync(directory, { recursive: true, force: true }));
-  const embedded = {
-    CODEXBOARD_CODEX_TRANSPORT: "embedded",
-    CODEXBOARD_CODEX_COMMAND: "/Applications/Codex.app/Contents/Resources/codex",
-    CODEXBOARD_CODEX_TOKEN_FILE: tokenFile,
-    CODEXBOARD_CODEX_PROJECT_STATE_FILE: "/tmp/codex-projects.json",
-  };
-  it("accepts embedded mode with production Feishu security settings", () => {
-    const webRoot = join(directory, "production-web");
-    mkdirSync(webRoot);
-    writeFileSync(join(webRoot, "index.html"), "<html></html>");
-    const secretFile = join(directory, "feishu-secret");
-    writeFileSync(secretFile, "test-secret", { mode: 0o600 });
-    const config = loadConfig({
-      ...embedded,
-      CODEXBOARD_ENV: "production",
-      CODEXBOARD_AUTH_MODE: "feishu",
-      CODEXBOARD_FEISHU_APP_ID: "cli_test",
-      CODEXBOARD_FEISHU_APP_SECRET_FILE: secretFile,
-      CODEXBOARD_ORIGIN: "https://tasks.example.com",
-      CODEXBOARD_ALLOWED_HOSTS: "tasks.example.com",
-      CODEXBOARD_WEB_ROOT: webRoot,
-    });
-    expect(config.CODEXBOARD_CODEX_TRANSPORT).toBe("embedded");
-  });
-  it("accepts a local embedded bridge with explicit native paths", () => {
-    expect(loadConfig(embedded).CODEXBOARD_CODEX_TRANSPORT).toBe("embedded");
-  });
-  it.each(["embedded", "websocket"])(
-    "accepts allocated loopback ports for %s bridges",
-    (transport) => {
-      for (const port of [1, 80, 47826, 65535]) {
-        const endpoint = `ws://127.0.0.1:${port}`;
-        expect(
-          loadConfig({
-            ...embedded,
-            CODEXBOARD_CODEX_TRANSPORT: transport,
-            CODEXBOARD_CODEX_ENDPOINT: endpoint,
-          }).CODEXBOARD_CODEX_ENDPOINT,
-        ).toBe(new URL(endpoint).toString());
-      }
-    },
-  );
-  it("rejects a remote endpoint and missing native paths for embedded mode", () => {
-    expect(() =>
-      loadConfig({ ...embedded, CODEXBOARD_CODEX_ENDPOINT: "ws://host.docker.internal:47825" }),
-    ).toThrow();
-    expect(() => loadConfig({ ...embedded, CODEXBOARD_CODEX_COMMAND: "codex" })).toThrow();
-    expect(() =>
-      loadConfig({ ...embedded, CODEXBOARD_CODEX_PROJECT_STATE_FILE: undefined }),
-    ).toThrow();
   });
 });
 
@@ -351,15 +278,10 @@ describe("unified Feishu credentials configuration", () => {
     const webRoot = join(directory, "web");
     mkdirSync(webRoot);
     writeFileSync(join(webRoot, "index.html"), "<html></html>");
-    const tokenFile = join(directory, "token");
-    writeFileSync(tokenFile, "test-token", { mode: 0o600 });
-
     const config = loadConfig({
       CODEXBOARD_ENV: "production",
       CODEXBOARD_AUTH_MODE: "feishu",
       CODEXBOARD_FEISHU_CREDENTIALS_FILE: credentialsFile,
-      CODEXBOARD_CODEX_TRANSPORT: "websocket",
-      CODEXBOARD_CODEX_TOKEN_FILE: tokenFile,
       CODEXBOARD_ORIGIN: "https://tasks.example.com",
       CODEXBOARD_WEB_ROOT: webRoot,
     });

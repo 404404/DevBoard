@@ -18,6 +18,7 @@ import {
 import {
   ApiError,
   listGlobalLabels,
+  listMilestones,
   moveTask,
   readTask,
   readTaskCreationOptions,
@@ -34,6 +35,7 @@ import { applyTaskUpdate, invalidateTaskMoveQueries } from "./task-move-cache";
 import { priorityLabel, statusLabel } from "./locale";
 import { MarkdownContent } from "./markdown";
 import { SfSymbol } from "./sf-symbol";
+import { CircleDot } from "./icons";
 import { copyText } from "./copy-text";
 import { createUuid } from "./random-id";
 import { canSelectTaskStatus, TASK_STATUS_META, TASK_STATUS_ORDER } from "./task-status";
@@ -43,6 +45,7 @@ import { DetailPropertyPicker } from "./detail-property-picker";
 import { TaskRelationProperties } from "./task-relation-properties";
 import { PersonAvatar } from "./person-avatar";
 import { TaskDescriptionAttachments, TaskWorkspacePanel } from "./task-workspace";
+import { TaskRunHistory } from "./task-run-history";
 import { TaskLifecycleActions } from "./task-lifecycle-actions";
 
 interface DetailProps {
@@ -192,6 +195,11 @@ function TaskDetailEditor({
   const [leaving, setLeaving] = useState(false);
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const labels = useQuery({ queryKey: ["labels"], queryFn: listGlobalLabels });
+  const milestones = useQuery({
+    queryKey: ["project-milestones", state.task.projectId],
+    queryFn: () => listMilestones(state.task.projectId),
+    enabled: task.permissions.canRead,
+  });
   const creationOptions = useQuery({
     queryKey: ["task-creation-options", state.task.projectId],
     queryFn: () => readTaskCreationOptions(state.task.projectId),
@@ -523,6 +531,14 @@ function TaskDetailEditor({
               writable={writable}
               onDraftChange={onCommentDraftChange}
             />
+            <TaskRunHistory
+              taskId={state.task.id}
+              projectId={state.task.projectId}
+              csrfToken={props.csrfToken}
+              canExecute={state.task.permissions.canExecute}
+              canManageProject={state.task.permissions.canWrite}
+              mutationsEnabled={props.mutationsEnabled}
+            />
           </div>
           <aside className="task-detail-properties" aria-label="任务属性">
             <div className="detail-execution-actions">
@@ -621,6 +637,23 @@ function TaskDetailEditor({
                 disabled={!writable}
                 normalizeSelection={false}
                 onChange={(value) => changeProperty("labels", { labels: value })}
+              />
+            </div>
+            <div className="detail-property-row">
+              <span>Milestone</span>
+              <DetailPropertyPicker
+                label="Milestone"
+                value={state.draft.milestoneId ?? ""}
+                disabled={!writable || milestones.isError}
+                options={[
+                  { value: "", label: "未设置", icon: <CircleDot size={14} /> },
+                  ...(milestones.data ?? []).map((milestone) => ({
+                    value: milestone.id,
+                    label: milestone.title,
+                    icon: <CircleDot size={14} />,
+                  })),
+                ]}
+                onChange={(value) => changeProperty("milestoneId", { milestoneId: value || null })}
               />
             </div>
             <TaskRelationProperties

@@ -2,6 +2,8 @@ import { WebLogout } from "./web-login";
 import { QueryNotice } from "./query-notice";
 import { userErrorMessage } from "./user-error";
 import { GitManagerDialog } from "./git-manager-dialog";
+import { ExecutionSettingsDialog } from "./execution-settings-dialog";
+import { ProjectCreateDialog } from "./project-create-dialog";
 import { GitBranch } from "./git-branch-icon";
 import { Notice } from "./notification-center";
 import { notify } from "./notifications";
@@ -185,6 +187,8 @@ export function BoardPage({
   const [taskCreateProject, setTaskCreateProject] = useState<ProjectView>();
   const [tagManagerOpen, setTagManagerOpen] = useState(false);
   const [gitManagerOpen, setGitManagerOpen] = useState(false);
+  const [executionSettingsOpen, setExecutionSettingsOpen] = useState(false);
+  const [projectCreateOpen, setProjectCreateOpen] = useState(false);
   const setNotice = (message?: string) => {
     if (message) notify(message, "error");
   };
@@ -292,6 +296,19 @@ export function BoardPage({
           </div>
 
           <div className="header-actions">
+            <button
+              className="button"
+              type="button"
+              disabled={realtime === "offline"}
+              onClick={() => setProjectCreateOpen(true)}
+            >
+              <Plus aria-hidden="true" />
+              <span>新建项目</span>
+            </button>
+            <button className="button" type="button" onClick={() => setExecutionSettingsOpen(true)}>
+              <TerminalSquare aria-hidden="true" />
+              <span>执行器</span>
+            </button>
             {onOpenRemote && (
               <button className="remote-entry button" onClick={onOpenRemote}>
                 <SfSymbol name="apple.terminal" />
@@ -358,15 +375,17 @@ export function BoardPage({
               window.history.replaceState(null, "", url);
               setSelectedTaskId(undefined);
             }}
-            renderActions={(task, enabled) => (
-              <CodexExecutionPanel
-                taskId={task.id}
-                csrfToken={session.csrfToken}
-                executable={enabled && task.permissions.canExecute}
-                temporary={task.projectId === TEMPORARY_PROJECT_ID}
-                threadState={task.codexThreadState}
-              />
-            )}
+            renderActions={(task, enabled) =>
+              selectedProject?.kind !== "managed" ? (
+                <CodexExecutionPanel
+                  taskId={task.id}
+                  csrfToken={session.csrfToken}
+                  executable={enabled && task.permissions.canExecute}
+                  temporary={task.projectId === TEMPORARY_PROJECT_ID}
+                  threadState={task.codexThreadState}
+                />
+              ) : null
+            }
             renderReassign={(task, enabled) =>
               task.permissions.canReassign ? (
                 <TaskReassignPanel
@@ -405,16 +424,18 @@ export function BoardPage({
                   <span className="command-label--full">标签管理</span>
                   <span className="command-label--compact">标签</span>
                 </button>
-                <button
-                  className="button"
-                  type="button"
-                  disabled={realtime === "offline"}
-                  onClick={() => setGitManagerOpen(true)}
-                >
-                  <GitBranch />
-                  <span className="command-label--full">分支 / worktree 管理</span>
-                  <span className="command-label--compact">分支</span>
-                </button>
+                {selectedProject?.kind === "codex" && (
+                  <button
+                    className="button"
+                    type="button"
+                    disabled={realtime === "offline"}
+                    onClick={() => setGitManagerOpen(true)}
+                  >
+                    <GitBranch />
+                    <span className="command-label--full">分支 / worktree 管理</span>
+                    <span className="command-label--compact">分支</span>
+                  </button>
+                )}
                 <button
                   className="button button--primary"
                   type="button"
@@ -489,7 +510,13 @@ export function BoardPage({
                   dashboard.isPending ? (
                     <BoardLoading />
                   ) : dashboard.data ? (
-                    <DashboardPanel dashboard={dashboard.data} onOpen={setSelectedTaskId} />
+                    <DashboardPanel
+                      dashboard={dashboard.data}
+                      projectId={selectedProject.id}
+                      csrfToken={session.csrfToken}
+                      mutationsEnabled={realtime !== "offline"}
+                      onOpen={setSelectedTaskId}
+                    />
                   ) : null
                 ) : view === "board" ? (
                   <TaskBoard
@@ -563,6 +590,29 @@ export function BoardPage({
       ) : null}
       {tagManagerOpen ? (
         <TagManagerDialog csrfToken={session.csrfToken} onClose={() => setTagManagerOpen(false)} />
+      ) : null}
+      {executionSettingsOpen ? (
+        <ExecutionSettingsDialog
+          csrfToken={session.csrfToken}
+          onClose={() => setExecutionSettingsOpen(false)}
+        />
+      ) : null}
+      {projectCreateOpen ? (
+        <ProjectCreateDialog
+          open={projectCreateOpen}
+          csrfToken={session.csrfToken}
+          onClose={() => setProjectCreateOpen(false)}
+          onCreated={(project) => {
+            queryClient.setQueryData<readonly ProjectView[]>(["projects"], (current) =>
+              current
+                ? [...current.filter((entry) => entry.id !== project.id), project]
+                : [project],
+            );
+            selectProject(project.id);
+            setProjectCreateOpen(false);
+            void queryClient.invalidateQueries({ queryKey: ["projects"] });
+          }}
+        />
       ) : null}
     </div>
   );
@@ -970,7 +1020,9 @@ function TaskReassignPanel({
           </button>
         </div>
       ) : (
-        <p className="reassign-empty">暂无在线的 Codex 项目，请先在 Codex Desktop 添加项目。</p>
+        <p className="reassign-empty">
+          暂无可重新分配的项目。请先创建 Project 并配置对应的 SSH Workspace Mapping。
+        </p>
       )}
       {mutation.isError ? (
         <Notice

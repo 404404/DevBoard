@@ -64,12 +64,14 @@ export function RemotePullRefresh({
     element.addEventListener("touchmove", move, { passive: false });
     element.addEventListener("touchend", end);
     element.addEventListener("touchcancel", reset);
+    element.dataset.pullRefreshReady = "true";
     return () => {
       disposed = true;
       element.removeEventListener("touchstart", begin);
       element.removeEventListener("touchmove", move);
       element.removeEventListener("touchend", end);
       element.removeEventListener("touchcancel", reset);
+      delete element.dataset.pullRefreshReady;
     };
   }, []);
 

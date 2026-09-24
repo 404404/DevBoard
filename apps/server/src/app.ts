@@ -17,7 +17,10 @@ import { EventFeed, registerEventFeedRoutes } from "./modules/event-feed/index.j
 import {
   ExecutionOrchestrator,
   ExecutionQueue,
+  ExecutionPlatformService,
+  ExecutionProviderRegistry,
   InteractionService,
+  registerExecutionPlatformRoutes,
   registerExecutionRoutes,
   type CodexExecutor,
   type CodexThreadProvisioner,
@@ -41,7 +44,7 @@ import {
   TaskGitFinalizer,
   TaskWorkspace,
 } from "./modules/taskboard/index.js";
-import { ProjectRegistry } from "./modules/project-registry/index.js";
+import { ProjectAdministration, ProjectRegistry } from "./modules/project-registry/index.js";
 import { ProjectSnapshotWatcher, ProjectSyncService } from "./modules/project-sync/index.js";
 import {
   BackupService,
@@ -71,6 +74,7 @@ interface CreateAppOptions {
   closeDatabaseOnClose?: boolean;
   codexExecutor?: CodexExecutor;
   codexThreadProvisioner?: CodexThreadProvisioner;
+  executionProviders?: ExecutionProviderRegistry;
   projectRegistry?: ProjectRegistry;
   runtimeHealth?: OperationsRuntimeHealth;
 }
@@ -93,8 +97,10 @@ export interface AppServices {
   readonly labels: LabelCatalog;
   readonly gitManagement: GitManagement;
   readonly projectRegistry: ProjectRegistry;
+  readonly projectAdministration: ProjectAdministration;
   readonly queue: ExecutionQueue;
   readonly interactions: InteractionService;
+  readonly executionPlatform: ExecutionPlatformService;
   readonly operations: OperationsHealthService;
   readonly requestMetrics: RequestMetrics;
   readonly backups: BackupService;
@@ -117,6 +123,7 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
         : (options.logger ?? false),
     bodyLimit: 1024 * 1024,
     requestIdHeader: "x-request-id",
+    trustProxy: options.config.CODEXBOARD_TRUST_PROXY,
   });
   const requestMetrics = new RequestMetrics();
   const operations = new OperationsHealthService({
@@ -167,6 +174,17 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
     database: options.database,
     historyLimit: options.config.CODEXBOARD_EVENT_HISTORY_LIMIT,
   });
+  const executionProviders = options.executionProviders ?? new ExecutionProviderRegistry();
+  const executionPlatform = new ExecutionPlatformService({
+    database: options.database,
+    providers: executionProviders,
+    knownHostsFile: join(options.config.CODEXBOARD_DATA_DIR, "ssh", "known_hosts"),
+    identityDirectory: options.config.CODEXBOARD_SSH_IDENTITY_DIR,
+    onRevisionCommitted: (revision) => eventFeed.notifyCommitted(revision),
+  });
+  const projectAdministration = new ProjectAdministration(options.database, undefined, (revision) =>
+    eventFeed.notifyCommitted(revision),
+  );
   const projectSync = new ProjectSyncService({
     database: options.database,
     onRevisionCommitted: (revision) => eventFeed.notifyCommitted(revision),
@@ -175,11 +193,15 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
     database: options.database,
     onRevisionCommitted: (revision) => eventFeed.notifyCommitted(revision),
   });
-  const projectSnapshotWatcher = new ProjectSnapshotWatcher({
-    snapshotFile: options.config.CODEXBOARD_CODEX_PROJECT_SNAPSHOT_FILE,
-    service: projectSync,
-    reconcileMs: options.config.CODEXBOARD_PROJECT_SYNC_RECONCILE_MS,
-  });
+  const remoteOnly = options.config.CODEXBOARD_ENV === "production";
+  const projectSnapshotWatcher =
+    !remoteOnly && options.config.CODEXBOARD_CODEX_PROJECT_IMPORT_ENABLED
+      ? new ProjectSnapshotWatcher({
+          snapshotFile: options.config.CODEXBOARD_CODEX_PROJECT_SNAPSHOT_FILE,
+          service: projectSync,
+          reconcileMs: options.config.CODEXBOARD_PROJECT_SYNC_RECONCILE_MS,
+        })
+      : undefined;
   const taskboard = new Taskboard({
     database: options.database,
     identityService,
@@ -205,7 +227,9 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
   });
   const projectRegistry =
     options.projectRegistry ??
-    new ProjectRegistry(options.database, options.config.CODEXBOARD_WORKSPACE_ROOTS);
+    new ProjectRegistry(options.database, options.config.CODEXBOARD_WORKSPACE_ROOTS, undefined, {
+      remoteOnly,
+    });
   const executionQueue = new ExecutionQueue({
     database: options.database,
     dataDirectory: options.config.CODEXBOARD_DATA_DIR,
@@ -285,7 +309,9 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
     database: options.database,
     taskboard,
     queue: executionQueue,
-    gitFinalizer: new TaskGitFinalizer(options.config.CODEXBOARD_WORKSPACE_ROOTS),
+    gitFinalizer: new TaskGitFinalizer(options.config.CODEXBOARD_WORKSPACE_ROOTS, undefined, {
+      remoteOnly,
+    }),
     scheduleExecution: schedule,
     onRevisionCommitted: (revision) => eventFeed.notifyCommitted(revision),
   });
@@ -295,6 +321,7 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
     options.config.CODEXBOARD_WORKSPACE_ROOTS,
     options.workspaceCommandRunner,
     options.gitOriginReader,
+    remoteOnly,
   );
   APP_CONTROLS.set(app, {
     scheduleExecution: schedule,
@@ -311,8 +338,10 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
       labels,
       gitManagement,
       projectRegistry,
+      projectAdministration,
       queue: executionQueue,
       interactions,
+      executionPlatform,
       operations,
       requestMetrics,
       backups,
@@ -351,7 +380,7 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
     taskLifecycle,
     workspace,
     attachments,
-    projectRegistry,
+    projectAdministration,
   });
   registerGitManagementRoutes(app, {
     config: options.config,
@@ -374,6 +403,12 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
     interactions,
     schedule,
   });
+  registerExecutionPlatformRoutes(app, {
+    config: options.config,
+    identityService,
+    taskboard,
+    service: executionPlatform,
+  });
   registerRemoteRoutes(app, {
     config: options.config,
     identityService,
@@ -384,7 +419,7 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
   });
 
   app.addHook("onReady", async () => {
-    await projectSnapshotWatcher.start();
+    await projectSnapshotWatcher?.start();
     void taskDeletion.resumePending();
     void taskLifecycle.resumePending();
   });
@@ -394,9 +429,10 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
     if (recoveryTimer) clearInterval(recoveryTimer);
     orchestrator?.stop();
     APP_CONTROLS.delete(app);
-    await projectSnapshotWatcher.close();
+    await projectSnapshotWatcher?.close();
     await taskLifecycle.close();
     interactions.expirePending("服务正在停止");
+    await executionProviders.dispose();
     eventFeed.close();
     if ((options.closeDatabaseOnClose ?? true) && options.database.open) {
       options.database.close();
@@ -405,15 +441,18 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
 
   app.get("/api/health", async () => {
     const sqliteHealthy = isDatabaseHealthy(options.database);
+    const eventsHealthy = eventFeed.isHealthy();
 
     return HealthResponseSchema.parse({
-      status: sqliteHealthy ? "ok" : "degraded",
+      status: sqliteHealthy && eventsHealthy ? "ok" : "degraded",
       service: "codexboard-server",
       version: SERVER_VERSION,
       timestamp: new Date().toISOString(),
       checks: {
         http: "ok",
         sqlite: sqliteHealthy ? "ok" : "unavailable",
+        migrations: "ok",
+        events: eventsHealthy ? "ok" : "unavailable",
       },
     });
   });

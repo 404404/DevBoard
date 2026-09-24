@@ -144,13 +144,13 @@ describe("event feed HTTP and SSE routes", () => {
     expect(page).toMatchObject({
       events: [
         {
-          aggregateId: created.data.id,
-          eventType: "task.created",
+          aggregateId: project.id,
+          aggregateType: "project",
+          eventType: "project.created",
         },
         {
-          revision: created.meta.revision,
           aggregateId: created.data.id,
-          eventType: "codex.thread_created",
+          eventType: "task.created",
         },
       ],
       cursorRevision: created.meta.revision,

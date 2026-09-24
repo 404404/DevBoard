@@ -1,0 +1,45 @@
+services:
+  devboard:
+    image: ${DEVBOARD_IMAGE:-ghcr.io/404404/devboard:preview}
+    restart: unless-stopped
+    init: true
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    ports:
+      - "${DEVBOARD_BIND_ADDRESS:-127.0.0.1}:47823:47823"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      CODEXBOARD_ENV: production
+      CODEXBOARD_AUTH_MODE: ${CODEXBOARD_AUTH_MODE:-web}
+      CODEXBOARD_HOST: 0.0.0.0
+      CODEXBOARD_PORT: 47823
+      CODEXBOARD_ADMIN_HOST: 127.0.0.1
+      CODEXBOARD_ADMIN_PORT: 47824
+      DEVBOARD_DATA_DIR: /var/lib/devboard
+      DEVBOARD_PUBLIC_ORIGIN: ${DEVBOARD_PUBLIC_ORIGIN:?Set DEVBOARD_PUBLIC_ORIGIN in .env}
+      DEVBOARD_TRUST_PROXY: ${DEVBOARD_TRUST_PROXY:-}
+      DEVBOARD_SSH_IDENTITY_DIR: ${DEVBOARD_SSH_IDENTITY_DIR:-/run/devboard/ssh/identities}
+      CODEXBOARD_LOG_LEVEL: ${CODEXBOARD_LOG_LEVEL:-info}
+      TZ: ${TZ:-Asia/Hong_Kong}
+    volumes:
+      - devboard-data:/var/lib/devboard
+      - ./secrets/ssh/identities:${DEVBOARD_SSH_IDENTITY_DIR:-/run/devboard/ssh/identities}:ro
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:47823/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+volumes:
+  devboard-data:

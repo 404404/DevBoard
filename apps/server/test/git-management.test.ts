@@ -88,6 +88,20 @@ it("creates branches and worktrees, refreshes executable contexts, removes only 
   expect(git(cwd, "branch", "--list", "feature/ready")).toBe("");
   expect((await manager.read(project.id)).entries).toHaveLength(1);
 });
+
+it("does not run Git against a container-local path in remote-only mode", async () => {
+  const db = initializeDatabase(":memory:");
+  cleanup.push(() => db.close());
+  const project = new ProjectAdministration(db).createProject({
+    projectKey: "RMT",
+    name: "Remote",
+    description: "",
+  });
+  const registry = new ProjectRegistry(db, [], undefined, { remoteOnly: true });
+  const manager = new GitManagement(db, registry, [], undefined, undefined, true);
+
+  await expect(manager.read(project.id)).rejects.toThrow("不对容器本地目录执行 Git");
+});
 it("protects primary checkouts and rejects stale head, unmerged work, untracked files and locks", async () => {
   const { manager, project, cwd } = await setup();
   const primary = (await manager.read(project.id)).entries[0]!;

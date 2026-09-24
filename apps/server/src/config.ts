@@ -1,7 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { existsSync, lstatSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 
 import { z } from "zod";
 import { isIP } from "node:net";
@@ -61,11 +60,22 @@ function isLocalDevelopmentOrigin(origin: string): boolean {
   return parsed.protocol === "http:" && ["localhost", "127.0.0.1"].includes(parsed.hostname);
 }
 
+function isProxyCidr(value: string): boolean {
+  const [address, prefixText, ...extra] = value.split("/");
+  if (!address || extra.length > 0) return false;
+  const family = isIP(address);
+  if (family === 0) return false;
+  if (prefixText === undefined) return true;
+  if (!/^\d{1,3}$/.test(prefixText)) return false;
+  const prefix = Number(prefixText);
+  return prefix > 0 && prefix <= (family === 4 ? 32 : 128);
+}
+
 const AppConfigSchema = z
   .object({
     CODEXBOARD_ENV: z.enum(["development", "test", "production"]).default("development"),
     CODEXBOARD_AUTH_MODE: z.enum(["development", "feishu", "web"]).default("development"),
-    CODEXBOARD_HOST: z.string().min(1).default("127.0.0.1"),
+    CODEXBOARD_HOST: z.string().min(1).default("0.0.0.0"),
     CODEXBOARD_PORT: z.coerce.number().int().min(1).max(65_535).default(47_823),
     CODEXBOARD_ADMIN_HOST: z.literal("127.0.0.1").default("127.0.0.1"),
     CODEXBOARD_ADMIN_PORT: z.coerce.number().int().min(1).max(65_535).default(47_824),
@@ -77,15 +87,33 @@ const AppConfigSchema = z
         [...new Set(hosts.split(",").map((host) => host.trim().toLowerCase()))].filter(Boolean),
       )
       .pipe(z.array(z.string().min(1)).min(1)),
+    CODEXBOARD_TRUST_PROXY: z
+      .string()
+      .default("")
+      .transform((value) => [
+        ...new Set(
+          value
+            .split(",")
+            .map((entry) => entry.trim())
+            .filter(Boolean),
+        ),
+      ])
+      .pipe(z.array(z.string().refine(isProxyCidr, "可信代理必须是明确 IP 或 CIDR；不接受通配符"))),
     CODEXBOARD_DATA_DIR: z
       .string()
       .trim()
       .min(1)
       .default(".data")
       .transform((directory) => resolve(REPOSITORY_ROOT, directory)),
+    CODEXBOARD_SSH_IDENTITY_DIR: z
+      .string()
+      .trim()
+      .min(1)
+      .default("/run/devboard/ssh/identities")
+      .refine(isAbsolute, "SSH Identity 目录必须使用绝对路径"),
     CODEXBOARD_WORKSPACE_ROOTS: z
       .string()
-      .default(dirname(REPOSITORY_ROOT))
+      .default(REPOSITORY_ROOT)
       .transform((roots) =>
         [...new Set(roots.split(",").map((root) => root.trim()))].filter(Boolean),
       )
@@ -129,28 +157,10 @@ const AppConfigSchema = z
     CODEXBOARD_EXECUTOR_NODE_PATH: z.string().trim().min(1).refine(isAbsolute).optional(),
     CODEXBOARD_EXECUTOR_TASKCTL_PATH: z.string().trim().min(1).refine(isAbsolute).optional(),
     CODEXBOARD_EXECUTOR_DATA_DIR: z.string().trim().min(1).refine(isAbsolute).optional(),
-    CODEXBOARD_CODEX_COMMAND: z.string().trim().min(1).default("codex"),
-    CODEXBOARD_CODEX_TRANSPORT: z
-      .enum(["managed-unix", "websocket", "embedded"])
-      .default("managed-unix"),
-    CODEXBOARD_CODEX_ENDPOINT: z
-      .url()
-      .default("ws://127.0.0.1:47825")
-      .transform((endpoint, context) => {
-        try {
-          return new URL(endpoint).toString();
-        } catch {
-          context.addIssue({ code: "custom", message: "Codex Endpoint URL 无效" });
-          return z.NEVER;
-        }
-      }),
-    CODEXBOARD_CODEX_TOKEN_FILE: z
-      .string()
-      .trim()
-      .min(1)
-      .refine(isAbsolute, "Codex capability token 文件必须使用绝对路径")
-      .optional(),
-    CODEXBOARD_CODEX_PROJECT_STATE_FILE: z.string().trim().min(1).refine(isAbsolute).optional(),
+    CODEXBOARD_CODEX_PROJECT_IMPORT_ENABLED: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
     CODEXBOARD_CODEX_PROJECT_SNAPSHOT_FILE: z
       .string()
       .trim()
@@ -176,18 +186,7 @@ const AppConfigSchema = z
       .transform((directory) => resolve(REPOSITORY_ROOT, directory)),
   })
   .superRefine((config, context) => {
-    if (config.CODEXBOARD_HOST !== "127.0.0.1") {
-      context.addIssue({
-        code: "custom",
-        path: ["CODEXBOARD_HOST"],
-        message: "业务监听地址必须是本机回环地址",
-      });
-    }
-
-    if (
-      config.CODEXBOARD_HOST === config.CODEXBOARD_ADMIN_HOST &&
-      config.CODEXBOARD_PORT === config.CODEXBOARD_ADMIN_PORT
-    ) {
+    if (config.CODEXBOARD_PORT === config.CODEXBOARD_ADMIN_PORT) {
       context.addIssue({
         code: "custom",
         path: ["CODEXBOARD_ADMIN_PORT"],
@@ -209,6 +208,7 @@ const AppConfigSchema = z
     }
 
     if (
+      config.CODEXBOARD_ENV === "production" &&
       config.CODEXBOARD_AUTH_MODE === "web" &&
       new URL(config.CODEXBOARD_ORIGIN).protocol !== "https:"
     ) {
@@ -238,13 +238,23 @@ const AppConfigSchema = z
         });
       }
       if (
-        new URL(config.CODEXBOARD_ORIGIN).protocol !== "https:" &&
-        !isPublicHttpOrigin(config.CODEXBOARD_ORIGIN)
+        config.CODEXBOARD_ENV === "production" &&
+        new URL(config.CODEXBOARD_ORIGIN).protocol !== "https:"
       ) {
         context.addIssue({
           code: "custom",
           path: ["CODEXBOARD_ORIGIN"],
           message: "飞书认证模式必须使用 HTTPS Origin 或公网域名或规范公网 IPv4 HTTP Origin",
+        });
+      }
+      if (
+        new URL(config.CODEXBOARD_ORIGIN).protocol === "http:" &&
+        !isPublicHttpOrigin(config.CODEXBOARD_ORIGIN)
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["CODEXBOARD_ORIGIN"],
+          message: "飞书 HTTP Origin 必须是规范公网域名或公网 IPv4 地址",
         });
       }
     }
@@ -260,70 +270,6 @@ const AppConfigSchema = z
         message: "开发身份适配器只能用于 localhost HTTP 开发环境",
       });
     }
-
-    if (config.CODEXBOARD_CODEX_TRANSPORT === "embedded") {
-      if (!isAbsolute(config.CODEXBOARD_CODEX_COMMAND)) {
-        context.addIssue({
-          code: "custom",
-          path: ["CODEXBOARD_CODEX_COMMAND"],
-          message: "内嵌桥接需要 Codex 程序的绝对路径",
-        });
-      }
-      if (!config.CODEXBOARD_CODEX_PROJECT_STATE_FILE) {
-        context.addIssue({
-          code: "custom",
-          path: ["CODEXBOARD_CODEX_PROJECT_STATE_FILE"],
-          message: "内嵌桥接需要 Codex 项目状态文件",
-        });
-      }
-    }
-
-    if (config.CODEXBOARD_CODEX_TRANSPORT !== "managed-unix") {
-      const endpoint = URL.parse(config.CODEXBOARD_CODEX_ENDPOINT);
-      if (!endpoint) {
-        context.addIssue({
-          code: "custom",
-          path: ["CODEXBOARD_CODEX_ENDPOINT"],
-          message: "Codex Endpoint URL 无效",
-        });
-        return;
-      }
-      const port = Number(endpoint.port || 80);
-      if (
-        endpoint.protocol !== "ws:" ||
-        endpoint.hostname !== "127.0.0.1" ||
-        !Number.isInteger(port) ||
-        port < 1 ||
-        port > 65_535 ||
-        endpoint.username ||
-        endpoint.password ||
-        endpoint.href !== `${endpoint.origin}/`
-      ) {
-        context.addIssue({
-          code: "custom",
-          path: ["CODEXBOARD_CODEX_ENDPOINT"],
-          message: "Codex Endpoint 必须是 ws://127.0.0.1:<1-65535>，不能包含凭据、路径、查询或片段",
-        });
-      }
-      if (!config.CODEXBOARD_CODEX_TOKEN_FILE) {
-        context.addIssue({
-          code: "custom",
-          path: ["CODEXBOARD_CODEX_TOKEN_FILE"],
-          message: "外部 Codex WebSocket 需要 capability token 文件",
-        });
-      }
-    }
-
-    if (
-      config.CODEXBOARD_ENV === "production" &&
-      config.CODEXBOARD_CODEX_TRANSPORT === "managed-unix"
-    ) {
-      context.addIssue({
-        code: "custom",
-        path: ["CODEXBOARD_CODEX_TRANSPORT"],
-        message: "生产环境必须使用受鉴权保护的外部或内嵌 Codex 桥接",
-      });
-    }
   });
 
 export type AppConfig = z.infer<typeof AppConfigSchema>;
@@ -333,14 +279,27 @@ export class ConfigError extends Error {
   readonly issues: readonly string[];
 
   constructor(issues: readonly string[]) {
-    super("服务配置无效");
+    super(issues.join("; "));
     this.name = "ConfigError";
     this.issues = issues;
   }
 }
 
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppConfig {
-  const result = AppConfigSchema.safeParse(normalizeCodexBoardEnvironment(environment));
+  const normalizedEnvironment = normalizeCodexBoardEnvironment(environment);
+  if (normalizedEnvironment.CODEXBOARD_ENV === "production") {
+    if (normalizedEnvironment.CODEXBOARD_ORIGIN === undefined) {
+      throw new ConfigError(["DEVBOARD_PUBLIC_ORIGIN: 生产环境必须显式配置 Public Origin"]);
+    }
+    try {
+      if (new URL(normalizedEnvironment.CODEXBOARD_ORIGIN).protocol !== "https:") {
+        throw new ConfigError(["DEVBOARD_PUBLIC_ORIGIN: 生产环境必须使用 HTTPS"]);
+      }
+    } catch (error: unknown) {
+      if (error instanceof ConfigError) throw error;
+    }
+  }
+  const result = AppConfigSchema.safeParse(normalizedEnvironment);
 
   if (!result.success) {
     throw new ConfigError(
@@ -348,6 +307,24 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     );
   }
   const config = result.data;
+  if (
+    config.CODEXBOARD_ENV === "production" &&
+    normalizedEnvironment.CODEXBOARD_ORIGIN === undefined
+  ) {
+    throw new ConfigError(["DEVBOARD_PUBLIC_ORIGIN: 生产环境必须显式配置 Public Origin"]);
+  }
+  if (
+    config.CODEXBOARD_ENV === "production" &&
+    new URL(config.CODEXBOARD_ORIGIN).protocol !== "https:"
+  ) {
+    throw new ConfigError(["DEVBOARD_PUBLIC_ORIGIN: 生产环境必须使用 HTTPS"]);
+  }
+  config.CODEXBOARD_ALLOWED_HOSTS = [
+    ...new Set([
+      ...config.CODEXBOARD_ALLOWED_HOSTS,
+      new URL(config.CODEXBOARD_ORIGIN).host.toLowerCase(),
+    ]),
+  ];
   if (isPublicHttpOrigin(config.CODEXBOARD_ORIGIN)) {
     config.CODEXBOARD_ORIGIN = new URL(config.CODEXBOARD_ORIGIN).origin;
   }
@@ -357,9 +334,6 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
       "run",
       "codex-projects.json",
     );
-  }
-  if (!config.CODEXBOARD_TEMPORARY_PROJECT_ROOT && process.platform === "darwin") {
-    config.CODEXBOARD_TEMPORARY_PROJECT_ROOT = join(homedir(), "Documents", "Codex");
   }
   if (config.CODEXBOARD_FEISHU_APP_SECRET && config.CODEXBOARD_FEISHU_APP_SECRET_FILE) {
     throw new ConfigError([
@@ -408,20 +382,6 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     } catch (error: unknown) {
       throw new ConfigError([
         `CODEXBOARD_FEISHU_APP_SECRET_FILE: ${error instanceof Error ? error.message : "无法读取"}`,
-      ]);
-    }
-  }
-  if (config.CODEXBOARD_CODEX_TOKEN_FILE) {
-    const path = config.CODEXBOARD_CODEX_TOKEN_FILE;
-    try {
-      const stat = lstatSync(path);
-      if (!stat.isFile() || stat.isSymbolicLink() || (stat.mode & 0o077) !== 0) {
-        throw new Error("文件必须是权限不宽于 0600 的普通文件");
-      }
-      if (!readFileSync(path, "utf8").trim()) throw new Error("文件内容为空");
-    } catch (error: unknown) {
-      throw new ConfigError([
-        `CODEXBOARD_CODEX_TOKEN_FILE: ${error instanceof Error ? error.message : "无法读取"}`,
       ]);
     }
   }

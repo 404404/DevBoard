@@ -19,4 +19,13 @@ it("explains actionable status codes using controlled copy", () => {
     "当前操作未获允许，请刷新页面后重试。",
   );
   expect(userErrorMessage(new ApiError(409, "CONFLICT", "raw"))).toBe("数据已更新，请刷新后重试。");
+  expect(userErrorMessage(new ApiError(409, "SSH_KEY_PASSPHRASE_REQUIRED", "raw"))).toContain(
+    "SSH Agent 加载",
+  );
+  expect(userErrorMessage(new ApiError(409, "SSH_IDENTITY_PERMISSIONS", "raw"))).toContain(
+    "chmod 600",
+  );
+  expect(userErrorMessage(new ApiError(409, "SSH_AGENT_UNAVAILABLE", "raw"))).toContain(
+    "SSH_AUTH_SOCK",
+  );
 });

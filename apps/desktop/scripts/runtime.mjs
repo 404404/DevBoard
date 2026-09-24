@@ -1,5 +1,11 @@
 import { manageWebAccounts } from "./web-accounts.mjs";
 import { readFrpcOrigin, isSupportedOrigin, readFrpcDnsTarget } from "./frpc-config.mjs";
+import {
+  PUBLIC_ACCESS_MODES,
+  parsePublicAccessDocument,
+  resolvePublicAccess,
+  serializePublicAccessDocument,
+} from "./public-access.mjs";
 import { DEFAULT_PORTS, readLocalPorts, savePorts } from "./ports.mjs";
 import { createSetupController, detectCodexPath } from "./setup-controller.mjs";
 import { createHash, randomUUID } from "node:crypto";
@@ -24,19 +30,51 @@ import net from "node:net";
 import https from "node:https";
 import http from "node:http";
 
-export function renderCaddyfile(url, ports) {
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  console.error(
+    "The macOS Desktop runtime is deprecated and disabled. Deploy DevBoard with Docker Compose.",
+  );
+  process.exit(78);
+}
+
+export function renderCaddyfile(url, ports, options = {}) {
+  const internalTls = options?.internalTls !== false;
+  const listenAddress = String(options?.listenAddress || "127.0.0.1");
   if (
     !isSupportedOrigin(url) ||
+    !/^[A-Za-z0-9_.:-]+$/.test(listenAddress) ||
     ![ports.api, ports.caddy].every((port) => Number.isInteger(port) && port >= 1 && port <= 65535)
   ) {
-    throw new Error("无效的公网地址或代理端口");
+    throw new Error("无效的公网地址、监听地址或代理端口");
   }
-  const plain = url.protocol === "http:";
+  const siteProtocol = internalTls ? url.protocol : "http:";
+  const plain = siteProtocol === "http:";
   const global = plain
     ? "auto_https off"
-    : `auto_https disable_redirects\n https_port ${ports.caddy}`;
+    : "auto_https disable_redirects\n https_port " + ports.caddy;
   const tls = plain ? "" : " tls {\n issuer acme {\n disable_http_challenge\n }\n }\n";
-  return `{\n admin off\n ${global}\n}\n${url.protocol}//${url.hostname}:${ports.caddy} {\n bind 127.0.0.1\n${tls} reverse_proxy 127.0.0.1:${ports.api} {\n flush_interval -1\n header_up Host ${url.host}\n header_up X-Forwarded-Proto ${plain ? "http" : "https"}\n }\n}\n`;
+  const forwardedProto = options?.forwardedProto || (url.protocol === "https:" ? "https" : "http");
+  return (
+    "{\n admin off\n " +
+    global +
+    "\n}\n" +
+    siteProtocol +
+    "://" +
+    url.hostname +
+    ":" +
+    ports.caddy +
+    " {\n bind " +
+    listenAddress +
+    "\n" +
+    tls +
+    " reverse_proxy 127.0.0.1:" +
+    ports.api +
+    " {\n flush_interval -1\n header_up Host " +
+    url.host +
+    "\n header_up X-Forwarded-Proto " +
+    forwardedProto +
+    "\n }\n}\n"
+  );
 }
 
 export function parseEnv(text) {
@@ -196,6 +234,7 @@ export function desktopPaths(
     CODEXBOARD_PORTS_FILE: join(directory, "ports.json"),
     CODEXBOARD_CADDY_DATA_DIR: join(base, "caddy/data"),
     CODEXBOARD_CADDY_CONFIG_DIR: join(base, "caddy/config"),
+    CODEXBOARD_PUBLIC_ACCESS_FILE: join(base, "config/public-access.json"),
   };
 }
 export function initializeDeployment(directory, defaults = DEFAULT_PORTS) {
@@ -206,10 +245,15 @@ export function initializeDeployment(directory, defaults = DEFAULT_PORTS) {
     dirname(paths.CODEXBOARD_FEISHU_CREDENTIALS_FILE),
     paths.CODEXBOARD_CADDY_DATA_DIR,
     paths.CODEXBOARD_CADDY_CONFIG_DIR,
+    dirname(paths.CODEXBOARD_PUBLIC_ACCESS_FILE),
   ])
     mkdirSync(dir, { recursive: true, mode: 0o700 });
   for (const [file, content] of [
     [paths.CODEXBOARD_FRPC_CONFIG_FILE, ""],
+    [
+      paths.CODEXBOARD_PUBLIC_ACCESS_FILE,
+      serializePublicAccessDocument({ mode: "builtin-frp", origin: "" }),
+    ],
     [paths.CODEXBOARD_CODEX_TOKEN_FILE, randomUUID() + randomUUID() + "\n"],
     [
       paths.CODEXBOARD_PORTS_FILE,
@@ -306,51 +350,112 @@ function deploymentPaths(directory) {
 }
 export function readDeploymentConfiguration(directory) {
   const paths = deploymentPaths(directory);
-  let credentials = { appId: "", appSecret: "" },
-    credentialsError = "";
+  const desktop = desktopPaths(directory);
+  let credentials = { appId: "", appSecret: "" };
+  let credentialsError = "";
   try {
     credentials = readCredentials(paths.credentials);
   } catch (error) {
     credentialsError = error.message;
   }
   const frpc = readFileSync(paths.frpc, "utf8");
-  let origin = "",
-    originError = "";
-  if (frpc.trim()) {
+  let publicAccess = { mode: "builtin-frp", origin: "", listenAddress: "127.0.0.1" };
+  let publicAccessError = "";
+  if (existsSync(desktop.CODEXBOARD_PUBLIC_ACCESS_FILE)) {
     try {
-      origin = readFrpcOrigin(
-        frpc,
-        readLocalPorts(desktopPaths(directory).CODEXBOARD_PORTS_FILE).caddy,
+      assertRegularFile(desktop.CODEXBOARD_PUBLIC_ACCESS_FILE);
+      publicAccess = parsePublicAccessDocument(
+        readFileSync(desktop.CODEXBOARD_PUBLIC_ACCESS_FILE, "utf8"),
       );
+    } catch (error) {
+      publicAccessError = error.message;
+    }
+  }
+  let frpcOrigin = "";
+  let frpcOriginError = "";
+  if (publicAccess.mode === "builtin-frp" && frpc.trim()) {
+    try {
+      frpcOrigin = readFrpcOrigin(frpc, readLocalPorts(desktop.CODEXBOARD_PORTS_FILE).caddy);
+    } catch (error) {
+      frpcOriginError = error.message;
+    }
+  }
+  let origin = "";
+  let originError = publicAccessError || frpcOriginError;
+  if (!publicAccessError) {
+    try {
+      origin = resolvePublicAccess({
+        mode: publicAccess.mode,
+        origin: publicAccess.origin,
+        frpcOrigin,
+        listenAddress: publicAccess.listenAddress,
+      }).origin;
     } catch (error) {
       originError = error.message;
     }
   }
   const accessMode =
     credentialsError || credentials.appId || credentials.appSecret ? "feishu" : "web";
-  return { ...credentials, accessMode, credentialsError, origin, originError, frpc, paths };
+  return {
+    ...credentials,
+    accessMode,
+    credentialsError,
+    publicAccessMode: publicAccess.mode,
+    publicOrigin: publicAccess.origin,
+    listenAddress: publicAccess.listenAddress,
+    publicAccessError,
+    origin,
+    originError,
+    frpc,
+    paths,
+  };
 }
 export async function saveDeploymentConfiguration(directory, values, verifyFrpc) {
   const current = readDeploymentConfiguration(directory);
   const appId = String(values.appId ?? current.appId ?? "").trim();
   const secret = String(values.appSecret ?? current.appSecret ?? "").trim();
-  const frpc = String(values.frpc || "").trim();
+  const frpc = values.frpc === undefined ? current.frpc : String(values.frpc || "").trim();
+  const requestedMode =
+    values.publicAccessMode === undefined ? current.publicAccessMode : values.publicAccessMode;
+  if (!PUBLIC_ACCESS_MODES.includes(requestedMode)) throw new Error("公共访问模式无效");
+  const publicAccessMode = requestedMode;
+  const requestedOrigin =
+    values.publicOrigin === undefined
+      ? current.publicOrigin
+      : String(values.publicOrigin || "").trim();
+  const publicOrigin = publicAccessMode === "external-reverse-proxy" ? requestedOrigin : "";
+  const listenAddress =
+    values.listenAddress === undefined
+      ? current.listenAddress
+      : String(values.listenAddress || "").trim();
   if (appId && !/^cli_[A-Za-z0-9]+$/.test(appId))
     throw new Error("App ID 格式无效，应以 cli_ 开头");
-  if (secret.length > 4096 || /[\r\n\0]/.test(secret)) throw new Error("App Secret 格式无效");
-  if (Buffer.byteLength(frpc) > 262144 || frpc.includes("\0"))
+  if (secret.length > 4096 || /[\r\n]/.test(secret) || secret.includes(String.fromCharCode(0)))
+    throw new Error("App Secret 格式无效");
+  if (Buffer.byteLength(frpc) > 262144 || frpc.includes(String.fromCharCode(0)))
     throw new Error("frpc.toml 内容过大或包含无效字符");
   const paths = deploymentPaths(directory);
+  const publicPath = desktopPaths(directory).CODEXBOARD_PUBLIC_ACCESS_FILE;
+  assertRegularFile(publicPath);
   if (Boolean(appId) !== Boolean(secret))
     throw new Error("飞书 App ID 和 App Secret 请同时填写，或同时留空以仅使用 Web 账号");
   const accessMode = appId && secret ? "feishu" : "web";
-  if (!frpc) throw new Error("请填写 frpc.toml 配置");
-  const origin = readFrpcOrigin(
-    frpc,
-    readLocalPorts(desktopPaths(directory).CODEXBOARD_PORTS_FILE).caddy,
-  );
-  if (accessMode === "web" && !origin.startsWith("https://"))
-    throw new Error("Web 账号访问必须使用 HTTPS 隧道");
+  let frpcOrigin = "";
+  if (publicAccessMode === "builtin-frp") {
+    if (!frpc) throw new Error("请填写 frpc.toml 配置");
+    frpcOrigin = readFrpcOrigin(
+      frpc,
+      readLocalPorts(desktopPaths(directory).CODEXBOARD_PORTS_FILE).caddy,
+    );
+  }
+  const resolved = resolvePublicAccess({
+    mode: publicAccessMode,
+    origin: publicOrigin,
+    frpcOrigin,
+    listenAddress,
+  });
+  if (accessMode === "web" && resolved.origin && !resolved.origin.startsWith("https://"))
+    throw new Error("Web 账号访问必须使用 HTTPS 公网入口");
   function clearLegacyCredentials() {
     // An explicit save confirms these credentials over legacy copies.
     for (const file of [
@@ -364,7 +469,13 @@ export async function saveDeploymentConfiguration(directory, values, verifyFrpc)
     !current.credentialsError &&
     current.appId === appId &&
     current.appSecret === secret &&
-    current.frpc.trim() === frpc
+    current.frpc.trim() === frpc &&
+    current.publicAccessMode === publicAccessMode &&
+    current.publicOrigin === publicOrigin &&
+    current.listenAddress === resolved.listenAddress &&
+    !current.publicAccessError &&
+    !current.originError &&
+    existsSync(publicPath)
   ) {
     clearLegacyCredentials();
     return { ...current, changed: false };
@@ -375,18 +486,26 @@ export async function saveDeploymentConfiguration(directory, values, verifyFrpc)
       content: JSON.stringify({ appId, appSecret: secret }, null, 2) + "\n",
     },
     { path: paths.frpc, content: frpc + "\n" },
+    {
+      path: publicPath,
+      content: serializePublicAccessDocument({
+        mode: publicAccessMode,
+        origin: publicOrigin,
+        listenAddress: resolved.listenAddress,
+      }),
+    },
   ];
   const staged = [];
   const written = [];
   try {
     for (const change of changes) {
-      const temp = join(dirname(change.path), `.codexboard-config-${randomUUID()}.toml`);
+      const temp = join(dirname(change.path), ".codexboard-config-" + randomUUID() + ".tmp");
       const previous = existsSync(change.path) ? readFileSync(change.path) : null;
       const mode = previous === null ? 0o600 : statSync(change.path).mode & 0o777;
       writeFileSync(temp, change.content, { mode: 0o600, flag: "wx" });
       staged.push({ ...change, temp, previous, mode });
     }
-    if (frpc) {
+    if (publicAccessMode === "builtin-frp") {
       try {
         await verifyFrpc(staged.find((item) => item.path === paths.frpc).temp);
       } catch {
@@ -437,6 +556,9 @@ function configurationFingerprint(deployment, ports, codexPath) {
     .update(
       JSON.stringify([
         deployment.accessMode,
+        deployment.publicAccessMode,
+        deployment.publicOrigin,
+        deployment.listenAddress,
         deployment.appId,
         deployment.appSecret,
         deployment.frpc,
@@ -487,7 +609,12 @@ async function main() {
     restartRequired: false,
     boardOpening: false,
     boardOpenError: "",
-    setupContext: { origin: "", domain: "", caddyPort: DEFAULT_PORTS.caddy },
+    setupContext: {
+      origin: "",
+      domain: "",
+      caddyPort: DEFAULT_PORTS.caddy,
+      publicAccessMode: "builtin-frp",
+    },
     logs: [],
   };
   let setupController;
@@ -508,12 +635,21 @@ async function main() {
     } catch (error) {
       state.portsMessage = error.message;
     }
-    const origin = state.deployment.origin || "";
+    const origin =
+      state.deployment.publicAccessMode === "local"
+        ? "http://127.0.0.1:" + state.ports.api
+        : state.deployment.origin || "";
     state.setupContext = {
-      ...readFrpcDnsTarget(state.deployment.frpc || ""),
+      ...(state.deployment.publicAccessMode === "builtin-frp"
+        ? readFrpcDnsTarget(state.deployment.frpc || "")
+        : {}),
       origin,
       domain: origin ? new URL(origin).hostname : "",
+      protocol: origin ? new URL(origin).protocol : "",
       caddyPort: state.ports.caddy,
+      publicAccessMode: state.deployment.publicAccessMode || "builtin-frp",
+      publicOrigin: state.deployment.publicOrigin || "",
+      listenAddress: state.deployment.listenAddress || "127.0.0.1",
     };
     if (children.length && config && config.fingerprint !== savedFingerprint())
       state.restartRequired = true;
@@ -545,10 +681,14 @@ async function main() {
       appId: state.deployment.appId || "",
       appSecret: state.deployment.appSecret || "",
       frpc: state.deployment.frpc || "",
+      publicAccessMode: state.deployment.publicAccessMode || "builtin-frp",
+      publicOrigin: state.deployment.publicOrigin || "",
+      listenAddress: state.deployment.listenAddress || "127.0.0.1",
+      apiPort: state.ports.api,
       caddyPort: state.ports.caddy,
       codexPath: settings.codexPath,
       frpcBinary: join(root, "bin/frpc"),
-      servicesRunning: children.length === 3,
+      servicesRunning: children.length > 0,
       restartRequired: state.restartRequired,
     }),
     onChange: publish,
@@ -577,31 +717,54 @@ async function main() {
     }
     const deployment = readDeploymentConfiguration(settings.configDirectory);
     const ports = readLocalPorts(c.CODEXBOARD_PORTS_FILE);
+    if (deployment.originError) throw new Error(deployment.originError);
+    const publicAccessMode = deployment.publicAccessMode || "builtin-frp";
+    const origin =
+      publicAccessMode === "local" ? "http://127.0.0.1:" + ports.api : deployment.origin;
+    if (!origin) throw new Error("请在连接配置中填写有效的公共 Origin");
+    const url = new URL(origin);
+    if (publicAccessMode === "local") {
+      if (!["localhost", "127.0.0.1"].includes(url.hostname))
+        throw new Error("本地模式只能使用 loopback 地址");
+    } else if (!isSupportedOrigin(url)) {
+      throw new Error("公网地址必须是 HTTP/HTTPS 域名或 HTTP 公网 IPv4");
+    }
+    if (
+      deployment.accessMode === "web" &&
+      publicAccessMode !== "local" &&
+      url.protocol !== "https:"
+    )
+      throw new Error("Web 账号访问必须使用 HTTPS");
+    if (deployment.accessMode === "feishu" && deployment.credentialsError)
+      throw new Error(deployment.credentialsError);
+    if (deployment.accessMode === "feishu" && (!deployment.appId || !deployment.appSecret))
+      throw new Error("请在连接配置中填写 App ID 和 App Secret");
+    if (publicAccessMode === "builtin-frp" && !deployment.frpc.trim())
+      throw new Error("请在连接配置中填写 frpc.toml");
+    if (publicAccessMode === "external-reverse-proxy" && !deployment.publicOrigin)
+      throw new Error("请在连接配置中填写外部反向代理 Origin");
     const env = nativeEnvironment(
-      { CODEXBOARD_ORIGIN: deployment.origin, CODEXBOARD_AUTH_MODE: deployment.accessMode },
+      {
+        CODEXBOARD_ORIGIN: origin,
+        CODEXBOARD_AUTH_MODE: deployment.accessMode,
+        CODEXBOARD_PUBLIC_ACCESS_MODE: publicAccessMode,
+      },
       c,
       root,
       ports,
     );
     if (!existsSync(settings.codexPath))
       throw new Error("未找到 Codex 程序，请先安装并登录 Codex Desktop");
-    if (deployment.accessMode === "feishu" && deployment.credentialsError)
-      throw new Error(deployment.credentialsError);
-    if (
-      (deployment.accessMode === "feishu" && (!deployment.appId || !deployment.appSecret)) ||
-      !deployment.frpc.trim()
-    )
-      throw new Error("请在连接配置中填写 App ID、App Secret 和 frpc 信息");
-    if (deployment.originError) throw new Error(deployment.originError);
-    const url = new URL(env.CODEXBOARD_ORIGIN);
-    if (deployment.accessMode === "web" && url.protocol !== "https:")
-      throw new Error("Web 账号访问必须使用 HTTPS");
-    if (!isSupportedOrigin(url)) throw new Error("公网地址必须是 HTTP/HTTPS 域名或 HTTP 公网 IPv4");
     return {
       c,
       env,
       url,
       ports,
+      publicAccessMode,
+      usesBuiltinProxy: publicAccessMode === "builtin-frp",
+      usesCaddy: publicAccessMode !== "local",
+      listenAddress: deployment.listenAddress || "127.0.0.1",
+      caddyInternalTls: publicAccessMode === "builtin-frp",
       revision: state.configRevision,
       fingerprint: configurationFingerprint(deployment, ports, settings.codexPath),
       appId: deployment.appId,
@@ -669,38 +832,59 @@ async function main() {
     publish();
     try {
       config = configuration();
-      const { c, env, url, ports, codex } = config;
+      const {
+        c,
+        env,
+        url,
+        ports,
+        usesBuiltinProxy,
+        usesCaddy,
+        listenAddress,
+        caddyInternalTls,
+        codex,
+      } = config;
       env.CODEXBOARD_CODEX_COMMAND = codex;
-      await assertPortsFree([ports.api, ports.admin, ports.bridge, ports.caddy]);
+      const requiredPorts = [ports.api, ports.admin, ports.bridge];
+      if (usesCaddy) requiredPorts.push(ports.caddy);
+      await assertPortsFree(requiredPorts);
       mkdirSync(join(c.CODEXBOARD_DATA_DIR, "run"), { recursive: true, mode: 0o700 });
       const caddyPath = join(stateDir, "Caddyfile");
-      writeFileSync(caddyPath, renderCaddyfile(url, ports), { mode: 0o600 });
+      if (usesCaddy)
+        writeFileSync(
+          caddyPath,
+          renderCaddyfile(url, ports, {
+            internalTls: caddyInternalTls,
+            listenAddress,
+            forwardedProto: url.protocol === "https:" ? "https" : "http",
+          }),
+          { mode: 0o600 },
+        );
       const common = {
         HOME: homedir(),
         TMPDIR: process.env.TMPDIR || "/tmp",
-        PATH: `${join(root, "bin")}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin`,
+        PATH: join(root, "bin") + ":/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
         LANG: "zh_CN.UTF-8",
         ...env,
         XDG_DATA_HOME: c.CODEXBOARD_CADDY_DATA_DIR,
         XDG_CONFIG_HOME: c.CODEXBOARD_CADDY_CONFIG_DIR,
       };
       const node = join(root, "bin/node");
-      launch("CodexBoard 后端", node, ["apps/server/dist/main.js"], common);
-      // Do not let Caddy establish a keep-alive connection to another process
-      // sharing the wildcard port while our loopback backend is still starting.
+      launch("DevBoard 后端", node, ["apps/server/dist/main.js"], common);
       const backendDeadline = Date.now() + 15000;
       while (!(await checkLocalApi(ports.api, url.host))) {
         if (!children.length || Date.now() >= backendDeadline)
           throw new Error("后端未能就绪，请检查端口占用或运行日志");
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
-      launch(
-        "Caddy",
-        join(root, "bin/caddy"),
-        ["run", "--config", caddyPath, "--adapter", "caddyfile"],
-        common,
-      );
-      launch("公网隧道", join(root, "bin/frpc"), ["-c", c.CODEXBOARD_FRPC_CONFIG_FILE], common);
+      if (usesCaddy)
+        launch(
+          "Caddy",
+          join(root, "bin/caddy"),
+          ["run", "--config", caddyPath, "--adapter", "caddyfile"],
+          common,
+        );
+      if (usesBuiltinProxy)
+        launch("公网隧道", join(root, "bin/frpc"), ["-c", c.CODEXBOARD_FRPC_CONFIG_FILE], common);
       state.url = url.origin;
       state.message = "服务启动中，等待健康检查…";
       publish();
@@ -718,34 +902,44 @@ async function main() {
     const owned = children;
     try {
       const api = await checkLocalApi(active.ports.api, active.url.host);
-      const bridge = await fetch(`http://127.0.0.1:${active.ports.bridge}/readyz`, {
+      const bridge = await fetch("http://127.0.0.1:" + active.ports.bridge + "/readyz", {
         signal: AbortSignal.timeout(1000),
       })
         .then((r) => r.ok)
         .catch(() => false);
-      const tls = await new Promise((ok) => {
-        const req = (active.url.protocol === "http:" ? http : https).get(
-          {
-            hostname: "127.0.0.1",
+      let caddy = true;
+      if (active.usesCaddy) {
+        const hostname =
+          active.listenAddress === "0.0.0.0" || active.listenAddress === "::"
+            ? "127.0.0.1"
+            : active.listenAddress === "localhost"
+              ? "127.0.0.1"
+              : active.listenAddress;
+        const transport = active.caddyInternalTls ? https : http;
+        caddy = await new Promise((ok) => {
+          const requestOptions = {
+            hostname,
             port: active.ports.caddy,
-            servername: active.url.hostname,
             path: "/api/health",
             headers: { host: active.url.host },
             agent: false,
-          },
-          (res) => {
+            ...(active.caddyInternalTls ? { servername: active.url.hostname } : {}),
+          };
+          const req = transport.get(requestOptions, (res) => {
             res.resume();
             ok(res.statusCode === 200);
-          },
-        );
-        req.setTimeout(1000, () => req.destroy());
-        req.on("error", () => ok(false));
-      });
+          });
+          req.setTimeout(1000, () => req.destroy());
+          req.on("error", () => ok(false));
+        });
+      }
       if (!children.length || children !== owned || config !== active) return;
-      const checks = [bridge && api, tls, true];
+      const checks = [bridge && api];
+      if (active.usesCaddy) checks.push(caddy);
+      if (active.usesBuiltinProxy) checks.push(true);
       state.services = state.services.map((s, i) => ({
         ...s,
-        status: i === 2 ? "running" : checks[i] ? "ready" : "waiting",
+        status: checks[i] === undefined ? "running" : checks[i] ? "ready" : "waiting",
       }));
       state.phase = checks.every(Boolean) ? "ready" : "starting";
       if (
@@ -791,8 +985,11 @@ async function main() {
           }
         } else if (request.action === "open_web_board") {
           try {
-            if (state.phase !== "ready" || config?.url.protocol !== "https:")
-              throw new Error("请先启动服务并配置 HTTPS 公网地址。");
+            if (
+              state.phase !== "ready" ||
+              (config?.publicAccessMode !== "local" && config?.url.protocol !== "https:")
+            )
+              throw new Error("请先启动服务并配置可用的公网地址。");
             await new Promise((resolve, reject) => {
               const child = spawn("/usr/bin/open", [config.url.origin], { stdio: "ignore" });
               child.once("error", reject);
@@ -803,7 +1000,7 @@ async function main() {
             state.webAccountsMessage = "已在默认浏览器打开登录页面。";
           } catch {
             state.webAccountsMessage =
-              "无法打开 Web 看板，请确认服务已启动、已配置 HTTPS 和默认浏览器。";
+              "无法打开 Web 看板，请确认服务已启动、访问模式和默认浏览器。";
           }
           publish();
         } else if (request.action === "web_accounts") {

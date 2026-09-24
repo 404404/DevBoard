@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 for (const width of [390, 1280]) {
-  test(`CodexBoard Web 登录品牌和图标在 ${width}px 正常显示`, async ({ page }) => {
+  test(`DevBoard Web 登录品牌和图标在 ${width}px 正常显示`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.route("**/api/v1/auth/config", (route) =>
       route.fulfill({
@@ -10,9 +10,9 @@ for (const width of [390, 1280]) {
     );
     await page.route("**/api/v1/session", (route) => route.fulfill({ status: 401, json: {} }));
     await page.goto("/");
-    await expect(page).toHaveTitle("CodexBoard");
-    await expect(page.getByRole("heading", { name: "登录 CodexBoard" })).toBeVisible();
-    const logo = page.getByRole("img", { name: "CodexBoard" });
+    await expect(page).toHaveTitle("DevBoard");
+    await expect(page.getByRole("heading", { name: "登录 DevBoard" })).toBeVisible();
+    const logo = page.getByRole("img", { name: "DevBoard" });
     await expect(logo).toBeVisible();
     expect(
       await logo.evaluate(

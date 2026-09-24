@@ -83,15 +83,36 @@ function nextWithTimeout<Output>(iterator: AsyncIterator<Output>): Promise<Itera
 }
 
 describe("EventFeed module", () => {
+  it("includes project aggregate changes in the matching project's history", () => {
+    const { eventFeed, firstProject, secondProject } = setup();
+
+    expect(
+      eventFeed.readSince({ projectId: firstProject.id, afterRevision: 0, limit: 100 }).events,
+    ).toContainEqual(
+      expect.objectContaining({
+        aggregateType: "project",
+        aggregateId: firstProject.id,
+        eventType: "project.created",
+        safePayload: expect.objectContaining({ projectId: firstProject.id, projectKey: "FEED" }),
+      }),
+    );
+    expect(
+      eventFeed.readSince({ projectId: firstProject.id, afterRevision: 0, limit: 100 }).events,
+    ).not.toContainEqual(expect.objectContaining({ aggregateId: secondProject.id }));
+  });
+
   it("reads project-scoped pages without losing global revision gaps", () => {
-    const { eventFeed, firstProject, secondProject, taskboard } = setup();
+    const { database, eventFeed, firstProject, secondProject, taskboard } = setup();
+    const startingRevision = Number(
+      database.prepare("SELECT coalesce(max(revision), 0) FROM change_events").pluck().get(),
+    );
     const first = createTask(taskboard, firstProject.id, "事件一", "feed-page-0001");
     const other = createTask(taskboard, secondProject.id, "其他事件", "feed-page-0002");
     const second = createTask(taskboard, firstProject.id, "事件二", "feed-page-0003");
 
     const firstPage = eventFeed.readSince({
       projectId: firstProject.id,
-      afterRevision: 0,
+      afterRevision: startingRevision,
       limit: 1,
     });
     const secondPage = eventFeed.readSince({
@@ -101,7 +122,7 @@ describe("EventFeed module", () => {
     });
     const otherPage = eventFeed.readSince({
       projectId: secondProject.id,
-      afterRevision: 0,
+      afterRevision: startingRevision,
       limit: 10,
     });
 
@@ -120,14 +141,25 @@ describe("EventFeed module", () => {
   });
 
   it("broadcasts one committed revision to multiple clients and deduplicates wakeups", async () => {
-    const { eventFeed, firstProject, taskboard } = setup();
+    const { database, eventFeed, firstProject, taskboard } = setup();
+    const cursor = Number(
+      database.prepare("SELECT coalesce(max(revision), 0) FROM change_events").pluck().get(),
+    );
     const firstController = new AbortController();
     const secondController = new AbortController();
     const firstIterator = eventFeed
-      .subscribe({ projectId: firstProject.id, afterRevision: 0, signal: firstController.signal })
+      .subscribe({
+        projectId: firstProject.id,
+        afterRevision: cursor,
+        signal: firstController.signal,
+      })
       [Symbol.asyncIterator]();
     const secondIterator = eventFeed
-      .subscribe({ projectId: firstProject.id, afterRevision: 0, signal: secondController.signal })
+      .subscribe({
+        projectId: firstProject.id,
+        afterRevision: cursor,
+        signal: secondController.signal,
+      })
       [Symbol.asyncIterator]();
     const firstWaiting = nextWithTimeout(firstIterator);
     const secondWaiting = nextWithTimeout(secondIterator);

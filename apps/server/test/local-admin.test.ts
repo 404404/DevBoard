@@ -12,7 +12,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../src/app.js";
 import { loadConfig } from "../src/config.js";
-import { initializeDatabase, type SqliteDatabase } from "../src/modules/database/index.js";
+import {
+  CORE_MIGRATIONS,
+  initializeDatabase,
+  type SqliteDatabase,
+} from "../src/modules/database/index.js";
 import type { BackupRunner } from "../src/modules/operations/index.js";
 import { ProjectSyncService } from "../src/modules/project-sync/index.js";
 import { createLocalAdminApp } from "../src/transports/local-admin-http.js";
@@ -35,7 +39,11 @@ afterEach(async () => {
 });
 
 function setup(
-  options: { readonly backupRunner?: BackupRunner; readonly adminPort?: number } = {},
+  options: {
+    readonly backupRunner?: BackupRunner;
+    readonly adminPort?: number;
+    readonly legacyProvisioner?: boolean;
+  } = {},
 ) {
   const root = mkdtempSync(join(tmpdir(), "codexboard-admin-"));
   temporaryDirectories.push(root);
@@ -58,7 +66,7 @@ function setup(
     database,
     capabilityToken,
     cliAuth,
-    codexThreadProvisioner: provisioner,
+    ...(options.legacyProvisioner === false ? {} : { codexThreadProvisioner: provisioner }),
     ...(options.backupRunner ? { backupRunner: options.backupRunner } : {}),
   });
   openApps.push(app);
@@ -102,6 +110,44 @@ function cookieHeader(response: Awaited<ReturnType<FastifyInstance["inject"]>>):
 }
 
 describe("local admin HTTP adapter", () => {
+  it("creates a board Task through taskctl without a local Codex provisioner", async () => {
+    const { app, capabilityToken, projectSync, root, loginCli } = setup({
+      legacyProvisioner: false,
+    });
+    const headers = {
+      host: "127.0.0.1:47824",
+      authorization: `Bearer ${capabilityToken}`,
+      ...(await loginCli()),
+    };
+    projectSync.reconcile({
+      schemaVersion: 1,
+      generatedAt: "2026-09-01T12:00:00.000Z",
+      projects: [
+        {
+          codexProjectId: "11111111-1111-4111-8111-111111111111",
+          name: "测试",
+          rootPaths: [realpathSync(root)],
+          position: 0,
+        },
+      ],
+    });
+    const projects = await app.inject({ method: "GET", url: "/api/v1/local/projects", headers });
+    const project = projects.json().data.find((entry: { kind: string }) => entry.kind === "codex");
+
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/v1/local/tasks",
+      headers: { ...headers, "idempotency-key": "taskctl-without-agent-session" },
+      payload: { projectId: project.id, title: "纯看板 CLI 任务" },
+    });
+
+    expect(created.statusCode, created.body).toBe(201);
+    expect(created.json().data).toMatchObject({
+      projectName: "测试",
+      codexThreadState: "none",
+    });
+  });
+
   it("rejects every board route without a valid user session despite a valid machine capability", async () => {
     const { app, capabilityToken, database, loginCli, cliAuth } = setup();
     expect(
@@ -566,7 +612,7 @@ describe("local admin HTTP adapter", () => {
       backupId: expect.stringMatching(/^backup-/),
       manifest: {
         manifestVersion: 1,
-        schemaVersion: 27,
+        schemaVersion: CORE_MIGRATIONS.at(-1)!.version,
         attachments: [],
       },
     });
@@ -912,7 +958,7 @@ it("deletes canceled tasks through the protected service with version checks and
     headers: { ...headers, "idempotency-key": "delete-cancel" },
     payload: { expectedVersion: task.version, targetStatus: "canceled" },
   });
-  expect(canceled.statusCode).toBe(200);
+  expect(canceled.statusCode, canceled.body).toBe(200);
   const version = canceled.json().data.version;
   const stale = await app.inject({
     method: "DELETE",

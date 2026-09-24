@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./helpers/remote-test";
 
 test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 test("permissions and steering use the isolated owner, preserve drafts and never auto-approve", async ({
@@ -117,7 +117,7 @@ test("permissions and steering use the isolated owner, preserve drafts and never
   await expect(queued).toContainText("保留失败的引导");
   const failedKeys: string[] = [];
   await page.route("**/api/v1/remote/threads/*/actions", async (route) => {
-    if (route.request().postDataJSON().operation !== "steer") return route.continue();
+    if (route.request().postDataJSON().operation !== "steer") return route.fallback();
     failedKeys.push(route.request().headers()["idempotency-key"]!);
     await route.fulfill({
       status: 409,
@@ -149,7 +149,7 @@ test("permissions and steering use the isolated owner, preserve drafts and never
   expect(failedKeys[1]).toBe(failedKeys[0]);
   let readUnavailable = true;
   await page.route("**/api/v1/remote/threads/*", async (route) => {
-    if (!readUnavailable || route.request().method() !== "GET") return route.continue();
+    if (!readUnavailable || route.request().method() !== "GET") return route.fallback();
     await route.fulfill({
       status: 503,
       json: { error: { code: "INVALID_REQUEST", message: "测试：桌面暂时断开" } },

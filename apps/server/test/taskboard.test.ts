@@ -9,7 +9,7 @@ import {
   type CreateTaskCommand,
   type LocalDevelopmentContextView,
 } from "@codexboard/contracts";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -639,14 +639,12 @@ describe("Taskboard module", () => {
     ).toThrow(/Thread 目录/);
   });
 
-  it("allows reassignment when the Thread cwd and target root resolve to the same directory", () => {
+  it("allows reassignment when the Thread cwd exactly matches the target workspace path", () => {
     const { database, project, taskboard } = setup();
     const directory = mkdtempSync(join(tmpdir(), "codexboard-reassign-"));
     temporaryDirectories.push(directory);
     const sourceRoot = join(directory, "source");
-    const targetAlias = join(directory, "target-alias");
     mkdirSync(sourceRoot);
-    symlinkSync(sourceRoot, targetAlias, "dir");
 
     const task = taskboard.createTask(
       createCommand(project.id, "同目录新项目任务"),
@@ -673,7 +671,7 @@ describe("Taskboard module", () => {
         `INSERT INTO task_threads (id, task_id, thread_id, cwd, is_primary)
         VALUES (?, ?, 'thread-same-directory', ?, 1)`,
       )
-      .run(crypto.randomUUID(), task.id, realpathSync(sourceRoot));
+      .run(crypto.randomUUID(), task.id, sourceRoot);
     sync.reconcile({
       schemaVersion: 1,
       generatedAt: "2026-09-01T12:01:00.000Z",
@@ -686,7 +684,7 @@ describe("Taskboard module", () => {
         {
           codexProjectId: "22222222-2222-4222-8222-222222222222",
           name: "同目录新项目",
-          rootPaths: [targetAlias],
+          rootPaths: [sourceRoot],
           position: 0,
         },
       ],
@@ -1092,6 +1090,10 @@ describe("Taskboard module", () => {
 
   it("moves by anchors while keeping version, activity and revision changes atomic", () => {
     const { database, project, taskboard } = setup();
+    const initialChangeCount = database
+      .prepare("SELECT count(*) FROM change_events")
+      .pluck()
+      .get() as number;
     const first = taskboard.createTask(
       createCommand(project.id, "第一个", { status: "todo" }),
       mutation("create-order-0001"),
@@ -1120,7 +1122,9 @@ describe("Taskboard module", () => {
     expect(moved.task.version).toBe(2);
     expect(moved.task.sortOrder).toBeLessThan(first.task.sortOrder);
     expect(database.prepare("SELECT count(*) FROM activities").pluck().get()).toBe(4);
-    expect(database.prepare("SELECT count(*) FROM change_events").pluck().get()).toBe(4);
+    expect(database.prepare("SELECT count(*) FROM change_events").pluck().get()).toBe(
+      initialChangeCount + 4,
+    );
     expect(
       JSON.parse(
         database
@@ -1137,7 +1141,9 @@ describe("Taskboard module", () => {
     );
     expect(statusMoved.task).toMatchObject({ status: "in_progress", version: 2 });
     expect(database.prepare("SELECT count(*) FROM activities").pluck().get()).toBe(5);
-    expect(database.prepare("SELECT count(*) FROM change_events").pluck().get()).toBe(5);
+    expect(database.prepare("SELECT count(*) FROM change_events").pluck().get()).toBe(
+      initialChangeCount + 5,
+    );
 
     const restored = taskboard.restoreTask(
       taskboard.archiveTask(
@@ -1668,6 +1674,10 @@ describe("Taskboard module", () => {
 
   it("returns the current resource on version conflict without partial writes", () => {
     const { database, project, taskboard } = setup();
+    const initialChangeCount = database
+      .prepare("SELECT count(*) FROM change_events")
+      .pluck()
+      .get() as number;
     const created = taskboard.createTask(
       createCommand(project.id, "并发任务"),
       mutation("create-conflict-0001"),
@@ -1693,7 +1703,9 @@ describe("Taskboard module", () => {
       details: { current: { version: updated.task.version, priority: "urgent" } },
     });
     expect(database.prepare("SELECT count(*) FROM activities").pluck().get()).toBe(2);
-    expect(database.prepare("SELECT count(*) FROM change_events").pluck().get()).toBe(2);
+    expect(database.prepare("SELECT count(*) FROM change_events").pluck().get()).toBe(
+      initialChangeCount + 2,
+    );
     expect(database.prepare("SELECT count(*) FROM request_idempotency").pluck().get()).toBe(2);
   });
 
@@ -1703,6 +1715,7 @@ describe("Taskboard module", () => {
       createCommand(project.id, "事务任务"),
       mutation("create-rollback-0001"),
     );
+    const changesAfterCreate = database.prepare("SELECT count(*) FROM change_events").pluck().get();
     database.exec(`
       CREATE TRIGGER fail_task_updated_event
       BEFORE INSERT ON change_events
@@ -1725,7 +1738,9 @@ describe("Taskboard module", () => {
       version: 1,
     });
     expect(database.prepare("SELECT count(*) FROM activities").pluck().get()).toBe(1);
-    expect(database.prepare("SELECT count(*) FROM change_events").pluck().get()).toBe(1);
+    expect(database.prepare("SELECT count(*) FROM change_events").pluck().get()).toBe(
+      changesAfterCreate,
+    );
     expect(
       database
         .prepare("SELECT count(*) FROM audit_events WHERE action LIKE 'task.%'")

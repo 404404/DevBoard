@@ -23,6 +23,11 @@ const RawEventRowSchema = z.object({
     "attachment",
     "job",
     "interaction",
+    "milestone",
+    "connection",
+    "execution_profile",
+    "workspace_mapping",
+    "run",
     "system",
   ]),
   aggregateId: z.uuid().nullable(),
@@ -101,6 +106,10 @@ export class EventFeed {
     this.#subscriptionPageSize = Math.min(200, Math.max(1, options.subscriptionPageSize ?? 100));
   }
 
+  isHealthy(): boolean {
+    return !this.#closed;
+  }
+
   readSince(input: EventFeedQuery): EventPage {
     const query = EventFeedQuerySchema.parse(input);
     this.#assertProjectExists(query.projectId);
@@ -135,11 +144,14 @@ export class EventFeed {
         FROM change_events
         WHERE revision > ?
           AND revision <= ?
-          AND json_extract(safe_payload_json, '$.projectId') = ?
+          AND (
+            json_extract(safe_payload_json, '$.projectId') = ?
+            OR (aggregate_type = 'project' AND aggregate_id = ?)
+          )
         ORDER BY revision
         LIMIT ?`,
       )
-      .all(query.afterRevision, latestRevision, query.projectId, query.limit + 1);
+      .all(query.afterRevision, latestRevision, query.projectId, query.projectId, query.limit + 1);
     const events = rows.slice(0, query.limit).map((row) => this.#boardEvent(row));
     const hasMore = rows.length > query.limit;
     const cursorRevision = hasMore

@@ -4,10 +4,17 @@
 
 ## 启用
 
-1. 启动 CodexBoard 本机服务，并配置 HTTPS 公网地址。HTTP/TCP 明文入口不接受密码登录。
-2. 打开「应用设置 → Web 账号」，填写账号、显示名称和密码，点击「创建账号」。账号为 3–64 位字母、数字、点、下划线或连字符，统一使用小写；密码为 8–256 位。
+1. 使用 Docker Compose 启动 DevBoard，并由外部反向代理提供 HTTPS。生产环境必须显式设置 `DEVBOARD_PUBLIC_ORIGIN`；HTTP/TCP 明文入口不接受密码登录。
+2. 通过交互式 TTY 在容器内创建账号。密码会隐藏输入，不要把密码写进命令参数或环境变量：
+
+   ```sh
+   docker compose exec -it devboard node apps/server/dist/ops.js web-account create --username alice --name "Alice"
+   ```
+
+   账号为 3–64 位字母、数字、点、下划线或连字符，统一使用小写；密码为 8–256 位。查看账号使用 `web-account list`；停用/启用或重置密码使用 `disable ID`、`enable ID`、`reset-password ID`。
+
 3. 在普通浏览器打开公网地址，输入账号密码。没有公开注册入口，也没有默认账号或默认密码。
-4. 「刷新账号列表」可查看已有账号；「停用并退出登录」阻止后续访问；「重置密码」撤销该账号所有浏览器会话。重新启用不会恢复旧浏览器或 CLI 会话。
+4. 停用账号会阻止后续访问；重置密码会撤销该账号所有浏览器会话。重新启用不会恢复旧浏览器或 CLI 会话。这些管理操作通过容器内 CLI 调用 loopback-only Admin API 完成；Admin API 不会发布到 Host。
 
 每个 Web 账号均能访问共享看板并操作、执行项目任务，只应分配给可信任的人。任务负责人、评论作者使用独立 Web 身份，不冒充飞书用户。历史任务、评论的身份与归属不变。Web 账号管理仅存在于本机应用的能力令牌保护接口，不能使用公网会话创建账号。
 
@@ -25,9 +32,9 @@
 
 ## 使用引导中的访问方式
 
-「使用引导」可切换查看 Web 或飞书的配置步骤，只改变引导内容，不改变运行配置，也不需要因此重启。
+「使用引导」说明 Docker Compose、外部 HTTPS 反向代理、Public Origin、飞书和 SSH Connection 的配置。TLS 由外部代理终止；配置 `DEVBOARD_TRUST_PROXY` 时只填实际代理的明确 IP/CIDR，不要信任所有代理。
 
-连接配置同时支持飞书与 Web，共用 frpc.toml 公网入口。填写完整飞书凭据即可使用飞书应用；HTTPS 和本机创建的有效 Web 账号就绪后，也能从浏览器登录。两种入口可同时使用。仅使用 Web 时，App ID 与 App Secret 同时留空即可。
+Web 与飞书共用 DevBoard 公共 HTTPS Origin；不存在内置 FRP、嵌入式 Caddy 或本机公网访问模式。填写完整飞书凭据即可使用飞书应用；HTTPS 和 Web 账号就绪后，也能从浏览器登录。两种入口可同时使用。仅使用 Web 时，App ID 与 App Secret 同时留空即可。
 
 Web 账号检查会读取本机服务最新账号列表，确认是否存在启用的账号。HTTPS 和服务运行状态单独检查；不会尝试密码登录，也不把账号检查通过当作真实登录成功。
 

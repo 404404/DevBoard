@@ -1,52 +1,50 @@
-# CodexBoard
+# DevBoard
 
-<img src="assets/brand/codexboard.png" alt="CodexBoard" width="112" />
+<img src="assets/brand/codexboard.png" alt="DevBoard" width="112" />
 
 [简体中文](README.md) · **English**
 
-Connect your projects to Codex and turn ideas into progress.
+Project control plane for managing projects, milestones, tasks, and remote runs.
 
 **User guide** · [Agent operating guide (Chinese)](AGENTS.md)
 
-CodexBoard connects your project task board to Codex running on your Mac. Organize projects and tasks, submit requests, track execution, and handle approvals or requests for more information. The Mac app starts and manages local services; you access the board through HTTPS with a locally created Web account, through Lark, or both.
+DevBoard is a Docker-hosted control plane. The container provides the Web UI, API, SQLite, Lark, Runs, and approvals. Codex, Cursor, Grok Build, and OpenCode execute over SSH on selected Connection Hosts. Production Git/worktree management and task Git finalization currently fail closed and are not yet connected to remote Workspace Mappings. Browser and Lark use the same board and Run state.
 
-Current release: **0.1.11 preview**, for **Apple Silicon Macs running macOS 13 or later**.
+Docker Compose is the primary deployment. The target image is `ghcr.io/404404/devboard` for `linux/amd64` and `linux/arm64`.
 
 ## Access methods
 
-|                        | Web                                                  | Lark                                                  |
-| ---------------------- | ---------------------------------------------------- | ----------------------------------------------------- |
-| Open in                | Desktop or mobile browser                            | Lark desktop or mobile client                         |
-| Identity               | Web account created locally                          | Lark user within the custom app's availability scope  |
-| Setup                  | HTTPS public entry point; no Lark app required       | Lark custom app and public tunnel                     |
-| CLI queries and writes | Pair with your Web account on the authorization page | Pair with your Lark account on the authorization page |
+|          | Web                          | Lark                                                 |
+| -------- | ---------------------------- | ---------------------------------------------------- |
+| Open in  | Desktop or mobile browser    | Lark desktop or mobile client                        |
+| Identity | Web account                  | Lark user within the custom app's availability scope |
+| Setup    | External HTTPS reverse proxy | Lark custom app and external HTTPS                   |
 
-Both methods can remain enabled and share the same board and local Codex.
+Both methods can remain enabled and share the same control plane, projects, and Runs.
 
 ## What you can do
 
 - Manage tasks by project using a dashboard, board, or list, with statuses, priorities, labels, comments, and attachments.
 - Start or continue Codex execution from a task, and view progress, results, and pending approvals.
 - Access the board in a desktop or mobile browser with a local Web account, or use Lark.
-- Manage branches and worktrees; desktop connection and port settings adapt to the window size.
-- Use mobile Remote to create or continue Codex conversations on your Mac, view streaming results, and handle approvals.
-- Send attachments and images from your phone, provide additional input, and view code diffs to review changes.
-- Let authorized agents query and manage tasks through the built-in command-line tool.
+- Configure SSH Hosts, Providers, Execution Profiles, and remote Workspace Mappings.
+- View the same streamed Run events and approvals from Web or Lark.
+- Send attachments and images from your phone and provide additional input to the same Run.
+- Manage tasks and remote Runs through Web or Lark; the container does not provide legacy local-cwd taskctl semantics.
 
-Local services and task data stay on your Mac. Lark sign-in, public access, and Codex execution still require their respective network services.
+The container does not install coding CLIs or mount host project directories or `~/.codex`. Workspace paths resolve through `Project → WorkspaceMapping → SSH Host`.
 
 ## Screenshots
 
-### Lark · Desktop, mobile, and Remote
+### Lark · Desktop and mobile
 
-Manage tasks in the Lark custom app. Mobile Remote supports Codex conversations, streamed output, attachments, approvals, and code review.
+Manage tasks in the Lark custom app. Web and Lark share the same projects, runs, events, and approvals.
 
 <table>
-  <tr><th>Desktop board</th><th>Mobile board</th><th>Remote</th></tr>
+  <tr><th>Desktop board</th><th>Mobile board</th></tr>
   <tr>
     <td align="center"><a href="docs/images/desktop-taskboard.png"><img src="docs/images/desktop-taskboard.png" alt="Desktop board" width="340" /></a></td>
     <td align="center"><a href="docs/images/mobile-taskboard.png"><img src="docs/images/mobile-taskboard.png" alt="Mobile board" height="200" /></a></td>
-    <td align="center"><a href="docs/images/mobile-remote.png"><img src="docs/images/mobile-remote.png" alt="Remote" height="200" /></a></td>
   </tr>
 </table>
 
@@ -62,137 +60,68 @@ Sign in over HTTPS with a locally created Web account. Click a thumbnail to view
   </tr>
 </table>
 
-## Prerequisites
+## Docker deployment
 
-| Requirement                           | Details                                                                                                                        |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Apple Silicon Mac                     | macOS 13 or later. The current installer does not support Intel Macs, Windows, or Linux.                                       |
-| Codex                                 | Installed, signed in, and working locally.                                                                                     |
-| Lark client and custom app (optional) | Required for Lark access or Lark CLI pairing; not required for the Web board or Web CLI pairing.                               |
-| Public frp tunnel service             | A working server or service-provider configuration to access the local services on your Mac.                                   |
-| Domain name, depending on tunnel type | HTTP/HTTPS domain-based access requires DNS configuration. TCP access through a public IPv4 address can work without a domain. |
-
-The installer includes **Node.js, the board's frontend and backend, the Codex bridge, SQLite components, Caddy, and the frp client**. You do not need to install Node.js, Docker, Rust, or development tools separately. You must provide Codex and a public frp server. Lark is optional for Web-only access.
-
-## Download and install
-
-1. Open the repository's [Releases page](https://github.com/RocYan98/CodexBoard/releases) and download `CodexBoard-VERSION-macos-arm64.dmg` from the selected release's **Assets**. The `Source code` archives are not installers.
-2. If an older version is installed, finish or safely handle any running board tasks, then quit CodexBoard normally from its menu.
-3. Open the DMG and drag `CodexBoard.app` into **Applications**.
-4. Open CodexBoard from Applications, then eject the installer disk.
-
-To check download integrity, also download the corresponding `.dmg.sha256` file and run the following in the directory containing both files. For version 0.1.11:
+You need Docker Engine, Docker Compose, and an external HTTPS reverse proxy. Each execution node—including the Docker Host itself—needs an SSH server, Git, and the selected Provider CLI. These programs are not installed in the DevBoard container.
 
 ```sh
-shasum -a 256 -c CodexBoard-0.1.11-macos-arm64.dmg.sha256
+cp .env.example .env
+mkdir -p secrets/ssh
+chmod 700 secrets secrets/ssh
+# Edit .env: set DEVBOARD_PUBLIC_ORIGIN and the observed proxy IP/CIDR in DEVBOARD_TRUST_PROXY
+docker compose config
+docker compose up -d
+docker compose ps
 ```
 
-An `OK` result means the file matches the publisher's checksum.
+Compose publishes `127.0.0.1:47823` by default for a reverse proxy on the same host. For a LAN-hosted proxy, set `DEVBOARD_BIND_ADDRESS` and restrict access with a firewall. TLS terminates at the external proxy. Production requires an explicit HTTPS `DEVBOARD_PUBLIC_ORIGIN`; `DEVBOARD_TRUST_PROXY` must list only the actual proxy address or CIDR.
 
-**The current release has not been signed with an Apple Developer ID or notarized.** macOS may block it on first launch. After confirming that you trust the download source, follow [Apple's instructions](https://support.apple.com/en-mo/102445). You do not need to disable system-wide security checks.
+Initial setup: start Compose → configure HTTPS reverse proxy and Public Origin → configure the Lark app (optional) → create an SSH Host and manually verify its Host Key fingerprint → detect remote Providers → create an Execution Profile → create/map the project's remote Workspace. For Docker Desktop, `host.docker.internal` is a convenient Host name. Linux Docker Engine can use Compose's `host-gateway` mapping where supported, or a LAN IP/DNS name.
 
-## Initial setup
-
-Open **使用引导 (Setup Guide)** in the app and follow these steps. Chinese labels below match the current app interface.
-
-### 1. Configure the frp client
-
-Obtain a complete `frpc.toml` from your frp provider or your own server setup, and paste it into **连接配置 (Connection Settings)**. The tunnel should forward traffic to `127.0.0.1` on this Mac and the **Caddy 本机端口 (local Caddy port)** shown in the app.
-
-The app detects the public entry address from the tunnel configuration. Use your own configuration; do not copy someone else's authentication parameters or public address.
-
-DNS configuration is part of this step. The guide shows instructions based on the tunnel type: HTTPS and HTTP domain-based access require DNS configuration according to your provider's instructions. TCP access through a public IPv4 address does not require DNS; use the public address directly. Where DNS is needed, use the domain and target shown in the guide.
-
-HTTPS access requires public port 443 to reach the local Caddy service. HTTP and TCP modes use plain HTTP, so sessions and application content are not encrypted with HTTPS.
-
-### 2. Configure Web accounts, Lark, or both
-
-The setup guide can show either Web or Lark instructions. This only changes the guide; Connection Settings supports both methods at once.
-
-#### Web accounts
-
-1. Configure an **HTTPS** public entry point, save it, and start or restart services. Password sign-in is not available over plain HTTP or TCP tunnel entry points.
-2. Open **应用设置 → Web 账号 (App Settings → Web Accounts)**, also accessible through **管理 Web 账号 (Manage Web Accounts)** in Connection Settings. Create a username, display name, and password of **8–256 characters**. Accounts can only be created locally; there is no public registration.
-3. Open your public URL in a browser and sign in. For Web-only access, leave both Lark App ID and App Secret empty.
-
-The guide checks the running configuration and enabled account availability automatically. It does not test the password or prove a successful browser sign-in; verify that separately.
-
-Web accounts are trusted users who can execute tasks. Accounts share the board without per-project access isolation. New tasks belong to the signed-in user, and comments use that identity. Only create accounts for people you trust. Disabling an account or resetting its password invalidates its existing browser and CLI pairing sessions.
-
-CLI queries and writes require a paired Web or Lark user session. To pair with a Web account, sign in on the browser authorization page, check the account, CLI name and verification code, and confirm the request.
-
-#### Lark app (can remain enabled alongside Web accounts)
-
-Create an enterprise custom web app in the [Lark developer console](https://open.feishu.cn/app). Enter its **App ID** and **App Secret** in **连接配置 (Connection Settings)**.
-
-Use the addresses in the setup guide to configure the desktop and mobile homepages, H5 trusted domains, and redirect URL. Enable the permission to obtain a user's user ID (`contact:user.employee_id:readonly`), then publish an app version in Lark and configure its availability scope.
-
-A successful credentials check only confirms that the credentials work. You still need to verify the publication status, availability scope, and actual sign-in in Lark. Any account that successfully authenticates through Lark can operate the same board, so configure the app's availability scope for your intended users.
-
-### 3. Confirm Codex sign-in, save, and verify
-
-Make sure Codex is installed and signed in on this Mac, then run the checks in the setup guide.
-
-**Running checks does not save your configuration automatically.** Save after filling in the settings. If settings have changed, choose to restart services immediately or restart them manually later. Unchanged settings do not trigger a new restart reminder.
-
-Once **服务概览 (Service Overview)** shows that the backend, Caddy, and public tunnel are healthy, sign in through your Web account or Lark and check that the board loads. When both methods are enabled, verify each separately.
+SQLite, attachments, backups, runtime state, and trusted `known_hosts` persist in `/var/lib/devboard`. Replacing the image does not replace this volume. The former macOS Desktop app is deprecated and is not a primary release target.
 
 ## Everyday use
 
-Manage projects in Codex Desktop, select a synced project on the board, and create a task describing what you need. After starting Codex execution, use the task details to view progress, results, approvals, and requests for more input. Review and accept the result when execution finishes.
+Create Projects and Tasks in DevBoard, map each Project to an absolute Workspace path on its SSH Host, then start a Run with an Execution Profile. Run state, events, approvals, and Continue are shared by Web and Lark. Changing the Provider Host does not change the Project or Task.
 
-- **Close the CodexBoard window:** the app remains in the menu bar and services keep running.
-- **Quit CodexBoard or click 停止服务 (Stop Services):** local services stop, and the board becomes temporarily unavailable in both browsers and Lark.
-- **Shut down, put your Mac to sleep, or disconnect it from the network:** public access may be interrupted. Keep your Mac online when using remote features.
+## Container operations
 
-Quitting CodexBoard does not close Codex Desktop. Handle any executing board tasks before updating or stopping services.
+Backup and verification commands can run inside the container via `docker exec`. The Admin API remains loopback-only and is not published to the host:
 
-## Install and use the Codex Skill
+```sh
+docker compose exec -T devboard node apps/server/dist/ops.js backup
+docker compose exec -T devboard node apps/server/dist/ops.js verify /var/lib/devboard/backups/<backup-id>
+# Password is read without echo from the TTY; it is not placed in argv, env, or output
+docker compose exec -it devboard node apps/server/dist/ops.js web-account create --username alice --name "Alice"
+docker compose exec -T devboard node apps/server/dist/ops.js web-account list
+```
 
-The companion Skill lets Codex query and modify tasks and assist with execution through the app's built-in command-line tool, without cloning the source or installing Node.js. Installation currently supports Codex; the Skill is named `manage-codexboard`.
-
-On first launch, if the companion Skill is not installed, the app displays **让 Codex 使用 CodexBoard (Let Codex use CodexBoard)**. Choose **安装到 Codex (Install to Codex)**, or install it later from **应用设置 → Agent Skill (App Settings → Agent Skill)**. The installation directory is `~/.agents/skills/manage-codexboard`.
-
-The app checks the bundled Skill against the installed version at startup and while running. When an update is available, a notice at the top of the window offers **查看 Skill (View Skill)** to open the update card; **重新检查 (Check Again)** refreshes the status. Changed bundle contents also trigger a notice when the version number stays the same. Dismissing a notice applies only to that version and content; another update will be shown again. Replacement happens only when you click to update. If you have edited the Skill, you must explicitly choose **使用随包版本 (Use Bundled Version)** to replace it. Symbolic links, directories managed by another tool, Skills using the old name, or matching Skills in legacy locations prompt you to handle them at their original location or in their manager, avoiding duplicate installations. The app does not check those managers for remote updates.
-
-An installed-file status does not mean the Skill is loaded in your current Codex conversation. Check the Skill list in Codex. If it is not recognized, force a Skill reload or reopen Codex when convenient, then use it in a new conversation:
-
-> Please use $manage-codexboard to first list my projects and tasks, then help me handle the task I specify.
-
-Installing the Skill or signing in to the board does not authorize the CLI automatically. Before an agent queries or changes the board on your behalf, confirm pairing through your Web account in the browser or your Lark account in Lark. The CLI then acts as the real user who confirmed the account, CLI name and verification code; it does not use a local service identity.
+The old `manage-codexboard` Skill/taskctl depends on the macOS Desktop runtime, caller cwd, and legacy Job/Git model. It is deprecated and does not operate SSH Runs. Read the [operations guide](docs/development.md) before backup or restore operations.
 
 ## Let an agent help with installation and configuration
 
-To have an agent help install the app, configure it, or troubleshoot a problem, give it this repository's [AGENTS.md (Chinese)](AGENTS.md) and explain what you want to accomplish. For example:
+To have an agent help deploy DevBoard, give it this repository's [AGENTS.md (Chinese)](AGENTS.md) and explain what you want to accomplish. For example:
 
-> Please read AGENTS.md, check whether my Mac meets the requirements, and help me install and configure CodexBoard. Clearly tell me when I need to sign in or confirm something in the Lark developer console.
+> Please read AGENTS.md and help deploy DevBoard with Docker Compose, an external HTTPS reverse proxy, and an SSH Host. Tell me when I need to verify a Host Key or confirm settings in the Lark developer console.
 
-The agent guide covers the built-in `taskctl` entry point, identity pairing, read-only checks, and common operations. It does not require cloning the source or installing development dependencies. Agents differ in how they automatically load instruction files; if yours cannot load the file automatically, provide its contents or a link directly.
+See the [deployment guide](docs/reverse-proxy.md) for proxy and SSH key setup. Never put a private key, App Secret, Web password, or runtime capability in chat, command arguments, or issues.
 
 ## Updates and data
 
-Under **应用设置 → 应用更新 (App Settings → App Updates)**, use **前往 Release 手动下载 (Download from Release)** to open the latest release in your browser, or check for updates here or from the menu bar. The app also checks automatically once a day and displays a notification and release notes when a new version is available. Once the download has been verified, click **安装并重启 (Install and Restart)**, handle running tasks as prompted, and confirm installation. Services keep running during checks and downloads; installation briefly stops the local services.
-
-Update packages are verified with a separate signing key. If automatic updating is unavailable, quit the old version normally and replace `CodexBoard.app` in Applications using the new DMG. Configuration, the database, and attachments are stored in:
-
-```text
-~/Library/Application Support/CodexBoard/
-```
-
-On the first launch after upgrading, if the new directory does not exist, the app automatically migrates the existing data after the old version has exited. If directories conflict, it preserves the existing data and prompts you to resolve the conflict. Replacing the app normally preserves your data. Deleting the data directory affects configuration and tasks; do not treat it as an installer cache or share it with other people alongside the installer.
+Update the container image and recreate the service while preserving the `devboard-data` volume. Take a DevBoard backup before an upgrade. Keep `.env` and `secrets/ssh` outside the image; never replace or delete the data volume as part of an image update. The macOS Desktop runtime is deprecated and is not part of the primary release workflow.
 
 ## Troubleshooting
 
-| Symptom                                                | What to check first                                                                                                                                                     |
-| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| macOS cannot verify the developer                      | The current release is not notarized. Verify the download source and follow the Apple instructions above.                                                               |
-| A port is in use and services cannot start             | Choose available ports in 连接配置 → 端口设置 (Connection Settings → Port Settings), save, and restart. Do not arbitrarily terminate other programs.                    |
-| Local services work, but the app does not open in Lark | Check that the Mac is online, along with the frp service, DNS, Lark homepage settings, publication status, and availability scope.                                      |
-| The Lark credentials check passes, but sign-in fails   | Check the user ID permission, trusted domains, and redirect URL, then try signing in through Lark.                                                                      |
-| Codex checks fail or projects do not appear            | Confirm sign-in and projects in Codex, then check again in the app. A basic sign-in check does not guarantee that online requests will work or that quota is available. |
+| Symptom                                          | What to check first                                                                                                                                      |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Container is unhealthy                           | Check `docker compose logs devboard`, `/api/health`, and write access to the data volume. An offline SSH Host does not make the control plane unhealthy. |
+| Login redirects loop or Secure cookie is missing | Check that Public Origin is the external HTTPS URL and `DEVBOARD_TRUST_PROXY` contains only the reverse proxy's actual source address/CIDR.              |
+| Lark callback or H5 page fails                   | Check Public Origin, the HTTPS proxy route, Lark redirect/allowed domains, app publication, and availability scope.                                      |
+| SSE stops behind the proxy                       | Disable buffering for `/api/v1/events/stream` and increase the proxy read timeout; see [reverse-proxy.md](docs/reverse-proxy.md).                        |
+| SSH connection fails                             | Check TCP/22, the confirmed Host Key fingerprint, selected key/agent, remote username, and Provider installation on that Host.                           |
 
-When reporting an issue, include the app version, macOS version, steps to reproduce it, and screenshots with sensitive details removed. Do not publish your App Secret, tunnel credentials, login tokens, or complete data directory.
+When reporting an issue, include the image tag/digest, container logs with secrets removed, and steps to reproduce it. Never publish an App Secret, private key, login token, or complete data volume.
 
 ## Source code and technical references
 
-Developers can consult the [development and operations reference](docs/development.md), [desktop app documentation](apps/desktop/README.md), and [taskctl command reference](docs/taskctl.md). These documents are in Chinese and are intended for development and troubleshooting; a normal installation does not require running their build commands.
+Developers can consult the [architecture overview](docs/architecture.md), [execution platform](docs/execution-platform.md), [Provider guide](docs/providers.md), [Docker/reverse-proxy deployment](docs/reverse-proxy.md), and the [development and operations reference](docs/development.md). Desktop/taskctl sources are retained only as migration history.

@@ -58,6 +58,28 @@ function setup() {
 }
 
 describe("Project Registry module", () => {
+  it("fails closed for container-local paths in remote-only mode", async () => {
+    const database = initializeDatabase(":memory:");
+    openDatabases.push(database);
+    const project = new ProjectAdministration(database).createProject({
+      projectKey: "SSH",
+      name: "远程项目",
+      description: "",
+    });
+    const registry = new ProjectRegistry(
+      database,
+      ["/path/that/exists/only/on/the/host"],
+      undefined,
+      {
+        remoteOnly: true,
+      },
+    );
+
+    await expect(registry.resolveExecutionContext(project.id)).rejects.toThrow(
+      "SSH Host Connection 和 Project Workspace Mapping",
+    );
+  });
+
   it("returns only active executable development contexts backed by worktrees", () => {
     const { administration, database, registry } = setup();
     const project = administration.createProject({

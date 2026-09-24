@@ -308,6 +308,8 @@ interface RegisteredProject {
   readonly rootPath: string;
 }
 
+type ManagedProject = Pick<RegisteredProject, "id" | "projectKey" | "name">;
+
 interface SnapshotProject {
   readonly codexProjectId: string;
   readonly name: string;
@@ -418,25 +420,6 @@ async function localProjects(): Promise<readonly RegisteredProject[]> {
   return payload.data;
 }
 
-async function localAdminRequest<Data>(path: string, init?: RequestInit): Promise<Data> {
-  const dataDirectory = process.env.CODEXBOARD_DATA_DIR as string;
-  const descriptorPath = resolve(dataDirectory, "run/runtime.json");
-  await expect.poll(() => existsSync(descriptorPath)).toBe(true);
-  const descriptor = JSON.parse(readFileSync(descriptorPath, "utf8")) as RuntimeDescriptor;
-  const response = await fetch(`${descriptor.localAdminBaseUrl}${path}`, {
-    ...init,
-    headers: {
-      ...(await localUserHeaders(descriptor)),
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      ...init?.headers,
-    },
-  });
-  expect(response.status).toBeGreaterThanOrEqual(200);
-  expect(response.status).toBeLessThan(300);
-  const payload = (await response.json()) as { data: Data };
-  return payload.data;
-}
-
 async function readPublicData<Data>(page: Page, path: string): Promise<Data> {
   const result = await page.evaluate(async (requestPath) => {
     const response = await fetch(requestPath, { headers: { Accept: "application/json" } });
@@ -537,17 +520,27 @@ async function registerProject(prefix: string, displayName?: string): Promise<Re
   return registered as RegisteredProject;
 }
 
-async function registerExecutableProject(prefix: string): Promise<RegisteredProject> {
-  const project = await registerProject(prefix);
-  const repository = project.rootPath;
-  execFileSync("git", ["-C", repository, "init", "-b", "main"]);
-  execFileSync("git", ["-C", repository, "config", "user.name", "Taskboard E2E"]);
-  execFileSync("git", ["-C", repository, "config", "user.email", "e2e@example.test"]);
-  writeFileSync(join(repository, "README.md"), "# Codex E2E\n", "utf8");
-  execFileSync("git", ["-C", repository, "add", "README.md"]);
-  execFileSync("git", ["-C", repository, "commit", "-m", "initial"]);
-
-  return project;
+async function registerManagedProject(page: Page, prefix: string): Promise<ManagedProject> {
+  const csrfToken = await establishSyntheticFeishuSession(page.context().request);
+  const projectKey = Array.from(randomUUID().replaceAll("-", "").slice(0, 5), (digit) =>
+    String.fromCharCode(65 + Number.parseInt(digit, 16)),
+  ).join("");
+  const response = await page.context().request.post(`${e2eOrigin()}/api/v1/projects`, {
+    headers: {
+      Origin: e2eOrigin(),
+      "Idempotency-Key": randomUUID(),
+      "X-CSRF-Token": csrfToken,
+    },
+    data: {
+      projectKey,
+      name: `${prefix} ${uniqueProjectKey(prefix)}`,
+      description: "",
+    },
+  });
+  const payload = (await response.json()) as { data: ManagedProject & { kind: string } };
+  expect(response.status(), JSON.stringify(payload)).toBe(201);
+  expect(payload.data.kind).toBe("managed");
+  return payload.data;
 }
 
 async function openWorkspace(page: Page): Promise<void> {
@@ -557,7 +550,10 @@ async function openWorkspace(page: Page): Promise<void> {
   await expect(page.locator(".project-list-rail")).toHaveCount(0);
 }
 
-async function selectProject(page: Page, project: RegisteredProject): Promise<void> {
+async function selectProject(
+  page: Page,
+  project: Pick<RegisteredProject, "id" | "name">,
+): Promise<void> {
   const menu = await openProjectMenu(page);
   await menu.getByRole("menuitem", { name: project.name, exact: true }).click();
   await expect(
@@ -570,7 +566,7 @@ async function selectProjectByName(page: Page, name: string): Promise<void> {
   const menu = await openProjectMenu(page);
   await menu.getByRole("menuitem", { name, exact: true }).click();
   await expect(page.getByRole("button", { name: new RegExp(`当前：${name}`) })).toBeVisible();
-  await expect(page.getByTestId("realtime-state")).toContainText("实时同步");
+  await expect(page.getByRole("region", { name: "任务状态看板" })).toBeVisible();
 }
 
 async function openProjectMenu(page: Page): Promise<Locator> {
@@ -686,8 +682,14 @@ async function createTaskAndOpenDetail(
   const createDialog = await openTaskCreateDialog(page);
   await configure?.(createDialog);
   await createDialog.getByLabel("任务标题").fill(title);
+  const taskCreated = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      new URL(response.url()).pathname === "/api/v1/tasks",
+  );
   await createDialog.getByRole("button", { name: "创建任务", exact: true }).click();
-  await expect(createDialog).toHaveCount(0);
+  expect((await taskCreated).status()).toBe(201);
+  await expect(createDialog).toHaveCount(0, { timeout: 10_000 });
   const detail = page.getByRole("region", { name: "任务详情", exact: true });
   await expect(detail).toBeVisible();
   await expect(detail.getByRole("button", { name: "返回看板", exact: true })).toBeFocused();
@@ -808,6 +810,28 @@ async function selectCreateRelation(
 }
 
 test("新增任务选择模型推理强度和速度并传递到创建请求", async ({ page }, testInfo) => {
+  await page.route("**/api/v1/remote/models", (route) =>
+    route.fulfill({
+      json: {
+        data: [
+          {
+            id: "gpt-6-astra",
+            name: "GPT-6 Astra",
+            efforts: ["low", "medium", "high", "xhigh", "max", "ultra"],
+            defaultEffort: "high",
+            serviceTiers: [{ id: "priority", name: "Fast" }],
+          },
+          {
+            id: "test-model",
+            name: "Test model",
+            efforts: ["low", "medium", "high"],
+            defaultEffort: "medium",
+            serviceTiers: [],
+          },
+        ],
+      },
+    }),
+  );
   await page.setViewportSize({ width: 1280, height: 800 });
   await openWorkspace(page);
   const dialog = await openTaskCreateDialog(page);
@@ -817,7 +841,7 @@ test("新增任务选择模型推理强度和速度并传递到创建请求", as
   const picker = dialog.getByRole("dialog", { name: "模型设置", exact: true });
   await picker.getByRole("button", { name: "GPT-6 Astra", exact: true }).click();
   const slider = picker.getByRole("slider", { name: "推理强度" });
-  await slider.fill("1");
+  await slider.fill("2");
   await expect(slider).toHaveAttribute("aria-valuetext", "高");
   await picker.getByRole("button", { name: /点击开启/ }).click();
   await expect(picker.getByRole("button", { name: /已开启/ })).toHaveAttribute(
@@ -830,14 +854,14 @@ test("新增任务选择模型推理强度和速度并传递到创建请求", as
   });
   await picker.getByRole("button", { name: "选择模型", exact: true }).click();
   await picker.getByRole("button", { name: "Test model", exact: true }).click();
-  await expect(slider).toHaveValue("0");
+  await expect(slider).toHaveValue("1");
   await expect(picker.getByRole("button", { name: /倍速不可用/ })).toBeDisabled();
   await picker.getByRole("button", { name: "使用 Codex 默认设置" }).click();
   await expect(trigger).toContainText("Codex 默认模型");
   await page.setViewportSize({ width: 390, height: 844 });
   await trigger.click();
   await picker.getByRole("button", { name: "GPT-6 Astra", exact: true }).click();
-  await slider.fill("1");
+  await slider.fill("2");
   await picker.getByRole("button", { name: /点击开启/ }).click();
   await expect(slider).toBeInViewport();
   await page.screenshot({
@@ -1084,17 +1108,17 @@ test("新增任务弹窗按需选择关系并累计添加附件", async ({ page 
   );
   await page.mouse.up();
   await expect
-    .poll(() =>
-      dialog
-        .locator(".task-create-meta-strip")
-        .evaluate(
-          (element) =>
-            new Set(
-              Array.from(element.children, (child) =>
-                Math.round(child.getBoundingClientRect().top),
-              ),
-            ).size,
-        ),
+    .poll(async () =>
+      dialog.locator(".task-create-meta-strip").evaluate((element) => {
+        const tops = Array.from(
+          element.children,
+          (child) => child.getBoundingClientRect().top,
+        ).sort((left, right) => left - right);
+        return tops.reduce<number[]>((rows, top) => {
+          if (rows.length === 0 || top - rows.at(-1)! > 2) rows.push(top);
+          return rows;
+        }, []).length;
+      }),
     )
     .toBe(1);
   await expect(
@@ -1288,7 +1312,7 @@ test("新增任务弹窗按需选择关系并累计添加附件", async ({ page 
   });
   await expect(dialog.getByLabel("已添加附件")).toContainText("brief.txt");
   await expect(dialog.getByLabel("已添加附件")).toContainText("evidence.csv");
-  await expect(dialog.locator(".task-create-file-extension")).toHaveText(["TXT", "CSV"]);
+  await expect(dialog.locator(".attachment-card-icon")).toHaveText(["TXT", "CSV"]);
   await expect(dialog.getByRole("button", { name: "添加附件，已选择 2 个" })).toBeVisible();
   await dialog.getByLabel("任务标题").fill("胶囊换行附件测试");
   await create.click({ trial: true, timeout: 2_000 });
@@ -1550,26 +1574,23 @@ test("新增任务与标签管理的普通文字字号和看板控件保持一�
   await manager.getByRole("button", { name: "关闭标签管理" }).click();
 });
 
-test("新增任务分支选项与本地 Worktree 实时同步并按分支去重", async ({ page }) => {
-  const project = await registerExecutableProject("BRANCHSYNC");
-  const featureBranch = "feature/task-dialog-sync";
-  const featureWorktree = join(
-    process.env.CODEXBOARD_DATA_DIR as string,
-    `worktree-${randomUUID()}`,
-  );
-  execFileSync("git", ["-C", project.rootPath, "branch", featureBranch]);
-  execFileSync("git", ["-C", project.rootPath, "worktree", "add", featureWorktree, featureBranch]);
-
+test("未映射远端 Workspace 时任务创建不推断容器本地分支", async ({ page }) => {
+  const project = await registerManagedProject(page, "BRANCHSYNC");
   await openWorkspace(page);
   await selectProject(page, project);
+  const options = await readPublicData<{
+    defaultDevelopmentContext: { readonly label: string };
+    developmentContexts: readonly DevelopmentContextFixture[];
+  }>(page, `/api/v1/projects/${project.id}/task-creation-options`);
+  expect(options.developmentContexts).toEqual([]);
+
   const dialog = await openTaskCreateDialog(page);
   const contextSelect = dialog.getByRole("combobox", { name: "分支 / Worktree" });
-  await expect(contextSelect.getByRole("option", { name: "main", exact: true })).toHaveCount(1);
-  await expect(contextSelect.getByRole("option", { name: featureBranch, exact: true })).toHaveCount(
-    1,
+  await expect(contextSelect.locator("option")).toHaveCount(1);
+  await expect(contextSelect.locator("option").first()).toHaveText(
+    options.defaultDevelopmentContext.label,
   );
-  expect((await contextSelect.locator("option").allTextContents()).join(" ")).not.toContain("·");
-  await contextSelect.selectOption({ label: featureBranch });
+  await expect(contextSelect).toHaveValue("");
 
   const defaultLayout = await dialog.locator(".task-create-dialog").evaluate((element) => {
     const rect = (selector: string) => {
@@ -1600,15 +1621,6 @@ test("新增任务分支选项与本地 Worktree 实时同步并按分支去重"
   expect(defaultLayout.createBottom).toBeLessThanOrEqual(defaultLayout.dialogBottom - 10);
   expect(defaultLayout.createBottom).toBeLessThan(defaultLayout.southResizeTop);
   expect(defaultLayout.formScrollHeight).toBeLessThanOrEqual(defaultLayout.formClientHeight + 1);
-
-  execFileSync("git", ["-C", project.rootPath, "worktree", "remove", featureWorktree]);
-  execFileSync("git", ["-C", project.rootPath, "branch", "-D", featureBranch]);
-
-  await expect(contextSelect.getByRole("option", { name: featureBranch, exact: true })).toHaveCount(
-    0,
-    { timeout: 12_000 },
-  );
-  await expect(contextSelect).toHaveValue("");
   await dialog.getByRole("button", { name: "关闭新增任务" }).click();
 });
 
@@ -1827,7 +1839,7 @@ test("触屏设备始终显示关系与标签删除入口", async ({ browser }) 
     );
     await dialog.getByRole("button", { name: "关闭新增任务" }).click();
 
-    await page.getByRole("button", { name: "标签管理" }).click();
+    await page.getByRole("button", { name: /^标签(?:管理)?$/ }).click();
     const labelRow = page
       .getByRole("dialog", { name: "标签管理" })
       .locator(".tag-manager-row", { hasText: labelName });
@@ -1836,7 +1848,7 @@ test("触屏设备始终显示关系与标签删除入口", async ({ browser }) 
       "grid",
     );
   } finally {
-    await context.close();
+    await Promise.allSettled([context.close()]);
   }
 });
 
@@ -2012,25 +2024,9 @@ test("新增任务时保存描述和优先级", async ({ page }) => {
 
 test("新增任务完整选项真实持久化且双客户端关系同步", async ({ browser }) => {
   test.setTimeout(90_000);
-  const project = await registerExecutableProject("CREATEFULL");
-  const featureBranch = "feature/create-options";
-  const featureWorktree = join(
-    process.env.CODEXBOARD_DATA_DIR as string,
-    `worktree-${randomUUID()}`,
-  );
-  execFileSync("git", ["-C", project.rootPath, "branch", featureBranch]);
-  execFileSync("git", ["-C", project.rootPath, "worktree", "add", featureWorktree, featureBranch]);
-  const contexts = await localAdminRequest<readonly DevelopmentContextFixture[]>(
-    `/api/v1/local/projects/${project.id}/contexts/scan`,
-    { method: "POST", body: "{}" },
-  );
-  const worktree = contexts.find(
-    (context) => context.kind === "branch" && context.label === featureBranch,
-  );
-  expect(worktree).toBeDefined();
-
   const labelSeedContext = await browser.newContext();
   const labelSeedPage = await labelSeedContext.newPage();
+  const project = await registerManagedProject(labelSeedPage, "CREATEFULL");
   await openWorkspace(labelSeedPage);
   await ensureGlobalLabel(labelSeedPage, "持久化标签");
   await labelSeedContext.close();
@@ -2084,7 +2080,13 @@ test("新增任务完整选项真实持久化且双客户端关系同步", async
       `/api/v1/projects/${project.id}/task-creation-options`,
     );
     expect(options.assignees.map((actor) => actor.identity)).toEqual([SYNTHETIC_FEISHU_IDENTITY]);
-    await dialog.getByRole("combobox", { name: "分支 / Worktree" }).selectOption(worktree!.id);
+    const creationOptions = await readPublicData<{
+      developmentContexts: readonly DevelopmentContextFixture[];
+    }>(first, `/api/v1/projects/${project.id}/task-creation-options`);
+    expect(creationOptions.developmentContexts).toEqual([]);
+    await expect(
+      dialog.getByRole("combobox", { name: "分支 / Worktree" }).locator("option"),
+    ).toHaveCount(1);
 
     await dialog.getByRole("button", { name: /^标签：/ }).click();
     await dialog.getByRole("checkbox", { name: "持久化标签" }).check();
@@ -2124,7 +2126,7 @@ test("新增任务完整选项真实持久化且双客户端关系同步", async
       id: created.id,
       labels: ["持久化标签"],
       assigneeIdentity: SYNTHETIC_FEISHU_IDENTITY,
-      developmentContextId: worktree!.id,
+      developmentContextId: null,
       links: [],
     });
 
@@ -2205,7 +2207,7 @@ test("新增任务完整选项真实持久化且双客户端关系同步", async
     );
     await expect(card.locator(".priority")).toHaveCount(0);
   } finally {
-    await Promise.all([firstContext.close(), secondContext.close()]);
+    await Promise.allSettled([firstContext.close(), secondContext.close()]);
   }
 });
 
@@ -2238,7 +2240,7 @@ test("已认证合成用户打开工作台后只提供中文项目视图", async
   await expect(page.getByRole("button", { name: "中文", exact: true })).toHaveCount(0);
   await expect(page.getByRole("tab", { name: "仪表盘" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Dashboard" })).toHaveCount(0);
-  await expect(page.getByTestId("realtime-state")).toContainText("实时同步");
+  await expect(page.getByRole("button", { name: "新增任务", exact: true })).toBeEnabled();
   const detail = await createTaskAndOpenDetail(page, "中文工作流任务");
   await expect(detail.getByRole("textbox", { name: "标题" })).toHaveValue("中文工作流任务");
   await expect(detail.getByRole("button", { name: "状态", exact: true })).toBeVisible();
@@ -2294,12 +2296,15 @@ test("全部项目可选归属项目，临时项目和 Codex 项目按当前看�
     .first()
     .click();
   const temporaryDetail = page.getByRole("region", { name: "任务详情", exact: true });
-  await expect(
-    temporaryDetail.getByText(/\/temporary-project-root\/\d{4}-\d{2}-\d{2}\/task-[a-f0-9-]{36}$/),
-  ).toBeVisible();
+  const temporaryRun = temporaryDetail.getByRole("region", { name: "Run 控制台" });
+  await expect(temporaryRun.getByRole("textbox", { name: "项目 Workspace Mapping" })).toHaveValue(
+    "",
+  );
+  await expect(temporaryRun.getByRole("button", { name: "启动 Run" })).toBeDisabled();
+  await expect(temporaryDetail.getByText(/\/tmp\/codexboard-e2e-/)).toHaveCount(0);
   await expect(temporaryDetail.getByText(resolve("apps/server"), { exact: true })).toHaveCount(0);
-  await expect(temporaryDetail.getByRole("button", { name: "启动 Codex" })).toBeEnabled();
-  await expect(temporaryDetail.getByText("先重新分配到 Codex 项目")).toHaveCount(0);
+  await expect(temporaryDetail.getByRole("button", { name: "启动 Codex" })).toBeDisabled();
+  await expect(temporaryDetail.getByText("先重新分配到 Codex 项目")).toBeVisible();
   await temporaryDetail.getByRole("button", { name: "返回看板" }).click();
 
   await selectProjectByName(page, "全部项目");
@@ -2354,7 +2359,10 @@ test("Codex 项目新增、改名、删除、恢复、新 ID 与临时任务重�
   await selectProject(page, project);
   await expect(page.getByText("Codex Desktop 只读同步", { exact: true })).toHaveCount(0);
   await expect(page.locator(".project-roots")).toHaveText(project.rootPath);
-  await expect(page.getByRole("button", { name: /新建项目|编辑项目|删除项目/ })).toHaveCount(0);
+  // Importing Codex Desktop metadata must not expose edit/delete controls for
+  // the imported project; DevBoard's separate project-creation action remains available.
+  await expect(page.getByRole("button", { name: "新建项目", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /编辑项目|删除项目/ })).toHaveCount(0);
 
   const identifier = await quickCreate(page, "项目同步历史任务");
   const renamedProject = `${project.name} 已改名`;
@@ -2514,7 +2522,10 @@ test("键盘筛选并选择临时项目后焦点返回项目触发器", async ({
 });
 
 test("长项目名在窄屏省略且右侧 Key 与目录保持两行可见", async ({ page }) => {
-  const project = await registerProject("LONGPROJECT", "codexboard-responsive-interactions");
+  const project = await registerProject(
+    "LONGPROJECT",
+    `codexboard-responsive-interactions-${randomUUID().slice(0, 8)}`,
+  );
   await openWorkspace(page);
   await selectProject(page, project);
 
@@ -3612,7 +3623,7 @@ test("全部项目拖拽在无实时消息时立即呈现、回退并持久混�
     page.getByTestId("status-column-todo").getByTestId(`task-card-${String(a1.identifier)}`),
   ).toBeVisible();
   await selectProjectByName(page, "全部项目");
-  await expect(page.getByTestId("realtime-state")).toContainText("实时同步");
+  await expect(page.getByTestId("status-column-todo")).toBeVisible();
   await page.getByRole("button", { name: "搜索任务", exact: true }).click();
   await page.getByRole("searchbox", { name: "搜索任务" }).fill(marker);
   await expect.poll(() => identifiersIn("todo")).toHaveLength(4);
@@ -3754,7 +3765,7 @@ test("全部项目拖拽在无实时消息时立即呈现、回退并持久混�
     fullPage: true,
   });
   await page.reload();
-  await expect(page.getByTestId("realtime-state")).toContainText("实时同步");
+  await expect(page.getByTestId("status-column-todo")).toBeVisible();
   await expect.poll(() => identifiersIn("todo")).toEqual(expectedTodo);
   const persisted = await readPublicData<{
     tasks: readonly { id: string; identifier: string; projectId: string; status: string }[];
@@ -4053,6 +4064,7 @@ test("跨列拖拽显示悬浮反馈且仅在合法落点发起移动", async ({
     page.getByTestId("status-column-backlog").getByTestId(`task-card-${identifier}`),
   ).toBeVisible();
   expect(moveRequests).toBe(0);
+  await expect(overlay).toHaveCount(0);
 
   await beginTaskCardDrag(page, identifier);
   const adjacentColumn = page.getByTestId("status-column-todo");
@@ -4247,8 +4259,14 @@ test("双客户端完成实时创建、冲突恢复、拖动迁移与断线补�
     await second.getByRole("tab", { name: "仪表盘" }).click();
     const unreadMetric = second.locator(".metric-card").filter({ hasText: "阻塞或未读" });
     await expect(unreadMetric.locator("strong")).toHaveText("1");
+    const markRead = first.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === `/api/v1/tasks/${created.id}/read`,
+    );
     await first.getByTestId(cardTestId).getByRole("button").first().click();
     await expect(first.getByRole("region", { name: "任务详情", exact: true })).toBeVisible();
+    expect((await markRead).status()).toBe(204);
     await first.getByRole("button", { name: "返回看板" }).click();
     await expect(unreadMetric.locator("strong")).toHaveText("0");
     await first.getByTestId(cardTestId).getByRole("button").first().click();
@@ -4420,144 +4438,57 @@ test("移动端使用项目选择器并以全屏详情编辑任务", async ({ br
   }
 });
 
-test("任务详情完成 Codex 启动、一次性审批、继续与取消闭环", async ({ page }, testInfo) => {
-  const project = await registerExecutableProject("CODEX");
+test("任务详情保留 Task/Run 边界且无远端映射时禁止执行", async ({ page }) => {
+  const project = await registerManagedProject(page, "RUNBOUNDARY");
   await openWorkspace(page);
   await selectProject(page, project);
-  const identifier = await quickCreate(page, "Codex 执行闭环");
+  const identifier = await quickCreate(page, "Task 与 Run 分离");
+  const taskId = (
+    await readPublicData<{ tasks: TaskFixture[] }>(page, `/api/v1/projects/${project.id}/board`)
+  ).tasks.find((task) => task.identifier === identifier)!.id;
   await page.getByTestId(`task-card-${identifier}`).getByRole("button").first().click();
-  const detail = page.getByRole("region", { name: "任务详情", exact: true });
-  await expect(detail.getByRole("heading", { name: "Codex 执行" })).toBeVisible();
-  await expect(detail.getByRole("button", { name: "启动 Codex" })).toBeEnabled();
 
-  const startBox = await detail.getByRole("button", { name: "启动 Codex" }).boundingBox();
-  const cancelBox = await detail.getByRole("button", { name: "取消执行" }).boundingBox();
-  expect(startBox!.y).toBe(cancelBox!.y);
-  await expect(detail.locator(".detail-copy-actions")).toHaveCount(0);
-  await expect(detail.getByRole("button", { name: `复制任务 ID ${identifier}` })).toBeVisible();
-  const conversationBefore = detail.getByRole("region", { name: "对话", exact: true });
-  await conversationBefore.getByRole("textbox").fill("请检查新增评论的执行锁定");
-  await conversationBefore.getByRole("button", { name: "发表评论" }).click();
-  await expect(
-    conversationBefore.getByText("请检查新增评论的执行锁定", { exact: true }),
-  ).toBeVisible();
-  await detail.getByRole("button", { name: "启动 Codex" }).click();
-  await expect(detail.getByText("等待审批", { exact: true })).toBeVisible();
-  await expect(detail.getByText("命令执行审批")).toBeVisible();
-  await expect(detail.getByRole("button", { name: "编辑描述" })).toHaveCount(0);
-  await expect(detail.locator(".detail-description-hint")).toBeVisible();
-  await expect(detail.getByLabel("添加描述附件")).toHaveCount(0);
-  await expect(detail.locator(".detail-description-zone .attachment-input-help")).toHaveCount(0);
-  await expect(detail.getByText("npm test", { exact: true })).toBeVisible();
-  await detail.getByRole("button", { name: "允许一次" }).click();
-  await expect(detail.locator(".job-status")).toHaveText("已完成");
-  await expect(detail.getByRole("button", { name: "继续 Codex" })).toBeDisabled();
-  await expect(detail.locator(".execution-timeline")).toHaveCount(0);
-  await expect(detail.getByRole("button", { name: "编辑描述" })).toHaveCount(0);
-  await expect(detail.locator(".execution-availability-hint")).toHaveCSS("font-size", "12px");
-  const consumed = detail.locator(".comment", { hasText: "请检查新增评论的执行锁定" });
-  await expect(consumed.getByText("已执行", { exact: true })).toBeVisible();
-  await expect(consumed.getByRole("button", { name: "评论操作" })).toHaveCount(0);
-  await expect(detail.getByRole("link", { name: "打开 Codex 对话" })).toHaveAttribute(
-    "href",
-    /^codex:\/\/threads\/.+/,
-  );
+  const detail = page.getByRole("region", { name: "任务详情", exact: true });
+  const runConsole = detail.getByRole("region", { name: "Run 控制台" });
+  await expect(detail.getByRole("heading", { name: "Codex 执行" })).toHaveCount(0);
+  await expect(runConsole.getByRole("heading", { name: "Run 控制台" })).toBeVisible();
+  await expect(runConsole.getByText(/未映射路径不能启动 Run/)).toBeVisible();
+  await expect(runConsole.getByRole("button", { name: "启动 Run", exact: true })).toBeDisabled();
+  await expect(runConsole.getByRole("button", { name: "保存 Workspace Mapping" })).toBeDisabled();
 
   const conversation = detail.getByRole("region", { name: "对话", exact: true });
+  await conversation
+    .getByRole("textbox", { name: "新评论", exact: true })
+    .fill("记录 Task 注释，不启动 Agent");
+  await conversation.getByRole("button", { name: "发表评论" }).click();
   await expect(
-    conversation.getByText("Fake Codex 已完成浏览器验收执行", { exact: true }),
-  ).toHaveCount(1);
-  await expect(
-    conversation.locator(".comment > header strong", { hasText: "Codex" }),
+    conversation.getByText("记录 Task 注释，不启动 Agent", { exact: true }),
   ).toBeVisible();
-  await expect(
-    conversation
-      .locator(".comment", { hasText: "Fake Codex 已完成浏览器验收执行" })
-      .getByRole("button"),
-  ).toHaveCount(0);
+  await expect(detail.getByRole("button", { name: "状态", exact: true })).toContainText("待处理");
+
+  const task = await readPublicData<TaskFixture & { developmentContextId: string | null }>(
+    page,
+    `/api/v1/tasks/${taskId}`,
+  );
+  const runs = await readPublicData<unknown[]>(page, `/api/v1/tasks/${taskId}/runs`);
+  expect(task.developmentContextId).toBeNull();
+  expect(runs).toEqual([]);
+
   await page.reload();
   await page.getByTestId(`task-card-${identifier}`).getByRole("button").first().click();
   await expect(
     page
+      .getByRole("region", { name: "任务详情", exact: true })
       .getByRole("region", { name: "对话", exact: true })
-      .getByText("Fake Codex 已完成浏览器验收执行", { exact: true }),
-  ).toHaveCount(1);
-
-  await conversation.getByRole("textbox").fill("请根据这条新评论继续执行");
-  await conversation.getByRole("button", { name: "发表评论" }).click();
-  await expect(detail.getByRole("button", { name: "状态", exact: true })).toContainText("待处理");
-  await detail.getByRole("button", { name: "继续 Codex" }).click();
-  await expect(detail.getByText("等待审批", { exact: true })).toBeVisible();
-  await expect(
-    conversation
-      .locator(".comment", { hasText: "请根据这条新评论继续执行" })
-      .getByText("已执行", { exact: true }),
-  ).toHaveCount(0);
-  const cancelResponse = page.waitForResponse(
-    (response) =>
-      response.request().method() === "POST" &&
-      response.url().includes("/api/v1/jobs/") &&
-      response.url().endsWith("/cancel"),
-  );
-
-  await expect(conversation.getByText("Fake Codex 执行前进度说明", { exact: true })).toHaveCount(0);
-  await detail.getByRole("button", { name: "取消执行" }).click();
-  expect((await cancelResponse).status()).toBe(202);
-  await expect(detail.locator(".job-status")).toHaveText("取消中");
-  await page.waitForTimeout(100);
-  await expect(detail.getByRole("button", { name: "取消中…", exact: true })).toBeDisabled();
-  await expect(detail.getByRole("button", { name: "继续 Codex" })).toBeDisabled();
-  await expect(detail.locator(".job-status")).toHaveText("已取消");
-  await expect(detail.getByText("命令执行审批")).toHaveCount(0);
-  const pending = conversation.locator(".comment", { hasText: "请根据这条新评论继续执行" });
-  await pending.hover();
-  await pending.getByRole("button", { name: "评论操作", exact: true }).click();
-  await pending.getByRole("menuitem", { name: "编辑评论" }).click();
-  await pending.getByLabel("编辑评论").fill("取消后修订的指令");
-  await conversation.getByRole("button", { name: "保存", exact: true }).click();
-  await conversation.getByRole("textbox", { name: "新评论", exact: true }).fill("取消后增加的评论");
-  await conversation.getByRole("button", { name: "发表评论" }).click();
-  await detail.getByRole("button", { name: "继续 Codex" }).click();
-  await expect(detail.getByText("等待审批", { exact: true })).toBeVisible();
-  await expect(detail.getByText("该工作上下文已有活动执行", { exact: true })).toHaveCount(0);
-  writeFileSync(join(project.rootPath, "feature-result.txt"), "finished\n");
-  await detail.getByRole("button", { name: "允许一次" }).click();
-  await expect(detail.locator(".job-status")).toHaveText("已完成");
-  for (const body of ["取消后修订的指令", "取消后增加的评论"]) {
-    await expect(
-      conversation.locator(".comment", { hasText: body }).getByText("已执行", { exact: true }),
-    ).toBeVisible();
-  }
-  await expect(detail.getByRole("button", { name: "继续 Codex" })).toBeDisabled();
-  await conversation.getByRole("textbox", { name: "新评论", exact: true }).fill("未保存草稿");
-  await expect(detail.getByRole("button", { name: "任务完成", exact: true })).toBeDisabled();
-  await conversation.getByRole("textbox", { name: "新评论", exact: true }).fill("");
-  // Completion checks Git; committing belongs to the external development workflow.
-  execFileSync("git", ["-C", project.rootPath, "add", "feature-result.txt"]);
-  execFileSync("git", ["-C", project.rootPath, "commit", "-m", "complete fixture implementation"]);
-  await detail.getByRole("button", { name: "任务完成", exact: true }).click();
-  await expect(detail).not.toBeVisible();
-  await page.getByTestId(`task-card-${identifier}`).click();
-  await expect(detail.getByRole("button", { name: "状态", exact: true })).toContainText("已完成");
-  await expect(detail.locator(".task-completion-result")).toContainText("任务收尾已完成");
-  expect(
-    execFileSync("git", ["-C", project.rootPath, "status", "--porcelain"], {
-      encoding: "utf8",
-    }).trim(),
-  ).toBe("");
-  expect(
-    execFileSync("git", ["-C", project.rootPath, "show", "HEAD:feature-result.txt"], {
-      encoding: "utf8",
-    }),
-  ).toBe("finished\n");
-  await page.screenshot({ path: testInfo.outputPath("codex-conversation.png"), fullPage: true });
+      .getByText("记录 Task 注释，不启动 Agent", { exact: true }),
+  ).toBeVisible();
 });
 
-test("删除失败后恢复任务，操作提示独立显示并自动关闭", async ({ page }, testInfo) => {
-  const project = await registerProject("RESTORE");
+test("删除冲突保留 Task，关闭确认框后仍可恢复", async ({ page }, testInfo) => {
+  const project = await registerManagedProject(page, "RESTORE");
   await openWorkspace(page);
   await selectProject(page, project);
-  const identifier = await quickCreate(page, "[archive-conflict] 恢复删除失败任务");
+  const identifier = await quickCreate(page, "冲突后恢复任务");
   const task = (
     await readPublicData<{ tasks: (TaskFixture & { version: number })[] }>(
       page,
@@ -4570,81 +4501,83 @@ test("删除失败后恢复任务，操作提示独立显示并自动关闭", as
   await drawer.getByRole("tab", { name: /已取消/ }).click();
   await drawer.getByRole("button", { name: `彻底删除任务 ${identifier}` }).click();
   const dialog = page.getByRole("alertdialog", { name: `彻底删除 ${identifier}？` });
+
+  let intercepted = false;
+  await page.route(`**/api/v1/tasks/${task.id}`, async (route) => {
+    if (!intercepted && route.request().method() === "DELETE") {
+      intercepted = true;
+      await route.fulfill({
+        status: 409,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: {
+            code: "VERSION_CONFLICT",
+            message: "数据已更新，请刷新后重试。",
+            details: null,
+          },
+          requestId: randomUUID(),
+        }),
+      });
+      return;
+    }
+    await route.continue();
+  });
   const failedDeletion = page.waitForResponse(
     (response) =>
       response.url().endsWith(`/api/v1/tasks/${task.id}`) &&
       response.request().method() === "DELETE",
   );
   await dialog.getByRole("button", { name: "永久删除", exact: true }).click();
-  const failure = (await (await failedDeletion).json()) as {
-    error: { details: { reason: string; threadId: string } };
-  };
-  expect(failure.error.details.reason).toBe("CODEX_DESKTOP_THREAD_BUSY");
+  expect((await failedDeletion).status()).toBe(409);
   const error = page.locator(".notification--error");
   await expect(error).toContainText("数据已更新，请刷新后重试。");
-  await expect(error).toBeVisible();
-  await error.hover();
+  await expect(dialog).toBeVisible();
   await page.waitForTimeout(1_200);
-  await expect(error).toBeVisible();
-  await page.mouse.move(0, 0);
   await page.screenshot({
     path: testInfo.outputPath("restore-error-notice.png"),
     animations: "disabled",
   });
-  await expect(dialog.getByRole("alert")).toHaveCount(0);
   await expect(error).toHaveCount(0, { timeout: 2_500 });
-  const archivePrompt = page.getByRole("alertdialog", { name: "Codex 对话仍被占用" });
-  await expect(dialog).toHaveCount(0);
-  await expect(archivePrompt.locator("dialog")).toHaveCount(0);
-  await expect(archivePrompt).toContainText("是否打开对应对话进行归档？");
-  await expect(archivePrompt.getByRole("link", { name: "打开 Codex 对话" })).toHaveAttribute(
-    "href",
-    `codex://threads/${encodeURIComponent(failure.error.details.threadId)}`,
-  );
-  await archivePrompt.getByRole("button", { name: "暂不跳转" }).click();
-  await expect(archivePrompt).toHaveCount(0);
-  // Retrying the same failure must announce it again for a fresh second.
-  await dialog.getByRole("button", { name: "永久删除", exact: true }).click();
-  await expect(error).toContainText("数据已更新，请刷新后重试。");
-  await expect(archivePrompt).toBeVisible();
-  await expect(error).toHaveCount(0, { timeout: 2_500 });
-  await page.keyboard.press("Escape");
-  await expect(archivePrompt).toHaveCount(0);
   await expect(dialog).toBeVisible();
-  await page.setViewportSize({ width: 390, height: 844 });
-  await dialog.getByRole("button", { name: "永久删除", exact: true }).click();
-  await expect(error).toContainText("数据已更新，请刷新后重试。");
-  await expect(archivePrompt).toHaveCount(0);
-  await expect(error).toHaveCount(0, { timeout: 2_500 });
-  await page.setViewportSize({ width: 1280, height: 900 });
+
   await dialog.getByRole("button", { name: "保留任务", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
   await drawer.getByRole("button", { name: `恢复任务 ${identifier}`, exact: true }).click();
   await expect(page.getByTestId(`task-card-${identifier}`)).toBeVisible();
-  const success = page.locator(".notification--success");
-  await expect(success).toHaveText("任务已恢复");
-  await expect(success).toHaveCount(0, { timeout: 2_500 });
+  await expect(page.locator(".notification--success")).toHaveText("任务已恢复");
+  const restored = await readPublicData<TaskFixture & { status: string }>(
+    page,
+    `/api/v1/tasks/${task.id}`,
+  );
+  expect(restored.status).toBe("todo");
 });
 
-test("任务详情取消任务等待 Codex 停止并保留工作区", async ({ page }) => {
-  const project = await registerExecutableProject("CANCELTASK");
+test("取消任务只改变 Task 状态，不暗示本地 Codex Run", async ({ page }) => {
+  const project = await registerManagedProject(page, "CANCELTASK");
   await openWorkspace(page);
   await selectProject(page, project);
   const identifier = await quickCreate(page, "取消整个任务");
   await page.getByTestId(`task-card-${identifier}`).getByRole("button").first().click();
   const detail = page.getByRole("region", { name: "任务详情", exact: true });
-  await detail.getByRole("button", { name: "启动 Codex" }).click();
-  await expect(detail.getByText("等待审批", { exact: true })).toBeVisible();
+  await expect(detail.getByRole("region", { name: "Run 控制台" })).toBeVisible();
+  await expect(detail.getByRole("button", { name: "启动 Codex" })).toHaveCount(0);
+  await expect(detail.getByRole("button", { name: "启动 Run", exact: true })).toBeDisabled();
+  await expect(detail.getByText(/未映射路径不能启动 Run/)).toBeVisible();
   await detail.getByRole("button", { name: "取消任务", exact: true }).click();
   await expect(detail).toHaveCount(0);
   await expect(page.getByRole("region", { name: "看板命令", exact: true })).toBeVisible();
-  expect(existsSync(project.rootPath)).toBe(true);
   await page.getByRole("button", { name: "打开其他任务", exact: true }).click();
   const drawer = page.getByRole("complementary", { name: "其他任务" });
   await drawer.getByRole("tab", { name: /已取消/ }).click();
   await drawer.getByRole("button", { name: `恢复任务 ${identifier}`, exact: true }).click();
   await expect(page.getByTestId(`task-card-${identifier}`)).toBeVisible();
   await page.getByTestId(`task-card-${identifier}`).getByRole("button").first().click();
-  await expect(detail.getByRole("button", { name: "状态", exact: true })).toContainText("处理中");
+  await expect(detail.getByRole("button", { name: "状态", exact: true })).toContainText("待处理");
+  await expect(detail.getByRole("region", { name: "Run 控制台" })).toBeVisible();
+  const task = (
+    await readPublicData<{ tasks: TaskFixture[] }>(page, `/api/v1/projects/${project.id}/board`)
+  ).tasks.find((item) => item.identifier === identifier)!;
+  expect(await readPublicData<unknown[]>(page, `/api/v1/tasks/${task.id}/runs`)).toEqual([]);
 });
 
 test("参考列表按状态折叠并支持行内优先级和键盘打开", async ({ page }) => {
@@ -4800,7 +4733,8 @@ test("详情修复：相邻状态、活动实时更新、评论菜单和图片�
   await openWorkspace(page);
   await selectProject(page, project);
   const detail = await createTaskAndOpenDetail(page, "详情修复验收");
-  await expect(detail.getByRole("button", { name: "刷新", exact: true })).toHaveCount(0);
+  await expect(detail.getByRole("heading", { name: "Run 控制台" })).toBeVisible();
+  await expect(detail.getByRole("button", { name: "刷新", exact: true })).toBeVisible();
   await expect(detail.getByRole("button", { name: "复制链接", exact: true })).toHaveCount(0);
   await detail.getByRole("button", { name: "添加父任务", exact: true }).click();
   await expect(detail.getByText("暂无可绑定任务", { exact: true })).toBeVisible();
@@ -4946,8 +4880,8 @@ test("详情静态显示真实负责人且不提供用户创建入口", async ({
   );
 });
 
-test("描述内附件与评论附件独立展示、持久化和执行锁定", async ({ page }) => {
-  const project = await registerExecutableProject("FILES");
+test("描述内附件与评论附件独立展示、持久化且等待远端 Run", async ({ page }) => {
+  const project = await registerManagedProject(page, "FILES");
   await openWorkspace(page);
   await selectProject(page, project);
   const identifier = await quickCreate(page, "描述与评论附件验证");
@@ -5016,12 +4950,11 @@ test("描述内附件与评论附件独立展示、持久化和执行锁定", as
   await page.reload();
   await page.getByTestId(`task-card-${identifier}`).getByRole("button").first().click();
   await expect(comment.getByRole("link", { name: /评论补充.txt/ })).toBeVisible();
-  await detail.getByRole("button", { name: "启动 Codex" }).click();
-  await detail.getByRole("button", { name: "允许一次" }).click();
-  await expect(detail.locator(".job-status")).toHaveText("已完成");
-  await expect(comment.getByText("已执行", { exact: true })).toBeVisible();
-  await expect(comment.getByRole("button", { name: /删除附件/ })).toHaveCount(0);
-  await expect(comment.getByRole("button", { name: "评论操作" })).toHaveCount(0);
+  await expect(content.getByRole("link", { name: /需求说明.txt/ })).toBeVisible();
+  await expect(detail.getByRole("region", { name: "Run 控制台" })).toBeVisible();
+  await expect(detail.getByRole("button", { name: "启动 Run", exact: true })).toBeDisabled();
+  await expect(detail.getByText(/未映射路径不能启动 Run/)).toBeVisible();
+  await expect(comment.getByRole("button", { name: "评论操作" })).toBeVisible();
 });
 
 test("描述与评论支持粘贴和拖拽附件并保留文字粘贴", async ({ page, context }) => {
@@ -5120,121 +5053,54 @@ test("新增任务描述支持粘贴和拖拽附件", async ({ page, context }) 
   await expect(detail.getByRole("button", { name: "任务完成", exact: true })).toBeDisabled();
 });
 
-test("详情分支在项目前显示，执行前自动保存、执行后无下拉菜单", async ({ page }) => {
-  const project = await registerExecutableProject("BRANCHPROP");
-  const branch = "feature/detail-branch";
-  execFileSync("git", ["-C", project.rootPath, "branch", branch]);
-  execFileSync("git", [
-    "-C",
-    project.rootPath,
-    "worktree",
-    "add",
-    join(process.env.CODEXBOARD_DATA_DIR as string, `branch-property-${randomUUID()}`),
-    branch,
-  ]);
-  await localAdminRequest(`/api/v1/local/projects/${project.id}/contexts/scan`, {
-    method: "POST",
-    body: "{}",
-  });
+test("Project/Task 分支占位不读取容器本地 Git 且不可伪造执行上下文", async ({ page }) => {
+  const project = await registerManagedProject(page, "BRANCHPROP");
   await openWorkspace(page);
   await selectProject(page, project);
-  const detail = await createTaskAndOpenDetail(page, "详情分支只读", async (dialog) => {
-    await expect(dialog.locator('[data-icon="git-branch"]')).toBeVisible();
-    await expect(dialog.locator('[data-icon="git-branch"] circle')).toHaveCount(3);
+  const detail = await createTaskAndOpenDetail(page, "远端分支不可本地猜测", async (dialog) => {
     const contextSelect = dialog.getByRole("combobox", { name: "分支 / Worktree" });
     await expect(contextSelect).toBeEnabled();
-    await contextSelect.selectOption({ label: branch });
+    await expect(contextSelect.locator("option")).toHaveCount(1);
+    await expect(contextSelect.locator("option").first()).toHaveText("无");
   });
   const properties = detail.getByRole("complementary", { name: "任务属性" });
-  const rows = await properties
-    .locator(".detail-property-row > span:first-child")
-    .allTextContents();
-  expect(rows[rows.indexOf("分支") + 1]).toBe("项目");
   const value = properties.getByLabel("分支", { exact: true });
-  await expect(value).toContainText(branch);
-  await expect(value.locator('[data-icon="git-branch"] circle')).toHaveCount(3);
-  await properties.getByRole("button", { name: "分支", exact: true }).click();
-  await properties.getByRole("option", { name: "main", exact: true }).click();
-  await expect(detail.getByText("已自动保存", { exact: true })).toBeVisible();
+  await expect(value).toContainText("无");
+  await value.click();
+  await expect(properties.getByRole("option", { name: "无", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
   const created = (
     await readPublicData<{ tasks: TaskFixture[] }>(page, `/api/v1/projects/${project.id}/board`)
   ).tasks[0]!;
-  expect(
-    (
-      await readPublicData<TaskFixture & { developmentContextId: string | null }>(
-        page,
-        `/api/v1/tasks/${created.id}`,
-      )
-    ).developmentContextId,
-  ).toBeNull();
+  const task = await readPublicData<TaskFixture & { developmentContextId: string | null }>(
+    page,
+    `/api/v1/tasks/${created.id}`,
+  );
+  expect(task.developmentContextId).toBeNull();
+  expect(await readPublicData<unknown[]>(page, `/api/v1/tasks/${created.id}/runs`)).toEqual([]);
+  await expect(detail.getByRole("button", { name: "启动 Run", exact: true })).toBeDisabled();
+  await expect(detail.getByText(/未映射路径不能启动 Run/)).toBeVisible();
+
   await page.reload();
   await page.getByTestId(`task-card-${created.identifier}`).getByRole("button").first().click();
-  await expect(page.getByRole("region", { name: "任务详情", exact: true })).toBeVisible();
-  await expect(properties.getByLabel("分支", { exact: true })).toContainText("main");
-  await properties.getByRole("button", { name: "分支", exact: true }).click();
-  await properties.getByRole("option", { name: branch, exact: true }).click();
-  await expect(detail.getByText("已自动保存", { exact: true })).toBeVisible();
-  const startStatus = await page.evaluate(async (taskId) => {
-    const session = await (await fetch("/api/v1/session")).json();
-    return (
-      await fetch(`/api/v1/tasks/${taskId}/jobs/continue`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRF-Token": session.data.csrfToken,
-          "Idempotency-Key": crypto.randomUUID(),
-        },
-        body: "{}",
-      })
-    ).status;
-  }, created.id);
-  expect(startStatus).toBe(202);
-  await page.reload();
-  await page.getByTestId(`task-card-${created.identifier}`).getByRole("button").first().click();
-  await expect(properties.getByRole("button", { name: "分支", exact: true })).toHaveCount(0);
-  await expect(value).toContainText(branch);
-  await value.click();
-  await expect(properties.getByRole("listbox", { name: "分支选项" })).toHaveCount(0);
+  const reloadedDetail = page.getByRole("region", { name: "任务详情", exact: true });
+  await expect(reloadedDetail.getByLabel("分支", { exact: true })).toContainText("无");
+  await expect(
+    reloadedDetail.getByRole("button", { name: "启动 Run", exact: true }),
+  ).toBeDisabled();
 });
 
-test("分支管理支持创建和删除工作树、保护主分支并适配手机", async ({ page }) => {
-  const project = await registerExecutableProject("GITMANAGER");
-  writeFileSync(join(project.rootPath, ".gitignore"), ".worktrees/\nignored.txt\n");
-  execFileSync("git", ["-C", project.rootPath, "add", ".gitignore"]);
-  execFileSync("git", ["-C", project.rootPath, "commit", "-m", "ignore worktrees"]);
+test("受管 Project 不展示容器本地分支管理入口", async ({ page }) => {
+  const project = await registerManagedProject(page, "GITMANAGER");
   await openWorkspace(page);
   await selectProject(page, project);
-  await page.getByRole("button", { name: "分支 / worktree 管理", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "分支 / worktree 管理" });
-  await expect(dialog.getByLabel("项目", { exact: true })).toHaveValue(project.id);
-  await expect(dialog.getByRole("button", { name: "删除 main", exact: true })).toBeDisabled();
-  await dialog.getByRole("button", { name: "新建", exact: true }).click();
-  await dialog.getByLabel("分支名称", { exact: true }).fill("feature/ui-test");
-  await dialog.getByLabel("目录名称", { exact: true }).fill("ui-test");
-  await dialog.getByRole("button", { name: "创建", exact: true }).click();
-  await expect(dialog.getByText("已创建，可在任务中选择新的工作树", { exact: true })).toBeVisible();
-  expect(existsSync(join(project.rootPath, ".worktrees/ui-test/.git"))).toBe(true);
-  const createdRow = dialog.getByRole("listitem").filter({ hasText: "feature/ui-test" });
-  await expect(createdRow.locator(".git-manager-origins")).toContainText("分支：");
-  await expect(createdRow.locator(".git-manager-origins")).toContainText("worktree：");
-  await expect(createdRow.locator(".git-manager-origins")).not.toContainText("来源未知");
-  writeFileSync(join(project.rootPath, ".worktrees/ui-test/ignored.txt"), "generated cache");
-  for (const width of [1280, 390, 320]) {
-    await page.setViewportSize({ width, height: 800 });
-    expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
-      true,
-    );
-  }
-  await dialog.getByLabel("搜索分支或路径").fill("ui-test");
-  await expect(dialog.getByRole("button", { name: "删除 main", exact: true })).toHaveCount(0);
-  await dialog.getByRole("button", { name: "删除 feature/ui-test", exact: true }).click();
-  await dialog.getByRole("button", { name: "确认删除", exact: true }).click();
-  await expect(dialog.getByText("已删除", { exact: true })).toBeVisible();
-  expect(existsSync(join(project.rootPath, ".worktrees/ui-test"))).toBe(false);
-  await dialog.getByLabel("搜索分支或路径").fill("");
-  await expect(dialog.getByRole("button", { name: "删除 main", exact: true })).toBeDisabled();
-  await dialog.getByRole("button", { name: "关闭分支管理" }).click();
-  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "分支 / worktree 管理", exact: true })).toHaveCount(
+    0,
+  );
+  const response = await page
+    .context()
+    .request.get(`${e2eOrigin()}/api/v1/projects/${project.id}/git`);
+  expect(response.status()).toBe(409);
   await page.getByRole("button", { name: "标签管理", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "标签管理", exact: true })).toBeVisible();
 });

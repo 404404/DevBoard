@@ -1,27 +1,26 @@
-# CodexBoard
+# DevBoard
 
-<img src="assets/brand/codexboard.png" alt="CodexBoard" width="112" />
+<img src="assets/brand/codexboard.png" alt="DevBoard" width="112" />
 
 **简体中文** · [English](README.en.md)
 
-连接项目与 Codex，让想法成为进展。
+项目控制面：在一个 Web 看板中管理项目、里程碑、任务与远程执行。
 
 **用户指南** · [给 Agent 的操作指南](AGENTS.md)
 
-CodexBoard 将项目任务看板与本机 Codex 连接起来。你可以整理项目和任务、提交需求、查看执行进度，并在需要时处理审批或补充信息。Mac 应用负责启动和管理本机服务，看板可通过 HTTPS 浏览器账号登录，也可在飞书中使用；两种方式可以同时配置。
+DevBoard 是运行在 Docker 中的项目控制面。容器提供 Web、API、SQLite、飞书/Lark、Run 与审批；Codex、Cursor、Grok Build、OpenCode 通过 SSH 在 Connection Host 上执行。生产环境的旧 Git/worktree 管理和任务 Git 收尾目前 fail-closed，尚未接入远端 Workspace Mapping。浏览器和飞书使用同一看板与 Run。
 
-当前为 **0.1.11 预览版**，支持 **Apple Silicon Mac · macOS 13 或更新版本**。
+主要部署方式为 Docker Compose；镜像目标为 `ghcr.io/404404/devboard`，支持 `linux/amd64` 与 `linux/arm64`。
 
 ## 访问方式
 
-|                | Web                          | 飞书                         |
-| -------------- | ---------------------------- | ---------------------------- |
-| 打开方式       | 桌面或移动浏览器             | 飞书桌面端或移动端           |
-| 登录身份       | 本机应用创建的 Web 账号      | 自建应用可用范围内的飞书用户 |
-| 配置要求       | HTTPS 公网入口，无需飞书应用 | 飞书自建应用与公网隧道       |
-| CLI 查询与写入 | 使用 Web 账号在授权页配对    | 使用飞书账号在授权页配对     |
+|          | Web                      | 飞书                         |
+| -------- | ------------------------ | ---------------------------- |
+| 打开方式 | 桌面或移动浏览器         | 飞书桌面端或移动端           |
+| 登录身份 | Web 账号                 | 自建应用可用范围内的飞书用户 |
+| 配置要求 | 外部 HTTPS reverse proxy | 飞书自建应用与外部 HTTPS     |
 
-两种方式可同时启用，共用同一看板和本机 Codex。
+两种方式可同时启用，共用同一控制面、项目与 Run。
 
 ## 可以做什么
 
@@ -29,25 +28,26 @@ CodexBoard 将项目任务看板与本机 Codex 连接起来。你可以整理�
 - 从任务中发起或继续 Codex 执行，查看进度、执行结果和需要你处理的审批。
 - 在桌面或移动浏览器中用独立账号访问看板，无需登录飞书；也支持飞书桌面端与移动端。
 - 在本机创建、停用 Web 账号或重置密码；Web 用户可作为任务负责人并以自己的身份评论。
-- 管理项目分支和 worktree；连接配置、端口设置支持窗口自适应。
-- 通过移动端 Remote 创建或继续 Mac 上的 Codex 对话，实时查看流式结果并处理审批。
-- 从手机发送附件和图片、补充执行所需信息，查看代码 diff 并审查改动。
-- 通过内置命令行工具，让已授权的 Agent 查询和管理任务。
+- 配置 SSH Host、Provider、Execution Profile 与远程 Workspace Mapping。
+- 通过 Web 或飞书查看同一 Run 的事件并处理审批。
+- 从手机发送附件和图片、补充执行所需信息，并查看同一 Run 的事件与审批。
+- 通过 Web 或飞书统一管理任务与远端 Run；容器不提供本机项目目录语义的 taskctl。
 
-本机服务与任务数据保存在你的 Mac 上；账号登录、公网访问和 Codex 执行仍需要对应的网络服务。
+容器不安装 coding CLI，也不挂载 Docker Host 的项目目录或 `~/.codex`。项目路径按 `Project → WorkspaceMapping → SSH Host` 解析。
+
+当前生产模式已阻止旧本机 Git/worktree 和 Git 收尾逻辑访问容器文件系统；这些旧入口需要完成 SSH Workspace Mapping 接线后才会恢复。请勿把旧 Desktop 项目路径或容器内同名目录当作可执行 Workspace。
 
 ## 界面预览
 
-### 飞书 · 桌面端、移动端与 Remote
+### 飞书 · 桌面端与移动端
 
-在飞书自建应用中管理任务；移动端 Remote 支持 Codex 对话、流式结果、附件、审批与代码审查。
+在飞书自建应用中管理任务。飞书和 Web 使用同一看板、Run 状态、事件与审批。
 
 <table>
-  <tr><th>桌面看板</th><th>移动看板</th><th>Remote</th></tr>
+  <tr><th>桌面看板</th><th>移动看板</th></tr>
   <tr>
     <td align="center"><a href="docs/images/desktop-taskboard.png"><img src="docs/images/desktop-taskboard.png" alt="桌面看板" width="340" /></a></td>
     <td align="center"><a href="docs/images/mobile-taskboard.png"><img src="docs/images/mobile-taskboard.png" alt="移动看板" height="200" /></a></td>
-    <td align="center"><a href="docs/images/mobile-remote.png"><img src="docs/images/mobile-remote.png" alt="Remote" height="200" /></a></td>
   </tr>
 </table>
 
@@ -63,122 +63,62 @@ CodexBoard 将项目任务看板与本机 Codex 连接起来。你可以整理�
   </tr>
 </table>
 
-## 安装前准备
+## Docker 部署
 
-| 需要准备                     | 说明                                                               |
-| ---------------------------- | ------------------------------------------------------------------ |
-| Apple Silicon Mac            | macOS 13+；当前安装包不支持 Intel Mac、Windows 或 Linux            |
-| Codex                        | 已安装并登录，在本机可以正常使用                                   |
-| 飞书客户端与自建应用（可选） | 使用飞书入口或飞书 CLI 配对时需要；Web 看板及 Web CLI 配对不需要   |
-| 公网 frp 隧道服务            | 准备可用的服务端或服务商配置，用于访问 Mac 上的本地服务            |
-| 域名（按隧道类型需要）       | HTTP/HTTPS 域名入口需要 DNS 配置；TCP 公网 IPv4 模式可以不使用域名 |
-
-安装包已包含 **Node.js、看板前后端、Codex 桥接、SQLite 组件、Caddy 和 frp 客户端**。无需另装 Node.js、Docker、Rust 或开发工具。Codex 和公网 frp 服务端需要自行准备；使用飞书方式时另行准备飞书客户端与自建应用。
-
-## 下载与安装
-
-1. 打开本仓库的 [Releases 页面](https://github.com/RocYan98/CodexBoard/releases)，在所选版本的 **Assets** 中下载 `CodexBoard-版本号-macos-arm64.dmg`。`Source code` 压缩包不是安装包。
-2. 如果已安装旧版，先结束或妥善处理正在执行的看板任务，再从菜单栏正常退出 CodexBoard。
-3. 打开 DMG，将 `CodexBoard.app` 拖入 **Applications（应用程序）**。
-4. 从“应用程序”打开 CodexBoard，随后推出安装磁盘。
-
-如需校验下载完整性，同时下载对应的 `.dmg.sha256` 文件，在两个文件所在目录执行。以 0.1.11 为例：
+需要 Docker Engine、Docker Compose，以及一个已准备外部 HTTPS reverse proxy 的域名。执行节点（包括 Docker Host 本机）需要 SSH server、Git 和所选 Provider CLI；这些程序不安装在 DevBoard 容器中。
 
 ```sh
-shasum -a 256 -c CodexBoard-0.1.11-macos-arm64.dmg.sha256
+cp .env.example .env
+mkdir -p secrets/ssh
+chmod 700 secrets secrets/ssh
+# 编辑 .env：设置 DEVBOARD_PUBLIC_ORIGIN 与实际 reverse proxy 的 DEVBOARD_TRUST_PROXY
+docker compose config
+docker compose up -d
+docker compose ps
 ```
 
-显示 `OK` 表示文件与发布者提供的校验值一致。
+Compose 默认只发布 `127.0.0.1:47823`，适用于同机 reverse proxy；LAN 上的代理请按 [部署指南](docs/reverse-proxy.md)设置 `DEVBOARD_BIND_ADDRESS` 并限制防火墙。外部代理负责 TLS，DevBoard 生产环境要求显式 HTTPS `DEVBOARD_PUBLIC_ORIGIN`。`DEVBOARD_TRUST_PROXY` 只填写实际代理 IP/CIDR，不能信任所有来源。
 
-**当前版本尚未完成 Apple Developer ID 签名和公证。** 首次打开可能被 macOS 拦截。确认下载来源可信后，按 [Apple 官方说明](https://support.apple.com/en-mo/102445)处理；不需要关闭系统的整体安全检查。
+首次配置顺序：启动 Compose → 配置 HTTPS reverse proxy 与 Public Origin → 配置飞书 App（可选）→ 创建 SSH Host 并人工确认 Host Key 指纹 → 检测远端 Provider → 创建 Execution Profile → 创建/映射项目远端 Workspace。macOS Docker Host 推荐 `host.docker.internal`；Linux Docker Engine 可用 Compose 提供的 `host-gateway` 映射，或填写 Host LAN IP/DNS。
 
-## 首次配置
-
-打开应用中的 **使用引导**，按页面完成以下步骤。
-
-### 1. 配置 frp 客户端
-
-从你的 frp 服务商或自建服务端获取完整的 `frpc.toml`，在“连接配置”中粘贴。隧道应转发到这台 Mac 的 `127.0.0.1` 和应用显示的 **Caddy 本机端口**。
-
-应用会从隧道配置自动识别公网入口。请使用自己的隧道配置，不要直接复制他人的认证参数或公网地址。
-
-DNS 解析已包含在这一步中，应用会根据隧道配置显示对应说明：HTTPS（以及 HTTP）域名入口需要按服务商要求配置 DNS；TCP 公网 IPv4 入口无需 DNS，直接使用公网地址。需要解析时，参考这一步显示的域名和解析目标。
-
-HTTPS 入口需要公网 443 能到达本机 Caddy。HTTP 和 TCP 模式使用明文 HTTP，会话和业务内容不经过 HTTPS 加密。
-
-### 2. 配置 Web 账号或飞书应用
-
-使用引导可选择 Web 或飞书流程，这只切换引导内容。“连接配置”可以同时保存飞书与公网配置，无需二选一。
-
-#### Web 账号
-
-1. 配置 **HTTPS** 公网入口，保存配置并启动或重启服务。Web 账号密码登录不支持 HTTP/TCP 明文入口。
-2. 打开 **应用设置 → Web 账号**（或连接配置中的“管理 Web 账号”），创建账号、显示名称和密码；密码为 **8–256 位**。仅本机可创建账号，网页不提供公开注册。
-3. 在浏览器打开自己的公网地址，用该账号登录。仅使用 Web 时，飞书 App ID 和 App Secret 均可留空。
-
-引导会自动检查运行配置和是否存在启用的 Web 账号；检查通过不代表已完成真实浏览器登录，仍需实际登录确认。
-
-Web 账号是可执行任务的受信任用户，不是只读访客。各账号共用看板，新建任务归当前登录用户，评论署该用户；目前不提供按项目隔离的账号权限。只给信任的人创建账号。停用或重置密码会使该账号已有浏览器登录和 CLI 配对会话失效。
-
-#### 飞书应用（可与 Web 同时启用）
-
-在 [飞书开发者后台](https://open.feishu.cn/app)创建企业自建网页应用，将 **App ID** 和 **App Secret** 填入“连接配置”。
-
-按使用引导中的地址设置桌面与移动主页、H5 可信域名和重定向 URL，并开通“获取用户 user ID”权限（`contact:user.employee_id:readonly`）。随后在飞书后台发布版本并设置可用范围。
-
-飞书应用凭据检查通过，只表示凭据可用；发布状态、可用范围和实际登录仍需要在飞书中确认。任何通过飞书登录验证的账号均可操作同一看板，请按实际需要设置应用可用范围。
-
-### 3. 确认 Codex 登录，保存并验证
-
-确认 Codex 已在这台 Mac 上安装并登录，再运行引导中的检查。
-
-**检查不会自动保存配置。** 完成填写后保存配置；实际发生修改时，选择立即重启服务或稍后手动重启。未修改内容时不会新增重启提醒。
-
-当“服务概览”显示后端、Caddy 和公网隧道正常后，通过浏览器 Web 账号或飞书完成实际登录并查看看板。若同时启用两种入口，分别验证登录。
+SQLite、附件、备份、运行状态和受信任 `known_hosts` 保存在 `/var/lib/devboard` 持久化卷。升级镜像不会替换这些数据。旧 macOS Desktop 已弃用，不再作为主要发行物。
 
 ## 日常使用
 
-在 Codex Desktop 中管理项目，在看板选择同步出的项目，创建任务并描述需求。发起 Codex 执行后，可以在任务详情查看进度、结果、审批和待补充输入；执行结束后再检查结果并验收。
+在 DevBoard 创建 Project 和 Task，为每个 SSH Host 配置该 Project 的绝对 Workspace Mapping，再选择 Execution Profile 启动 Run。Run 的状态、事件、审批和 Continue 在 Web 与飞书中共享。更换 Codex/Cursor/Grok/OpenCode Host 不会改变 Project 或 Task。
 
-- **关闭 CodexBoard 窗口**：应用保留在菜单栏，服务继续运行。
-- **退出 CodexBoard 或点击停止服务**：本机服务停止，浏览器和飞书中的看板暂时无法访问。
-- **Mac 关机、休眠或断网**：公网访问可能中断；使用远程功能时需要保持 Mac 在线。
+## 容器内运维命令
 
-退出 CodexBoard 不会关闭 Codex Desktop，但应在更新或停止服务前处理好看板中的执行任务。
+备份和验证等运维命令可在容器内通过 `docker exec` 运行；Admin API 仍只监听容器 loopback，不会发布到 Host：
 
-## 安装与使用 Codex Skill
+```sh
+docker compose exec -T devboard node apps/server/dist/ops.js backup
+docker compose exec -T devboard node apps/server/dist/ops.js verify /var/lib/devboard/backups/<backup-id>
+# Web 账号密码由 TTY 隐藏读取，不进入命令参数、环境变量或输出
+docker compose exec -it devboard node apps/server/dist/ops.js web-account create --username alice --name "Alice"
+docker compose exec -T devboard node apps/server/dist/ops.js web-account list
+```
 
-配套 Skill 让 Codex 通过应用内置命令行查询、修改任务和协助执行，无需克隆源码或安装 Node.js。目前支持安装到 Codex，技能名称为 `manage-codexboard`。
-
-首次启动且尚未安装配套技能时，应用会显示 **让 Codex 使用 CodexBoard** 提示，可以选择 **安装到 Codex**，也可以稍后从 **应用设置 → Agent Skill** 安装。安装位置为 `~/.agents/skills/manage-codexboard`。
-
-应用启动后会自动比较随包 Skill 与已安装版本，检测到更新时在窗口顶部提示，点击“查看 Skill”可进入更新卡片；也可用“重新检查”刷新。版本号相同但随包内容变化时也会提示，关闭当前提示后再次出现新内容会重新提醒。点击更新后才替换；已有用户修改时，会提示检查修改，须明确选择“使用随包版本”。符号链接、由其他工具管理的目录、旧版名称的技能或旧技能目录中的同名技能，会提示回到原位置或管理器处理，避免重复安装；应用不会检查这些管理器中的远端版本。
-
-“文件已安装”不表示当前 Codex 任务已加载技能。请在 Codex 的技能列表中确认；未识别时可强制重新加载技能，或在方便时重新打开 Codex，再在新任务中使用：
-
-> 请使用 $manage-codexboard，先查看我的项目和任务，再帮我处理指定任务。
-
-技能安装或浏览器登录不等于已授权 CLI。CLI 查询和写入看板都需要配对：Web 用户在浏览器授权页登录并确认，飞书用户在飞书看板中确认。核对账号、CLI 名称和验证码后，该 CLI 使用确认授权的真实用户身份；不会以本机服务身份操作看板。
+旧 `manage-codexboard` Skill/taskctl 依赖 macOS Desktop、本机 cwd 和旧 Job/Git 模型，已弃用，不适用于当前 SSH Run 部署。备份及恢复前请阅读 [运维说明](docs/development.md)。
 
 ## 让 Agent 协助安装与配置
 
-需要 Agent 帮你安装应用、完成配置或排查问题时，把本仓库的 [AGENTS.md](AGENTS.md)交给它，并说明你要完成的事情，例如：
+需要 Agent 协助部署时，把本仓库的 [AGENTS.md](AGENTS.md)交给它，并说明你要完成的事情，例如：
 
-> 请阅读 AGENTS.md，检查我的 Mac 是否满足要求，帮我安装并配置 CodexBoard。需要我登录或在飞书后台确认的步骤，请明确告诉我。
+> 请阅读 AGENTS.md，帮我用 Docker Compose 部署 DevBoard，配置外部 HTTPS reverse proxy 和 SSH Host。需要我核对 Host Key 或在飞书后台确认的步骤，请明确告诉我。
 
-Agent 指南提供内置 `taskctl` 的入口、身份配对、只读检查和常用操作流程，无需为此克隆源码或安装开发依赖。不同 Agent 对指令文件的自动读取方式不同；不能自动读取时，直接提供文件内容或链接。
+reverse proxy 和 SSH key 配置见 [部署指南](docs/reverse-proxy.md)。不要把 Private Key、App Secret、Web 密码或 runtime capability 写入聊天、命令行参数或 Issue。
 
 ## 更新与数据
 
-在 **应用设置 → 应用更新** 中，可通过“前往 Release 手动下载”打开最新发布页，也可在此处或菜单栏检查新版本。应用每天自动检查一次，发现新版本后显示提醒和更新说明。下载并验证完成后，点击“安装并重启”，按提示处理正在执行的任务，再确认安装。检查和下载期间服务继续运行；安装时本机服务会暂时停止。
-
-更新包使用独立签名校验。无法自动更新时，可正常退出旧版，再用新版 DMG 替换“应用程序”中的 `CodexBoard.app`。配置、数据库和附件保存在：
+更新镜像并保留数据卷；升级前可先执行上方的在线备份命令：
 
 ```text
-~/Library/Application Support/CodexBoard/
+docker compose pull
+docker compose up -d
 ```
 
-升级首次启动时，若新目录尚不存在，应用会在旧版退出后自动迁移已有数据；遇到目录冲突时会保留原数据并提示处理。正常替换应用会保留数据。删除数据目录会影响配置和任务数据，不要把它当成安装缓存清理，也不要随安装包发送给别人。
+SQLite、附件和备份位于 Compose named volume `devboard-data`，不要在升级时删除该卷。恢复数据前先使用受支持的备份/恢复运维命令，并确认目标数据目录。
 
 ## 访问安全
 
@@ -186,17 +126,18 @@ Agent 指南提供内置 `taskctl` 的入口、身份配对、只读检查和常
 
 ## 常见问题
 
-| 现象                         | 先检查什么                                                                        |
-| ---------------------------- | --------------------------------------------------------------------------------- |
-| macOS 提示无法验证开发者     | 当前版本未公证；核对来源并查看上面的 Apple 官方说明                               |
-| 端口被占用，服务无法启动     | 在“连接配置 → 端口设置”中选用空闲端口；修改后保存并重启，不要随意结束其他程序     |
-| 本机服务正常，飞书里打不开   | 检查 Mac 是否在线、frp 服务与 DNS，以及飞书主页、发布状态和可用范围               |
-| Web 无法登录                 | 检查 HTTPS、配置是否已应用、服务是否运行、账号是否启用及密码；重置后重新登录      |
-| 飞书凭据检查通过，但登录失败 | 检查 user ID 权限、可信域名和重定向 URL，再从飞书实际登录                         |
-| Codex 检查未通过或项目未出现 | 先在 Codex 中确认登录与项目，再回到应用检查；基础登录检查不保证在线请求和额度可用 |
+| 现象                        | 先检查什么                                                                        |
+| --------------------------- | --------------------------------------------------------------------------------- |
+| 容器不能健康启动            | `docker compose logs devboard`；检查 Public Origin、SQLite 持久卷和 migration     |
+| Web 登录/secure cookie 失败 | 检查 HTTPS Public Origin、保留的 Host 与实际代理地址是否在 `DEVBOARD_TRUST_PROXY` |
+| SSE 没有实时更新            | 关闭 `/api/v1/events` 的代理 buffering/cache，增加 read timeout                   |
+| SSH Host 测试失败           | 分别检查 DNS/TCP、Host Key 确认、SSH Agent socket/Identity File 及远端 sshd       |
+| Provider 未检测到           | 在目标 SSH Host 安装对应 CLI；DevBoard 镜像不包含这些 CLI                         |
+| Workspace/Git 状态不正确    | 核对该项目到所选 Connection 的远端绝对路径映射，不要检查容器内同名路径            |
+| 飞书凭据检查通过但登录失败  | 检查 user ID 权限、可信域名、redirect URL、应用发布和可用范围，再从飞书实际登录   |
 
-反馈问题时，请提供应用版本、macOS 版本、复现步骤和经过脱敏的报错截图。不要公开 App Secret、隧道认证信息、登录令牌或完整数据目录。
+反馈问题时，请提供 image tag、架构、复现步骤和经过脱敏的日志。不要公开 App Secret、SSH Private Key、登录令牌或完整数据目录。
 
 ## 源码与技术资料
 
-开发者可查阅 [开发与运维参考](docs/development.md)、[桌面应用说明](apps/desktop/README.md)和 [taskctl 命令参考](docs/taskctl.md)。这些资料供开发与排障使用，普通安装不需要执行其中的构建命令。
+开发者可查阅 [架构总览](docs/architecture.md)、[执行平台说明](docs/execution-platform.md)、[Provider 说明](docs/providers.md)、[Docker/reverse proxy 部署](docs/reverse-proxy.md)、[容器验收与预览部署](docs/container-acceptance.md)和 [开发与运维参考](docs/development.md)。旧 Desktop/taskctl 说明只为迁移留档。

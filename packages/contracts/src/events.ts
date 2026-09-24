@@ -9,6 +9,11 @@ export const AggregateTypeSchema = z.enum([
   "attachment",
   "job",
   "interaction",
+  "milestone",
+  "connection",
+  "execution_profile",
+  "workspace_mapping",
+  "run",
   "system",
 ]);
 

@@ -348,7 +348,7 @@ fn install_and_restart(
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
-        .map_err(|_| "更新已安装，但无法自动重新启动。请退出并重新打开 CodexBoard。")?;
+        .map_err(|_| "更新已安装，但无法自动重新启动。请退出并重新打开 DevBoard。")?;
     controller.quitting.store(true, Ordering::SeqCst);
     app.exit(0);
     Ok(())

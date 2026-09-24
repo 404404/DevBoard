@@ -171,7 +171,9 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
   const registry =
     options.services?.projectRegistry ??
     options.projectRegistry ??
-    new ProjectRegistry(options.database, options.config.CODEXBOARD_WORKSPACE_ROOTS);
+    new ProjectRegistry(options.database, options.config.CODEXBOARD_WORKSPACE_ROOTS, undefined, {
+      remoteOnly: options.config.CODEXBOARD_ENV === "production",
+    });
   const identityService =
     options.services?.identityService ??
     new IdentityService({
@@ -266,7 +268,9 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
       database: options.database,
       taskboard,
       queue,
-      gitFinalizer: new TaskGitFinalizer(options.config.CODEXBOARD_WORKSPACE_ROOTS),
+      gitFinalizer: new TaskGitFinalizer(options.config.CODEXBOARD_WORKSPACE_ROOTS, undefined, {
+        remoteOnly: options.config.CODEXBOARD_ENV === "production",
+      }),
       scheduleExecution: options.scheduleExecution ?? (() => {}),
       ...revisionOption,
     });
@@ -291,7 +295,14 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
   const eventFeed = new EventFeed({ database: options.database });
   const gitManagement =
     options.services?.gitManagement ??
-    new GitManagement(options.database, registry, options.config.CODEXBOARD_WORKSPACE_ROOTS);
+    new GitManagement(
+      options.database,
+      registry,
+      options.config.CODEXBOARD_WORKSPACE_ROOTS,
+      undefined,
+      undefined,
+      options.config.CODEXBOARD_ENV === "production",
+    );
   const expectedHost = `${options.config.CODEXBOARD_ADMIN_HOST}:${options.config.CODEXBOARD_ADMIN_PORT}`;
 
   app.addHook("onRequest", async (request) => {
@@ -565,6 +576,13 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
   });
 
   app.get("/api/v1/local/context", async (request) => {
+    if (options.config.CODEXBOARD_ENV === "production") {
+      throw new AppError(
+        "INVALID_REQUEST",
+        409,
+        "容器部署不解析 taskctl 客户端目录；请通过 SSH Host 和 Workspace Mapping 选择项目",
+      );
+    }
     const header = request.headers["x-taskctl-cwd"];
     const requestedCwd = TaskctlCwdHeaderSchema.parse(
       decodeTaskctlCwdHeader(typeof header === "string" ? header : undefined),
@@ -621,15 +639,20 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
 
   app.post("/api/v1/local/tasks", async (request, reply) => {
     const actor = requestActor(request);
-    if (!taskCreation) {
-      throw new AppError("UPSTREAM_ERROR", 503, "Codex App Server 当前不可用，无法创建任务");
-    }
     const command = CreateTaskCommandSchema.parse(request.body);
     if (command.assigneeIdentity && !sameIdentity(command.assigneeIdentity, actor.identity))
       throw new AppError("FORBIDDEN", 403, "CLI 创建任务的负责人必须是当前登录用户");
     command.assigneeIdentity = actor.identity;
     assertUserAssignee(options.database, identityKey(actor.identity));
-    const result = await taskCreation.create(command, mutationContext(request));
+    const context = mutationContext(request);
+    // taskctl is also used by container-side board/ops workflows. Creating a
+    // Task must not require a local Codex process or implicitly start a Thread.
+    // Preserve optional Thread provisioning only for explicitly injected
+    // embedded legacy callers.
+    const result =
+      taskCreation && taskboard.projectSourceKind(command.projectId, actor) !== "legacy"
+        ? await taskCreation.create(command, context)
+        : taskboard.createTask(command, context);
     await reply.code(201).send({ data: result.task, meta: { revision: result.revision } });
   });
 

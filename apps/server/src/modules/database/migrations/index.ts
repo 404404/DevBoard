@@ -1,3 +1,5 @@
+import { EXECUTION_PLATFORM_SQL, migrateExecutionPlatform } from "./0028-execution-platform.js";
+import { SSH_IDENTITY_REFERENCES_MIGRATION } from "./0029-ssh-identity-references.js";
 import { DESKTOP_OUTCOME_CORRECTION_SQL } from "./0026-desktop-outcome-correction.js";
 import { WEB_CLI_AUTH_VERSION_SQL } from "./0027-web-cli-auth-version.js";
 import { EXECUTION_RESULT_RECOVERY_SQL } from "./0025-execution-result-recovery.js";
@@ -134,6 +136,14 @@ export function identityMigrations(
     { version: 25, name: "execution_result_recovery", sql: EXECUTION_RESULT_RECOVERY_SQL },
     { version: 26, name: "desktop_outcome_correction", sql: DESKTOP_OUTCOME_CORRECTION_SQL },
     { version: 27, name: "web_cli_auth_version", sql: WEB_CLI_AUTH_VERSION_SQL },
+    {
+      version: 28,
+      name: "execution_platform",
+      sql: EXECUTION_PLATFORM_SQL,
+      transformChecksum: "execution-platform-v1",
+      transform: migrateExecutionPlatform,
+    },
+    SSH_IDENTITY_REFERENCES_MIGRATION,
   ];
 }
 

@@ -1,0 +1,7 @@
+services:
+  devboard:
+    environment:
+      CODEXBOARD_AUTH_MODE: feishu
+      CODEXBOARD_FEISHU_CREDENTIALS_FILE: /run/devboard/secrets/feishu-credentials.json
+    volumes:
+      - ./secrets/feishu-credentials.json:/run/devboard/secrets/feishu-credentials.json:ro

@@ -11,7 +11,8 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
+import { tmpdir } from "node:os";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -37,7 +38,7 @@ afterEach(() => {
 });
 
 function temporaryDirectory(): string {
-  const directory = mkdtempSync(join("/private/tmp", "codexboard-backup-"));
+  const directory = mkdtempSync(join(tmpdir(), "codexboard-backup-"));
   temporaryDirectories.push(directory);
   return directory;
 }
@@ -554,16 +555,17 @@ describe("BackupService", () => {
     }
   });
 
-  it("canonicalizes the macOS tmp alias before enforcing attachment containment", async () => {
-    const dataDirectory = temporaryDirectory();
+  it("canonicalizes symlinked data paths before enforcing attachment containment", async () => {
+    const dataDirectory =
+      process.platform === "darwin"
+        ? mkdtempSync(join("/private/tmp", "codexboard-backup-alias-"))
+        : temporaryDirectory();
+    temporaryDirectories.push(dataDirectory);
     const database = initializeDatabase(join(dataDirectory, "taskboard.sqlite"));
     const service = new BackupService({ database, dataDirectory });
-    const aliasDestination = join(
-      "/tmp",
-      dataDirectory.slice("/private/tmp/".length),
-      "attachments",
-      "alias-backup",
-    );
+    const aliasDirectory =
+      process.platform === "darwin" ? join("/tmp", basename(dataDirectory)) : dataDirectory;
+    const aliasDestination = join(aliasDirectory, "attachments", "alias-backup");
     try {
       await expect(service.create(aliasDestination)).rejects.toThrow(/附件目录/);
     } finally {

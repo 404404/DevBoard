@@ -1,8 +1,7 @@
 import { desktopUserEvent } from "./desktop-user-events.js";
-import type { TaskModelOptions } from "@codexboard/contracts";
+import type { InteractionDecision, ModelDescriptor, TaskModelOptions } from "@codexboard/contracts";
 import { ModelsSchema } from "../codex/model-catalog.js";
 import { AppError } from "../../app-error.js";
-import type { InteractionDecision } from "@codexboard/contracts";
 import { randomUUID } from "node:crypto";
 import { isAbsolute, join } from "node:path";
 import { z } from "zod";
@@ -53,6 +52,7 @@ export interface CodexRecoveredOutcome extends CodexExecutionResult {
 
 export interface CodexExecutor {
   readHistory?(threadId: string): Promise<CodexThreadHistory | null>;
+  listModels?(): Promise<readonly ModelDescriptor[]>;
   readOutcome?(input: {
     readonly jobId: string;
     readonly threadId: string;
@@ -64,6 +64,8 @@ export interface CodexExecutor {
       readonly cwd: string;
       readonly prompt: string;
       readonly modelOptions?: TaskModelOptions;
+      readonly reasoningEffort?: string | null;
+      readonly permissionMode?: string | null;
     },
     callbacks: CodexExecutionCallbacks,
   ): Promise<CodexExecutionResult>;
@@ -74,6 +76,8 @@ export interface CodexExecutor {
       readonly cwd: string;
       readonly prompt: string;
       readonly modelOptions?: TaskModelOptions;
+      readonly reasoningEffort?: string | null;
+      readonly permissionMode?: string | null;
     },
     callbacks: CodexExecutionCallbacks,
   ): Promise<CodexExecutionResult>;
@@ -111,6 +115,30 @@ export class CodexDisconnectedError extends Error {
   constructor(message = "Codex App Server 连接已中断") {
     super(message);
     this.name = "CodexDisconnectedError";
+  }
+}
+
+function sandboxPolicyForPermissionMode(mode: string | null | undefined, cwd: string): unknown {
+  switch (mode) {
+    case undefined:
+    case null:
+    case "":
+    case "default":
+      return undefined;
+    case "read-only":
+      return { type: "readOnly", networkAccess: false };
+    case "workspace-write":
+      return {
+        type: "workspaceWrite",
+        writableRoots: [cwd],
+        networkAccess: false,
+        excludeTmpdirEnvVar: false,
+        excludeSlashTmp: false,
+      };
+    case "danger-full-access":
+      return { type: "dangerFullAccess" };
+    default:
+      throw new AppError("INVALID_REQUEST", 400, "Codex permission mode is unsupported: " + mode);
   }
 }
 
@@ -245,6 +273,8 @@ export class AppServerCodexExecutor implements CodexExecutor, CodexThreadProvisi
       readonly cwd: string;
       readonly prompt: string;
       readonly modelOptions?: TaskModelOptions;
+      readonly reasoningEffort?: string | null;
+      readonly permissionMode?: string | null;
     },
     callbacks: CodexExecutionCallbacks,
   ): Promise<CodexExecutionResult> {
@@ -271,6 +301,8 @@ export class AppServerCodexExecutor implements CodexExecutor, CodexThreadProvisi
       readonly cwd: string;
       readonly prompt: string;
       readonly modelOptions?: TaskModelOptions;
+      readonly reasoningEffort?: string | null;
+      readonly permissionMode?: string | null;
     },
     callbacks: CodexExecutionCallbacks,
   ): Promise<CodexExecutionResult> {
@@ -339,6 +371,21 @@ export class AppServerCodexExecutor implements CodexExecutor, CodexThreadProvisi
         }),
       })),
     };
+  }
+
+  async listModels(): Promise<readonly ModelDescriptor[]> {
+    await this.#client.connect();
+    const catalog = ModelsSchema.parse(await this.#client.request("model/list", { limit: 100 }));
+    return catalog.data
+      .filter((model) => !model.hidden)
+      .map((model) => ({
+        id: model.model,
+        name: model.displayName,
+        reasoningEfforts: model.supportedReasoningEfforts.map(
+          ({ reasoningEffort }) => reasoningEffort,
+        ),
+        modes: [],
+      }));
   }
 
   async readOutcome(input: {
@@ -509,6 +556,8 @@ export class AppServerCodexExecutor implements CodexExecutor, CodexThreadProvisi
       readonly cwd: string;
       readonly prompt: string;
       readonly modelOptions?: TaskModelOptions;
+      readonly reasoningEffort?: string | null;
+      readonly permissionMode?: string | null;
     },
     callbacks: CodexExecutionCallbacks,
   ): Promise<CodexExecutionResult> {
@@ -527,11 +576,16 @@ export class AppServerCodexExecutor implements CodexExecutor, CodexThreadProvisi
     let turnId: string | undefined;
     try {
       callbacks.onDispatchState?.("sent");
+      const sandboxPolicy = sandboxPolicyForPermissionMode(input.permissionMode, input.cwd);
       const response = TurnResponseSchema.parse(
         await this.#client.request("turn/start", {
           threadId,
           clientUserMessageId: input.jobId,
           ...(input.modelOptions ?? {}),
+          ...(input.reasoningEffort || input.modelOptions?.effort
+            ? { effort: input.reasoningEffort ?? input.modelOptions?.effort }
+            : {}),
+          ...(sandboxPolicy ? { sandboxPolicy } : {}),
           cwd: input.cwd,
           input: [{ type: "text", text: input.prompt, text_elements: [] }],
         }),

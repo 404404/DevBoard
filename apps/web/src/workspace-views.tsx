@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components -- filter primitives are colocated with the three shared task views */
 import type { DashboardView, TaskPriority } from "@codexboard/contracts";
 import { EMPTY_TASK_FILTERS, filterTasks, type TaskFilters } from "./task-filters";
+import { ProjectMilestones } from "./project-milestones";
 
 export type WorkspaceViewMode = "dashboard" | "board" | "list";
 
@@ -49,9 +50,15 @@ export function WorkspaceTabs({
 export function DashboardPanel({
   dashboard,
   onOpen,
+  projectId,
+  csrfToken,
+  mutationsEnabled,
 }: {
   readonly dashboard: DashboardView;
   readonly onOpen: (id: string) => void;
+  readonly projectId: string;
+  readonly csrfToken: string;
+  readonly mutationsEnabled: boolean;
 }) {
   return (
     <section className="dashboard-panel" aria-label="项目仪表盘">
@@ -86,6 +93,11 @@ export function DashboardPanel({
           onOpen={onOpen}
         />
       </div>
+      <ProjectMilestones
+        projectId={projectId}
+        csrfToken={csrfToken}
+        mutationsEnabled={mutationsEnabled}
+      />
     </section>
   );
 }

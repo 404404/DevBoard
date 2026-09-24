@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CreateTaskCommandSchema, identityKey, TEMPORARY_PROJECT_ID } from "@codexboard/contracts";
@@ -14,19 +14,27 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
 });
 const password = "A-long-private-password-2026";
-function setup(protocol = "https", mode: "feishu" | "web" = "feishu") {
+function setup(
+  protocol = "https",
+  mode: "feishu" | "web" = "feishu",
+  trustProxy = "127.0.0.1",
+  environment: "test" | "production" = "test",
+) {
   const root = mkdtempSync(join(tmpdir(), "web-account-test-"));
+  if (environment === "production") writeFileSync(join(root, "index.html"), "<!doctype html>");
   const database = initializeDatabase(":memory:");
   const config = loadConfig({
-    CODEXBOARD_ENV: "test",
+    CODEXBOARD_ENV: environment,
     CODEXBOARD_AUTH_MODE: mode,
     CODEXBOARD_ORIGIN: `${protocol}://tasks.example.com`,
     CODEXBOARD_ALLOWED_HOSTS: "tasks.example.com",
+    CODEXBOARD_TRUST_PROXY: trustProxy,
     CODEXBOARD_FEISHU_APP_ID: mode === "feishu" ? "cli_test" : undefined,
     CODEXBOARD_FEISHU_APP_SECRET: mode === "feishu" ? "test-secret" : undefined,
     CODEXBOARD_DATA_DIR: root,
     CODEXBOARD_WORKSPACE_ROOTS: root,
     CODEXBOARD_TEMPORARY_PROJECT_ROOT: root,
+    ...(environment === "production" ? { CODEXBOARD_WEB_ROOT: root } : {}),
   });
   const app = createApp({
     config,
@@ -56,7 +64,11 @@ function setup(protocol = "https", mode: "feishu" | "web" = "feishu") {
     database.close();
     rmSync(root, { recursive: true, force: true });
   });
-  const headers = { host: "tasks.example.com", origin: config.CODEXBOARD_ORIGIN };
+  const headers = {
+    host: "tasks.example.com",
+    origin: config.CODEXBOARD_ORIGIN,
+    ...(protocol === "https" ? { "x-forwarded-proto": "https" } : {}),
+  };
   const localHeaders = { host: "127.0.0.1:47824", authorization: `Bearer ${"x".repeat(43)}` };
   const accounts = new WebAccountService(database);
   const login = () =>
@@ -216,6 +228,28 @@ it("blocks HTTP password login, cross-origin and forged Host requests", async ()
     ).statusCode,
   ).toBe(400);
 });
+
+it("uses forwarded HTTPS only when the proxy source is explicitly trusted", async () => {
+  const trusted = setup("https", "web", "127.0.0.1", "production");
+  await trusted.accounts.create({ username: "alice", name: "Alice", password });
+  const trustedLogin = await trusted.login();
+  expect(trustedLogin.statusCode).toBe(201);
+  expect(trustedLogin.cookies.find((cookie) => cookie.name.endsWith("session"))?.secure).toBe(true);
+
+  const untrusted = setup("https", "web", "10.20.0.0/16", "production");
+  await untrusted.accounts.create({ username: "alice", name: "Alice", password });
+  const forgedForwardedScheme = await untrusted.app.inject({
+    method: "POST",
+    url: "/api/v1/auth/web/login",
+    headers: {
+      host: "tasks.example.com",
+      origin: "https://tasks.example.com",
+      "x-forwarded-proto": "https",
+    },
+    payload: { username: "alice", password },
+  });
+  expect(forgedForwardedScheme.statusCode).toBe(403);
+});
 it("locks after five guesses across service instances and disables existing sessions", async () => {
   const t = setup();
   const account = await t.accounts.create({ username: "alice", name: "Alice", password });
@@ -231,7 +265,7 @@ it("locks after five guesses across service instances and disables existing sess
     (await t.app.inject({ url: "/api/v1/session", headers: { ...t.headers, cookie } })).statusCode,
   ).toBe(401);
   await expect(t.accounts.verify({ username: "alice", password })).rejects.toThrow();
-});
+}, 15_000);
 
 it("bounds simultaneous password verification and unlocks after the persisted lock expires", async () => {
   const t = setup();
@@ -249,7 +283,7 @@ it("bounds simultaneous password verification and unlocks after the persisted lo
   await expect(service.verify({ username: "alice", password })).rejects.toThrow();
   now += 15 * 60_000 + 1;
   await expect(service.verify({ username: "alice", password })).resolves.toBeTypeOf("string");
-});
+}, 15_000);
 
 it("accepts eight-character passwords for creation and reset and rejects shorter ones", async () => {
   const t = setup();
@@ -292,8 +326,12 @@ it("Web-only mode has no development or Feishu login and advertises account logi
     ).toBe(404);
   }
   expect(() =>
-    loadConfig({ CODEXBOARD_AUTH_MODE: "web", CODEXBOARD_ORIGIN: "http://tasks.example.com" }),
-  ).toThrow();
+    loadConfig({
+      CODEXBOARD_ENV: "production",
+      CODEXBOARD_AUTH_MODE: "web",
+      DEVBOARD_PUBLIC_ORIGIN: "http://tasks.example.com",
+    }),
+  ).toThrow(/HTTPS/);
 });
 
 it.each(["feishu", "web"] as const)(

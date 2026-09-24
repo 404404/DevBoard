@@ -30,7 +30,7 @@ export function canCreateTaskInProject(
   if (project.kind === "all") {
     return projects.length === 0 || creatableTaskProjects(session, projects).length > 0;
   }
-  return project.kind === "codex";
+  return project.kind === "codex" || project.kind === "managed";
 }
 
 export function creatableTaskProjects(
@@ -38,7 +38,9 @@ export function creatableTaskProjects(
   projects: readonly ProjectView[],
 ): ProjectView[] {
   return projects.filter(
-    (project) => !project.archivedAt && (project.kind === "temporary" || project.kind === "codex"),
+    (project) =>
+      !project.archivedAt &&
+      (project.kind === "temporary" || project.kind === "codex" || project.kind === "managed"),
   );
 }
 
@@ -55,5 +57,5 @@ export function taskProjectContext(task: TaskView, projectKind: ProjectKind): st
 }
 
 export function reassignableProjects(projects: readonly ProjectView[]): ProjectView[] {
-  return projects.filter((project) => project.kind === "codex");
+  return projects.filter((project) => project.kind === "codex" || project.kind === "managed");
 }

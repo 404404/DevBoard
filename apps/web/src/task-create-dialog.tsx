@@ -307,6 +307,15 @@ export function TaskCreateDialog({
     (candidate) => candidate.id === targetProjectId && !candidate.archivedAt,
   );
 
+  const resetDialogGeometry = () => {
+    const initialRect = initialDesktopDialogRect();
+    customRectRef.current = initialRect;
+    defaultContentHeightRef.current = undefined;
+    expandedRef.current = false;
+    setDialogRect(initialRect);
+    setExpanded(false);
+  };
+
   const completeCreation = (task: TaskView) => {
     creationSucceededRef.current = true;
     for (const queryKey of taskMutationInvalidationKeys(targetProjectId, [
@@ -318,6 +327,7 @@ export function TaskCreateDialog({
       void queryClient.invalidateQueries({ queryKey });
     }
     void queryClient.invalidateQueries({ queryKey: ["task-creation-options", targetProjectId] });
+    resetDialogGeometry();
     onClose();
     onCreated(task);
   };
@@ -483,6 +493,7 @@ export function TaskCreateDialog({
   }, [expanded]);
 
   useEffect(() => {
+    if (!open) return;
     const panel = panelRef.current;
     const form = formRef.current;
     const footer = footerRef.current;
@@ -565,7 +576,10 @@ export function TaskCreateDialog({
       return;
     }
     if (createdTaskRef.current) completeCreation(createdTaskRef.current);
-    else onClose();
+    else {
+      resetDialogGeometry();
+      onClose();
+    }
   };
 
   const changeProject = (projectId: string) => {

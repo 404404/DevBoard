@@ -3,6 +3,7 @@ import {
   GitManagementViewSchema,
   type CreateGitResourceCommand,
   type DeleteGitResourceCommand,
+  type CreateProjectCommand,
 } from "@codexboard/contracts";
 import { createUuid } from "./random-id";
 import {
@@ -35,6 +36,9 @@ import {
   type JobView,
   type GlobalLabelView,
   type ProjectTaskCreationOptionsView,
+  type ProjectView,
+  type UpdateProjectCommand,
+  type ArchiveProjectCommand,
   type SessionView,
   type TaskPriority,
   type TaskRelationView,
@@ -46,10 +50,36 @@ import {
   TaskLifecycleViewSchema,
   type TaskLifecycleView,
   type TaskLifecycleCommand,
+  ExecutionSettingsViewSchema,
+  ExecutionApprovalDecisionSchema,
+  ExecutionApprovalViewSchema,
+  ConnectionViewSchema,
+  ExecutionProfileViewSchema,
+  WorkspaceMappingViewSchema,
+  MilestoneViewSchema,
+  RunViewSchema,
+  ProviderHealthSchema,
+  ProjectExecutionProfileViewSchema,
+  type ConnectionView,
+  type CreateConnectionCommand,
+  type CreateExecutionProfileCommand,
+  type CreateMilestoneCommand,
+  type CreateWorkspaceMappingCommand,
+  type ExecutionProfileView,
+  type ExecutionApprovalDecision,
+  type ExecutionApprovalView,
+  type ExecutionSettingsView,
+  type ProjectExecutionProfileView,
+  type MilestoneView,
+  type RunView,
+  type WorkspaceMappingView,
+  type UpdateConnectionCommand,
+  type UpdateExecutionProfileCommand,
 } from "@codexboard/contracts";
 import { z } from "zod";
 
 const ProjectListResponseSchema = z.object({ data: z.array(ProjectViewSchema) });
+const ProjectMutationResponseSchema = z.object({ data: ProjectViewSchema });
 const BoardResponseSchema = z.object({ data: BoardViewSchema });
 const ProjectTaskCreationOptionsResponseSchema = z.object({
   data: ProjectTaskCreationOptionsViewSchema,
@@ -210,6 +240,55 @@ export async function logout(csrfToken: string): Promise<void> {
 
 export async function listProjects() {
   return (await apiRequest("/api/v1/projects", ProjectListResponseSchema)).data;
+}
+
+export async function createProject(
+  input: CreateProjectCommand,
+  csrfToken: string,
+): Promise<ProjectView> {
+  return (
+    await apiRequest("/api/v1/projects", ProjectMutationResponseSchema, {
+      method: "POST",
+      headers: mutationHeaders(csrfToken, newIdempotencyKey()),
+      body: JSON.stringify(input),
+    })
+  ).data;
+}
+
+export async function updateProject(
+  projectId: string,
+  input: UpdateProjectCommand,
+  csrfToken: string,
+): Promise<ProjectView> {
+  return (
+    await apiRequest(
+      `/api/v1/projects/${encodeURIComponent(projectId)}`,
+      ProjectMutationResponseSchema,
+      {
+        method: "PATCH",
+        headers: mutationHeaders(csrfToken, newIdempotencyKey()),
+        body: JSON.stringify(input),
+      },
+    )
+  ).data;
+}
+
+export async function archiveProject(
+  projectId: string,
+  input: ArchiveProjectCommand,
+  csrfToken: string,
+): Promise<ProjectView> {
+  return (
+    await apiRequest(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/archive`,
+      ProjectMutationResponseSchema,
+      {
+        method: "POST",
+        headers: mutationHeaders(csrfToken, newIdempotencyKey()),
+        body: JSON.stringify(input),
+      },
+    )
+  ).data;
 }
 
 export async function readBoard(projectId: string): Promise<BoardView> {
@@ -454,6 +533,7 @@ export async function createTask(
     labels: string[];
     assigneeIdentity: UserIdentityRef | null;
     developmentContextId: string | null;
+    milestoneId?: string | null;
     links: string[];
     initialRelations: InitialTaskRelations;
   },
@@ -481,6 +561,7 @@ export async function updateTask(
     links?: string[];
     startAt?: string | null;
     dueAt?: string | null;
+    milestoneId?: string | null;
   },
   csrfToken: string,
   idempotencyKey: string,
@@ -725,4 +806,416 @@ export async function deleteGitResource(
       body: JSON.stringify(command),
     },
   );
+}
+
+const ExecutionSettingsResponseSchema = z.object({ data: ExecutionSettingsViewSchema });
+const ConnectionListResponseSchema = z.object({ data: z.array(ConnectionViewSchema) });
+const ConnectionMutationResponseSchema = z.object({
+  data: z.object({ connection: ConnectionViewSchema, revision: z.number().int().positive() }),
+});
+const ConnectionTestResponseSchema = z.object({
+  data: z.object({ connection: ConnectionViewSchema, health: ProviderHealthSchema }),
+});
+const SSHHostKeyViewSchema = z.object({
+  algorithm: z.string().min(1),
+  fingerprint: z.string().regex(/^SHA256:[A-Za-z0-9+/]+$/),
+  trusted: z.boolean(),
+});
+const SSHHostKeyListResponseSchema = z.object({ data: z.array(SSHHostKeyViewSchema) });
+const SSHHostKeyResponseSchema = z.object({ data: SSHHostKeyViewSchema });
+const RevisionOnlyResponseSchema = z.object({
+  data: z.object({ revision: z.number().int().positive() }),
+});
+const ProfileListResponseSchema = z.object({ data: z.array(ExecutionProfileViewSchema) });
+const ProfileMutationResponseSchema = z.object({
+  data: z.object({ profile: ExecutionProfileViewSchema, revision: z.number().int().positive() }),
+});
+const MappingListResponseSchema = z.object({ data: z.array(WorkspaceMappingViewSchema) });
+const MappingMutationResponseSchema = z.object({
+  data: z.object({ mapping: WorkspaceMappingViewSchema, revision: z.number().int().positive() }),
+});
+const MilestoneListResponseSchema = z.object({ data: z.array(MilestoneViewSchema) });
+const MilestoneMutationResponseSchema = z.object({
+  data: z.object({ milestone: MilestoneViewSchema, revision: z.number().int().positive() }),
+});
+const RunListResponseSchema = z.object({ data: z.array(RunViewSchema) });
+const RunResponseSchema = z.object({ data: RunViewSchema });
+const ApprovalListResponseSchema = z.object({ data: z.array(ExecutionApprovalViewSchema) });
+const ApprovalResponseSchema = z.object({ data: ExecutionApprovalViewSchema });
+const ProjectExecutionProfileResponseSchema = z.object({ data: ProjectExecutionProfileViewSchema });
+const ProjectExecutionProfileMutationResponseSchema = z.object({
+  data: z.object({
+    setting: ProjectExecutionProfileViewSchema,
+    revision: z.number().int().positive(),
+  }),
+});
+
+export async function readExecutionSettings(): Promise<ExecutionSettingsView> {
+  return (await apiRequest("/api/v1/execution/settings", ExecutionSettingsResponseSchema)).data;
+}
+
+export async function listExecutionConnections(): Promise<readonly ConnectionView[]> {
+  return (await apiRequest("/api/v1/execution/connections", ConnectionListResponseSchema)).data;
+}
+
+export async function createExecutionConnection(
+  input: CreateConnectionCommand,
+  csrfToken: string,
+): Promise<ConnectionView> {
+  return (
+    await apiRequest("/api/v1/execution/connections", ConnectionMutationResponseSchema, {
+      method: "POST",
+      headers: mutationHeaders(csrfToken, newIdempotencyKey()),
+      body: JSON.stringify(input),
+    })
+  ).data.connection;
+}
+
+export async function updateExecutionConnection(
+  connectionId: string,
+  input: UpdateConnectionCommand,
+  csrfToken: string,
+): Promise<ConnectionView> {
+  return (
+    await apiRequest(
+      "/api/v1/execution/connections/" + encodeURIComponent(connectionId),
+      ConnectionMutationResponseSchema,
+      {
+        method: "PATCH",
+        headers: mutationHeaders(csrfToken, newIdempotencyKey()),
+        body: JSON.stringify(input),
+      },
+    )
+  ).data.connection;
+}
+
+export async function deleteExecutionConnection(
+  connectionId: string,
+  csrfToken: string,
+): Promise<void> {
+  await apiRequest(
+    "/api/v1/execution/connections/" + encodeURIComponent(connectionId),
+    RevisionOnlyResponseSchema,
+    {
+      method: "DELETE",
+      headers: mutationHeaders(csrfToken, newIdempotencyKey()),
+    },
+  );
+}
+
+export async function testExecutionConnection(
+  connectionId: string,
+  csrfToken: string,
+  workspace = "/",
+) {
+  return (
+    await apiRequest(
+      "/api/v1/execution/connections/" + encodeURIComponent(connectionId) + "/test",
+      ConnectionTestResponseSchema,
+      {
+        method: "POST",
+        headers: mutationHeaders(csrfToken, newIdempotencyKey()),
+        body: JSON.stringify({ workspace }),
+      },
+    )
+  ).data;
+}
+
+export async function scanSSHHostKeys(connectionId: string, csrfToken: string) {
+  return (
+    await apiRequest(
+      `/api/v1/execution/connections/${encodeURIComponent(connectionId)}/host-keys/scan`,
+      SSHHostKeyListResponseSchema,
+      {
+        method: "POST",
+        headers: mutationHeaders(csrfToken, newIdempotencyKey()),
+        body: JSON.stringify({}),
+      },
+    )
+  ).data;
+}
+
+export async function listTrustedSSHHostKeys(connectionId: string) {
+  return (
+    await apiRequest(
+      `/api/v1/execution/connections/${encodeURIComponent(connectionId)}/host-keys`,
+      SSHHostKeyListResponseSchema,
+    )
+  ).data;
+}
+
+export async function trustSSHHostKey(
+  connectionId: string,
+  fingerprint: string,
+  csrfToken: string,
+) {
+  return (
+    await apiRequest(
+      `/api/v1/execution/connections/${encodeURIComponent(connectionId)}/host-keys/trust`,
+      SSHHostKeyResponseSchema,
+      {
+        method: "POST",
+        headers: mutationHeaders(csrfToken, newIdempotencyKey()),
+        body: JSON.stringify({ fingerprint }),
+      },
+    )
+  ).data;
+}
+
+export async function listExecutionProfiles(): Promise<readonly ExecutionProfileView[]> {
+  return (await apiRequest("/api/v1/execution/profiles", ProfileListResponseSchema)).data;
+}
+
+export async function createExecutionProfile(
+  input: CreateExecutionProfileCommand,
+  csrfToken: string,
+): Promise<ExecutionProfileView> {
+  return (
+    await apiRequest("/api/v1/execution/profiles", ProfileMutationResponseSchema, {
+      method: "POST",
+      headers: mutationHeaders(csrfToken, newIdempotencyKey()),
+      body: JSON.stringify(input),
+    })
+  ).data.profile;
+}
+
+export async function updateExecutionProfile(
+  profileId: string,
+  input: UpdateExecutionProfileCommand,
+  csrfToken: string,
+): Promise<ExecutionProfileView> {
+  return (
+    await apiRequest(
+      "/api/v1/execution/profiles/" + encodeURIComponent(profileId),
+      ProfileMutationResponseSchema,
+      {
+        method: "PATCH",
+        headers: mutationHeaders(csrfToken, newIdempotencyKey()),
+        body: JSON.stringify(input),
+      },
+    )
+  ).data.profile;
+}
+
+export async function deleteExecutionProfile(profileId: string, csrfToken: string): Promise<void> {
+  await apiRequest(
+    "/api/v1/execution/profiles/" + encodeURIComponent(profileId),
+    RevisionOnlyResponseSchema,
+    {
+      method: "DELETE",
+      headers: mutationHeaders(csrfToken, newIdempotencyKey()),
+    },
+  );
+}
+
+export async function readProjectDefaultProfile(
+  projectId: string,
+): Promise<ProjectExecutionProfileView> {
+  return (
+    await apiRequest(
+      "/api/v1/projects/" + encodeURIComponent(projectId) + "/execution-profile",
+      ProjectExecutionProfileResponseSchema,
+    )
+  ).data;
+}
+
+export async function setProjectDefaultProfile(
+  projectId: string,
+  profileId: string | null,
+  csrfToken: string,
+): Promise<ProjectExecutionProfileView> {
+  return (
+    await apiRequest(
+      "/api/v1/projects/" + encodeURIComponent(projectId) + "/execution-profile",
+      ProjectExecutionProfileMutationResponseSchema,
+      {
+        method: "PUT",
+        headers: mutationHeaders(csrfToken, newIdempotencyKey()),
+        body: JSON.stringify({ profileId }),
+      },
+    )
+  ).data.setting;
+}
+
+export async function listWorkspaceMappings(
+  projectId: string,
+): Promise<readonly WorkspaceMappingView[]> {
+  return (
+    await apiRequest(
+      "/api/v1/projects/" + encodeURIComponent(projectId) + "/workspace-mappings",
+      MappingListResponseSchema,
+    )
+  ).data;
+}
+
+export async function createWorkspaceMapping(
+  projectId: string,
+  input: Omit<CreateWorkspaceMappingCommand, "projectId">,
+  csrfToken: string,
+): Promise<WorkspaceMappingView> {
+  return (
+    await apiRequest(
+      "/api/v1/projects/" + encodeURIComponent(projectId) + "/workspace-mappings",
+      MappingMutationResponseSchema,
+      {
+        method: "POST",
+        headers: mutationHeaders(csrfToken, newIdempotencyKey()),
+        body: JSON.stringify(input),
+      },
+    )
+  ).data.mapping;
+}
+
+export async function createRemoteWorkspaceMapping(
+  projectId: string,
+  input: Omit<CreateWorkspaceMappingCommand, "projectId">,
+  csrfToken: string,
+): Promise<WorkspaceMappingView> {
+  return (
+    await apiRequest(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/workspace-mappings/create`,
+      MappingMutationResponseSchema,
+      {
+        method: "POST",
+        headers: mutationHeaders(csrfToken, newIdempotencyKey()),
+        body: JSON.stringify(input),
+      },
+    )
+  ).data.mapping;
+}
+
+export async function deleteWorkspaceMapping(
+  projectId: string,
+  mappingId: string,
+  csrfToken: string,
+): Promise<void> {
+  await apiRequest(
+    "/api/v1/projects/" +
+      encodeURIComponent(projectId) +
+      "/workspace-mappings/" +
+      encodeURIComponent(mappingId),
+    RevisionOnlyResponseSchema,
+    {
+      method: "DELETE",
+      headers: mutationHeaders(csrfToken, newIdempotencyKey()),
+    },
+  );
+}
+
+export async function listMilestones(projectId: string): Promise<readonly MilestoneView[]> {
+  return (
+    await apiRequest(
+      "/api/v1/projects/" + encodeURIComponent(projectId) + "/milestones",
+      MilestoneListResponseSchema,
+    )
+  ).data;
+}
+
+export async function createMilestone(
+  projectId: string,
+  input: Omit<CreateMilestoneCommand, "projectId">,
+  csrfToken: string,
+): Promise<MilestoneView> {
+  return (
+    await apiRequest(
+      "/api/v1/projects/" + encodeURIComponent(projectId) + "/milestones",
+      MilestoneMutationResponseSchema,
+      {
+        method: "POST",
+        headers: mutationHeaders(csrfToken, newIdempotencyKey()),
+        body: JSON.stringify(input),
+      },
+    )
+  ).data.milestone;
+}
+
+export async function listTaskRuns(taskId: string): Promise<readonly RunView[]> {
+  return (
+    await apiRequest("/api/v1/tasks/" + encodeURIComponent(taskId) + "/runs", RunListResponseSchema)
+  ).data;
+}
+
+export async function readRun(runId: string): Promise<RunView> {
+  return (await apiRequest("/api/v1/runs/" + encodeURIComponent(runId), RunResponseSchema)).data;
+}
+export interface StartTaskRunInput {
+  readonly executionProfileId?: string | null;
+  readonly prompt: string;
+  readonly model?: string | null;
+  readonly reasoningEffort?: string | null;
+  readonly mode?: string | null;
+  readonly permissionMode?: string | null;
+}
+
+export async function startTaskRun(
+  taskId: string,
+  input: StartTaskRunInput,
+  csrfToken: string,
+): Promise<RunView> {
+  return (
+    await apiRequest(
+      "/api/v1/tasks/" + encodeURIComponent(taskId) + "/runs/start",
+      RunResponseSchema,
+      {
+        method: "POST",
+        headers: mutationHeaders(csrfToken, newIdempotencyKey()),
+        body: JSON.stringify(input),
+      },
+    )
+  ).data;
+}
+
+export async function continueTaskRun(
+  runId: string,
+  prompt: string,
+  csrfToken: string,
+): Promise<RunView> {
+  return (
+    await apiRequest("/api/v1/runs/" + encodeURIComponent(runId) + "/continue", RunResponseSchema, {
+      method: "POST",
+      headers: mutationHeaders(csrfToken, newIdempotencyKey()),
+      body: JSON.stringify({ prompt }),
+    })
+  ).data;
+}
+
+export async function cancelRun(runId: string, csrfToken: string): Promise<RunView> {
+  return (
+    await apiRequest("/api/v1/runs/" + encodeURIComponent(runId) + "/cancel", RunResponseSchema, {
+      method: "POST",
+      headers: mutationHeaders(csrfToken, newIdempotencyKey()),
+    })
+  ).data;
+}
+
+export async function listRunApprovals(runId: string): Promise<readonly ExecutionApprovalView[]> {
+  return (
+    await apiRequest(
+      "/api/v1/runs/" + encodeURIComponent(runId) + "/approvals",
+      ApprovalListResponseSchema,
+    )
+  ).data;
+}
+
+export async function respondToRunApproval(
+  runId: string,
+  approvalId: string,
+  decision: ExecutionApprovalDecision,
+  csrfToken: string,
+): Promise<ExecutionApprovalView> {
+  return (
+    await apiRequest(
+      "/api/v1/runs/" +
+        encodeURIComponent(runId) +
+        "/approvals/" +
+        encodeURIComponent(approvalId) +
+        "/respond",
+      ApprovalResponseSchema,
+      {
+        method: "POST",
+        headers: mutationHeaders(csrfToken, newIdempotencyKey()),
+        body: JSON.stringify(ExecutionApprovalDecisionSchema.parse(decision)),
+      },
+    )
+  ).data;
 }

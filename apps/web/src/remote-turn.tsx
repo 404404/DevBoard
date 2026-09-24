@@ -39,6 +39,9 @@ export function RemoteTurnContent({
   }, [active, turn.startedAtMs, turn.workDurationMs]);
   const parts = splitRemoteTurn(turn);
   const progressGroups = groupRemoteProgress(parts.progress);
+  const hasAnsweredQuestion = turn.items.some((item) =>
+    item.asyncQuestions?.some((question) => question.answer !== null),
+  );
   const statusActive =
     active && showActivityStatus && !parts.final.some((item) => !item.asyncQuestions?.length);
   const hasStatusGroup = progressGroups.at(-1)?.kind === "commands";
@@ -56,7 +59,11 @@ export function RemoteTurnContent({
     <>
       {parts.users.map((item) => renderItem(item))}
       {(progressGroups.length > 0 || duration != null) && (
-        <details className="remote-progress" key={active ? "active" : "finished"} open={active}>
+        <details
+          className="remote-progress"
+          key={active ? "active" : "finished"}
+          open={active || hasAnsweredQuestion}
+        >
           <summary>
             <span>
               {active ? label : duration != null ? "用时" : label}

@@ -22,6 +22,7 @@ const task: TaskView = {
   startAt: null,
   dueAt: null,
   recurrence: null,
+  milestoneId: null,
   developmentContextId: null,
   sortOrder: 1,
   version: 1,

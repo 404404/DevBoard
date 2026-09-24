@@ -35,6 +35,7 @@ function task(id: string, status: TaskView["status"], version = 1): TaskView {
     startAt: null,
     dueAt: null,
     recurrence: null,
+    milestoneId: null,
     developmentContextId: null,
     links: [],
     sortOrder: 1,

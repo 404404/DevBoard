@@ -1,4 +1,5 @@
-import type { DashboardView, TaskView } from "@codexboard/contracts";
+import { ALL_PROJECT_ID, type DashboardView, type TaskView } from "@codexboard/contracts";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -34,6 +35,7 @@ function task(
     startAt: null,
     dueAt: null,
     recurrence: null,
+    milestoneId: null,
     developmentContextId: null,
     links: [],
     sortOrder: 1,
@@ -144,10 +146,17 @@ describe("DashboardPanel", () => {
       dueSoonTasks: [],
     };
     const html = renderToStaticMarkup(
-      createElement(DashboardPanel, {
-        dashboard,
-        onOpen: () => undefined,
-      }),
+      createElement(
+        QueryClientProvider,
+        { client: new QueryClient() },
+        createElement(DashboardPanel, {
+          dashboard,
+          onOpen: () => undefined,
+          projectId: ALL_PROJECT_ID,
+          csrfToken: "test-csrf-token",
+          mutationsEnabled: false,
+        }),
+      ),
     );
     for (const expected of [
       "优先级分布",

@@ -1,0 +1,72 @@
+name: Deploy Preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: Immutable DevBoard GHCR image reference including @sha256 digest
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: preview
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate image and deployment configuration
+        env:
+          IMAGE: ${{ inputs.image }}
+          DEPLOY_HOST: ${{ secrets.DEVBOARD_PREVIEW_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEVBOARD_PREVIEW_PORT }}
+          DEPLOY_USER: ${{ secrets.DEVBOARD_PREVIEW_USER }}
+          DEPLOY_PATH: ${{ secrets.DEVBOARD_PREVIEW_PATH }}
+          DEPLOY_KEY: ${{ secrets.DEVBOARD_PREVIEW_SSH_PRIVATE_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEVBOARD_PREVIEW_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          [[ "$IMAGE" =~ ^ghcr\.io/404404/devboard(:((main|preview|sha-[a-f0-9]{7,40}|[0-9]+\.[0-9]+\.[0-9]+)))?@sha256:[a-f0-9]{64}$ ]]
+          [[ "$DEPLOY_HOST" =~ ^[A-Za-z0-9._:-]+$ ]]
+          [[ "$DEPLOY_PORT" =~ ^[0-9]{1,5}$ ]]
+          (( DEPLOY_PORT >= 1 && DEPLOY_PORT <= 65535 ))
+          [[ "$DEPLOY_USER" =~ ^[A-Za-z0-9._-]+$ ]]
+          [[ "$DEPLOY_PATH" =~ ^/[A-Za-z0-9_./-]+$ && "$DEPLOY_PATH" != *..* ]]
+          test -n "$DEPLOY_KEY"
+          test -n "$DEPLOY_KNOWN_HOSTS"
+      - name: Authenticate to GHCR and verify selected multi-arch image
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - name: Inspect selected image manifest
+        env:
+          IMAGE: ${{ inputs.image }}
+        run: docker buildx imagetools inspect "$IMAGE"
+      - name: Start deployment SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEVBOARD_PREVIEW_SSH_PRIVATE_KEY }}
+      - name: Deploy and verify
+        env:
+          IMAGE: ${{ inputs.image }}
+          DEPLOY_HOST: ${{ secrets.DEVBOARD_PREVIEW_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEVBOARD_PREVIEW_PORT }}
+          DEPLOY_USER: ${{ secrets.DEVBOARD_PREVIEW_USER }}
+          DEPLOY_PATH: ${{ secrets.DEVBOARD_PREVIEW_PATH }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEVBOARD_PREVIEW_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          known_hosts="$RUNNER_TEMP/devboard-preview-known-hosts"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$known_hosts"
+          chmod 600 "$known_hosts"
+          trap 'rm -f "$known_hosts"' EXIT
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o UpdateHostKeys=no \
+            -o UserKnownHostsFile="$known_hosts" -o GlobalKnownHostsFile=/dev/null \
+            -o ConnectTimeout=10 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "bash -s -- '$IMAGE' '$DEPLOY_PATH'" < deploy/scripts/remote-deploy.sh

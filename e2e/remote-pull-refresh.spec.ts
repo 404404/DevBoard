@@ -1,21 +1,30 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./helpers/remote-test";
 
 test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
 async function touch(page: Page, type: string, y: number, x = 100, count = 1) {
+  await expect(page.locator(".remote-list-body")).toHaveAttribute(
+    "data-pull-refresh-ready",
+    "true",
+  );
   await page.locator(".remote-list-body").evaluate(
     (element, args) => {
-      const touches =
-        args.type === "touchend" || args.type === "touchcancel"
-          ? []
-          : Array.from({ length: args.count }, (_, identifier) => ({
-              identifier,
-              target: element,
-              clientX: args.x + identifier * 20,
-              clientY: args.y,
-            }));
-      const event = new Event(args.type, { bubbles: true, cancelable: true });
-      Object.defineProperty(event, "touches", { value: touches });
+      const touches = Array.from({ length: args.count }, (_, identifier) => ({
+        identifier,
+        target: element,
+        clientX: args.x + identifier * 20,
+        clientY: args.y,
+      }));
+      const activeTouches = args.type === "touchend" || args.type === "touchcancel" ? [] : touches;
+      const event = new Event(args.type, {
+        bubbles: true,
+        cancelable: true,
+      });
+      Object.defineProperties(event, {
+        touches: { value: activeTouches },
+        targetTouches: { value: activeTouches },
+        changedTouches: { value: touches },
+      });
       element.dispatchEvent(event);
     },
     { type, y, x, count },
@@ -58,6 +67,11 @@ test("pull refresh updates projects and tasks, preserves expansion, and waits fo
   await page.goto("/?remote=1");
   await page.getByRole("button", { name: "最近", exact: true }).click();
   await expect(page.getByRole("button", { name: "刷新前", exact: true })).toBeVisible();
+  const list = page.locator(".remote-list-body");
+  await list.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  await expect.poll(() => list.evaluate((element) => element.scrollTop)).toBe(0);
   try {
     await touch(page, "touchstart", 150);
     await touch(page, "touchmove", 190);

@@ -4,6 +4,7 @@ import Database from "better-sqlite3";
 import { readIdentityAudit } from "./modules/identity/index.js";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { StringDecoder } from "node:string_decoder";
 
 import { BackupManifestSchema, RuntimeDescriptorSchema } from "@codexboard/contracts";
 import { z } from "zod";
@@ -13,6 +14,8 @@ import { openDatabase } from "./modules/database/index.js";
 import { acquireDataDirectoryLock, BackupService } from "./modules/operations/index.js";
 
 type Output = (line: string) => void;
+
+const ONLINE_BACKUP_TIMEOUT_MS = 30_000;
 
 const OnlineBackupResponseSchema = z
   .object({
@@ -25,8 +28,33 @@ const OnlineBackupResponseSchema = z
   })
   .strict();
 
+const WebAccountsResponseSchema = z
+  .object({
+    data: z.array(
+      z.object({
+        id: z.uuid(),
+        username: z.string(),
+        name: z.string(),
+        active: z.number().int().min(0).max(1),
+      }),
+    ),
+  })
+  .strict();
+
+const WebAccountResponseSchema = z
+  .object({
+    data: z.object({
+      id: z.uuid(),
+      username: z.string(),
+      name: z.string(),
+      active: z.number().int().min(0).max(1),
+    }),
+  })
+  .strict();
+
 export interface OperationsDependencies {
   readonly fetch?: typeof fetch;
+  readonly readSecret?: (prompt: string) => Promise<string>;
 }
 
 function emit(output: Output, value: unknown): void {
@@ -41,6 +69,164 @@ function optionValue(arguments_: readonly string[], name: string): string | unde
   return value;
 }
 
+function readAdminRuntime(config: ReturnType<typeof loadConfig>) {
+  const runtimePath = join(config.CODEXBOARD_DATA_DIR, "run", "runtime.json");
+  if (!existsSync(runtimePath)) return null;
+  const runtimeStat = lstatSync(runtimePath);
+  if (runtimeStat.isSymbolicLink() || !runtimeStat.isFile())
+    throw new Error("运行时描述必须是不含符号链接的普通文件");
+  const runtime = RuntimeDescriptorSchema.parse(
+    JSON.parse(readFileSync(runtimePath, "utf8")) as unknown,
+  );
+  const adminUrl = new URL(runtime.localAdminBaseUrl);
+  if (
+    adminUrl.protocol !== "http:" ||
+    adminUrl.hostname !== config.CODEXBOARD_ADMIN_HOST ||
+    Number(adminUrl.port || 80) !== config.CODEXBOARD_ADMIN_PORT ||
+    adminUrl.username ||
+    adminUrl.password ||
+    adminUrl.href !== `${adminUrl.origin}/`
+  ) {
+    throw new Error("运行时管理地址与本机配置不一致");
+  }
+  return { runtime, adminUrl };
+}
+
+async function readSecretFromTerminal(prompt: string): Promise<string> {
+  const input = process.stdin;
+  if (!input.isTTY || typeof input.setRawMode !== "function") {
+    throw new Error("密码必须通过交互式 TTY 输入；不要将密码放入参数或环境变量");
+  }
+  return new Promise((resolveSecret, rejectSecret) => {
+    let value = "";
+    const decoder = new StringDecoder("utf8");
+    const wasRaw = input.isRaw;
+    let finished = false;
+    const cleanup = () => {
+      if (finished) return;
+      finished = true;
+      input.off("data", onData);
+      input.off("end", onEnd);
+      input.setRawMode(wasRaw ?? false);
+      input.pause();
+      process.stderr.write("\n");
+    };
+    const onEnd = () => {
+      cleanup();
+      rejectSecret(new Error("密码输入流已关闭"));
+    };
+    const onData = (chunk: Buffer | string) => {
+      const text = decoder.write(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+      for (const character of text) {
+        if (character === "\u0003" || character === "\u0004") {
+          cleanup();
+          rejectSecret(new Error("密码输入已取消"));
+          break;
+        }
+        if (character === "\r" || character === "\n") {
+          cleanup();
+          resolveSecret(value);
+          break;
+        }
+        if (character === "\u007f" || character === "\b") {
+          value = Array.from(value).slice(0, -1).join("");
+        } else if (character >= " ") {
+          if (value.length >= 256) {
+            cleanup();
+            rejectSecret(new Error("密码不能超过 256 个字符"));
+            break;
+          }
+          value += character;
+        }
+      }
+    };
+    process.stderr.write(prompt);
+    input.setRawMode(true);
+    input.resume();
+    input.on("data", onData);
+    input.once("end", onEnd);
+  });
+}
+
+async function webAccountOperation(
+  arguments_: readonly string[],
+  config: ReturnType<typeof loadConfig>,
+  output: Output,
+  dependencies: OperationsDependencies,
+): Promise<number> {
+  const [, action, ...options] = arguments_;
+  if (!action || !["list", "create", "enable", "disable", "reset-password"].includes(action)) {
+    emit(output, {
+      ok: false,
+      code: "USAGE_ERROR",
+      message:
+        "用法：ops web-account list | create --username NAME --name DISPLAY | enable ID | disable ID | reset-password ID",
+    });
+    return 2;
+  }
+  const context = readAdminRuntime(config);
+  if (!context) {
+    throw new Error("服务未运行或 runtime descriptor 不存在；请先启动 DevBoard 容器");
+  }
+  const fetcher = dependencies.fetch ?? fetch;
+  const request = async (path: string, method: string, body?: unknown) => {
+    const response = await fetcher(new URL(path, context.adminUrl), {
+      method,
+      headers: {
+        Authorization: `Bearer ${context.runtime.capabilityToken}`,
+        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) {
+      throw new Error(`本机账号管理请求失败（HTTP ${response.status}）`);
+    }
+    return response.json() as Promise<unknown>;
+  };
+
+  if (action === "list") {
+    const result = WebAccountsResponseSchema.parse(
+      await request("/api/v1/local/web-accounts", "GET"),
+    );
+    emit(output, { ok: true, command: "web-account", action, accounts: result.data });
+    return 0;
+  }
+
+  if (action === "create") {
+    const username = optionValue(options, "--username");
+    const name = optionValue(options, "--name");
+    if (!username || !name) throw new Error("create 需要 --username 和 --name");
+    const readSecret = dependencies.readSecret ?? readSecretFromTerminal;
+    const password = await readSecret("新 Web 密码（输入不回显）：");
+    const confirmation = await readSecret("再次输入密码确认（输入不回显）：");
+    if (password !== confirmation) throw new Error("两次密码不一致，未创建账号");
+    const result = WebAccountResponseSchema.parse(
+      await request("/api/v1/local/web-accounts", "POST", { username, name, password }),
+    );
+    emit(output, { ok: true, command: "web-account", action, account: result.data });
+    return 0;
+  }
+
+  if (action === "reset-password") {
+    const id = z.uuid().parse(options[0]);
+    const readSecret = dependencies.readSecret ?? readSecretFromTerminal;
+    const password = await readSecret("新 Web 密码（输入不回显）：");
+    const confirmation = await readSecret("再次输入密码确认（输入不回显）：");
+    if (password !== confirmation) throw new Error("两次密码不一致，未重置密码");
+    await request(`/api/v1/local/web-accounts/${encodeURIComponent(id)}`, "PATCH", { password });
+    emit(output, { ok: true, command: "web-account", action, id });
+    return 0;
+  }
+
+  const id = z.uuid().parse(options[0]);
+  await request(`/api/v1/local/web-accounts/${encodeURIComponent(id)}`, "PATCH", {
+    active: action === "enable",
+  });
+  emit(output, { ok: true, command: "web-account", action, id });
+  return 0;
+}
+
 export async function runOperations(
   arguments_: readonly string[],
   environment: NodeJS.ProcessEnv = process.env,
@@ -48,11 +234,15 @@ export async function runOperations(
   dependencies: OperationsDependencies = {},
 ): Promise<number> {
   const [command, target] = arguments_;
-  if (!command || !["backup", "verify", "restore", "audit-identities"].includes(command)) {
+  if (
+    !command ||
+    !["backup", "verify", "restore", "audit-identities", "web-account"].includes(command)
+  ) {
     emit(output, {
       ok: false,
       code: "USAGE_ERROR",
-      message: "用法：ops backup [--output DIR] | verify DIR | restore DIR | audit-identities DIR",
+      message:
+        "用法：ops backup [--output DIR] | verify DIR | restore DIR | audit-identities DIR | web-account list/create/enable/disable/reset-password",
     });
     return 2;
   }
@@ -96,6 +286,8 @@ export async function runOperations(
     }
 
     const config = loadConfig(environment);
+    if (command === "web-account")
+      return await webAccountOperation(arguments_, config, output, dependencies);
     if (command === "restore") {
       if (!target) throw new Error("restore 缺少备份目录");
       const result = await BackupService.restore(target, config.CODEXBOARD_DATA_DIR);
@@ -104,35 +296,17 @@ export async function runOperations(
     }
 
     const requestedDestination = optionValue(arguments_, "--output");
-    const runtimePath = join(config.CODEXBOARD_DATA_DIR, "run", "runtime.json");
-    if (existsSync(runtimePath)) {
-      const runtimeStat = lstatSync(runtimePath);
-      if (runtimeStat.isSymbolicLink() || !runtimeStat.isFile()) {
-        throw new Error("运行时描述必须是不含符号链接的普通文件");
-      }
-      const runtime = RuntimeDescriptorSchema.parse(
-        JSON.parse(readFileSync(runtimePath, "utf8")) as unknown,
-      );
-      const adminUrl = new URL(runtime.localAdminBaseUrl);
-      if (
-        adminUrl.protocol !== "http:" ||
-        adminUrl.hostname !== config.CODEXBOARD_ADMIN_HOST ||
-        Number(adminUrl.port || 80) !== config.CODEXBOARD_ADMIN_PORT ||
-        adminUrl.username ||
-        adminUrl.password ||
-        adminUrl.href !== `${adminUrl.origin}/`
-      ) {
-        throw new Error("运行时管理地址与本机配置不一致");
-      }
+    const context = readAdminRuntime(config);
+    if (context) {
       if (!requestedDestination) {
         let response: Response | undefined;
         try {
           response = await (dependencies.fetch ?? fetch)(
-            new URL("/api/v1/local/backups", adminUrl),
+            new URL("/api/v1/local/backups", context.adminUrl),
             {
               method: "POST",
-              headers: { Authorization: `Bearer ${runtime.capabilityToken}` },
-              signal: AbortSignal.timeout(2_000),
+              headers: { Authorization: `Bearer ${context.runtime.capabilityToken}` },
+              signal: AbortSignal.timeout(ONLINE_BACKUP_TIMEOUT_MS),
             },
           );
         } catch {
@@ -140,7 +314,9 @@ export async function runOperations(
           // the kernel-backed data lock; success proves there is no live owner.
         }
         if (response) {
-          if (!response.ok) throw new Error(`在线备份请求失败（HTTP ${response.status}）`);
+          if (!response.ok) {
+            throw new Error(`在线备份请求失败（HTTP ${response.status}）`);
+          }
           const result = OnlineBackupResponseSchema.parse(await response.json());
           emit(output, {
             ok: true,

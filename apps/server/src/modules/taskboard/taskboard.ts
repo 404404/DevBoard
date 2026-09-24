@@ -7,13 +7,13 @@ import {
   type UserIdentityRef,
 } from "@codexboard/contracts";
 import { createHash, randomUUID } from "node:crypto";
-import { realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 
 import {
   BoardViewSchema,
   ProjectViewSchema,
   ProjectTaskCreationOptionsViewSchema,
+  type LocalProjectKind,
   TaskConflictSummarySchema,
   TaskLabelsSchema,
   TaskMutationResultSchema,
@@ -91,6 +91,7 @@ const RawTaskRowSchema = z.object({
   dueAt: z.string().datetime().nullable(),
   recurrenceJson: z.string().nullable(),
   developmentContextJson: z.string().nullable(),
+  milestoneId: z.uuid().nullable(),
   linksJson: z.string(),
   sortOrder: z.number().finite(),
   version: z.number().int().positive(),
@@ -154,6 +155,7 @@ const TASK_COLUMNS = `
   tasks.due_at AS dueAt,
   tasks.recurrence_json AS recurrenceJson,
   tasks.development_context_json AS developmentContextJson,
+  tasks.milestone_id AS milestoneId,
   tasks.links_json AS linksJson,
   tasks.sort_order AS sortOrder,
   tasks.version,
@@ -206,8 +208,8 @@ export class Taskboard {
           AND (
             projects.source_kind = 'system'
             OR (
-              projects.source_kind = 'codex'
-              AND projects.sync_deleted_at IS NULL
+              (projects.source_kind = 'codex' AND projects.sync_deleted_at IS NULL)
+            OR projects.source_kind = 'legacy'
             )
           )
         ORDER BY
@@ -218,6 +220,13 @@ export class Taskboard {
       .all();
 
     return rows.map((row) => this.#projectView(row));
+  }
+
+  projectSourceKind(projectId: string, actor: PrincipalView): LocalProjectKind {
+    const project = this.#readProject(projectId, actor);
+    if (project.kind === "codex") return "codex";
+    if (project.kind === "managed") return "legacy";
+    return "system";
   }
 
   readBoard(projectId: string, actor: PrincipalView): BoardView {
@@ -320,7 +329,7 @@ export class Taskboard {
     if (visibleProject.kind === "all") {
       throw new AppError("INVALID_REQUEST", 409, "全部项目只能选择实际目标项目后创建任务");
     }
-    if (visibleProject.kind === "codex") {
+    if (visibleProject.kind === "codex" || visibleProject.kind === "managed") {
       this.#identityService.authorizeProject(context.actor, command.projectId, "write");
     }
     return this.#idempotentMutation(`task.create:${command.projectId}`, command, context, () => {
@@ -334,6 +343,7 @@ export class Taskboard {
       this.#validateAssignee(command.projectId, assigneeIdentity);
       this.#validateLabels(command.labels);
       this.#validateDevelopmentContext(command.projectId, command.developmentContextId);
+      this.#validateMilestone(command.projectId, command.milestoneId);
       const initialRelations = this.#validatedInitialRelations(command, context.actor);
       for (const relation of initialRelations) {
         assertTaskDeletionAvailable(this.#database, relation.targetTaskId);
@@ -361,9 +371,9 @@ export class Taskboard {
           `INSERT INTO tasks (
               id, identifier, project_id, task_number, title, description, status, priority,
               blocked_from_status, labels_json, assignee_identity_key, creator_identity_key, start_at, due_at,
-              recurrence_json, development_context_json, links_json, sort_order, version,
+              recurrence_json, development_context_json, milestone_id, links_json, sort_order, version,
               created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
         )
         .run(
           taskId,
@@ -384,6 +394,7 @@ export class Taskboard {
           command.developmentContextId
             ? JSON.stringify({ id: command.developmentContextId })
             : null,
+          command.milestoneId,
           JSON.stringify(command.links),
           sortOrder,
           timestamp,
@@ -407,6 +418,7 @@ export class Taskboard {
             "dueAt",
             "recurrence",
             "developmentContextId",
+            "milestoneId",
             "links",
           ],
         },
@@ -641,6 +653,7 @@ export class Taskboard {
           command.developmentContextId === undefined
             ? current.developmentContextId
             : command.developmentContextId,
+        milestoneId: command.milestoneId === undefined ? current.milestoneId : command.milestoneId,
       };
       this.#validateDateRange(next.startAt, next.dueAt);
       if (command.assigneeIdentity !== undefined) {
@@ -654,6 +667,7 @@ export class Taskboard {
       }
       this.#validateLabels(next.labels);
       this.#validateDevelopmentContext(current.projectId, next.developmentContextId);
+      this.#validateMilestone(current.projectId, next.milestoneId);
       const timestamp = this.#now().toISOString();
 
       const update = this.#database
@@ -668,6 +682,7 @@ export class Taskboard {
             due_at = ?,
             recurrence_json = ?,
             development_context_json = ?,
+            milestone_id = ?,
             links_json = ?,
             version = version + 1,
             updated_at = ?
@@ -683,6 +698,7 @@ export class Taskboard {
           this.#normalizedTimestamp(next.dueAt),
           next.recurrence ? JSON.stringify(next.recurrence) : null,
           next.developmentContextId ? JSON.stringify({ id: next.developmentContextId }) : null,
+          next.milestoneId,
           JSON.stringify(next.links),
           timestamp,
           taskId,
@@ -829,7 +845,7 @@ export class Taskboard {
     }
     this.#assertExpectedVersion(visible, command.expectedVersion);
     const target = this.#readProject(command.targetProjectId, context.actor);
-    if (target.kind !== "codex") {
+    if (target.kind !== "codex" && target.kind !== "managed") {
       throw new AppError("INVALID_REQUEST", 409, "只能重新分配到有效的 Codex 项目");
     }
     this.#identityService.authorizeProject(context.actor, target.id, "write");
@@ -1101,7 +1117,12 @@ export class Taskboard {
     const roots: unknown = JSON.parse(row.rootPathsJson);
     return ProjectViewSchema.parse({
       ...row,
-      kind: row.sourceKind === "system" ? row.systemKind : "codex",
+      kind:
+        row.sourceKind === "system"
+          ? row.systemKind
+          : row.sourceKind === "legacy"
+            ? "managed"
+            : "codex",
       rootPaths:
         row.sourceKind === "system" && row.systemKind === "temporary" && this.#temporaryProjectRoot
           ? [this.#temporaryProjectRoot]
@@ -1241,7 +1262,7 @@ export class Taskboard {
           `SELECT ${TASK_COLUMNS}
         FROM tasks JOIN projects AS current ON current.id = tasks.project_id
         WHERE tasks.archived_at IS NULL AND (
-          (current.source_kind = 'codex' AND current.sync_deleted_at IS NULL)
+          ((current.source_kind = 'codex' AND current.sync_deleted_at IS NULL) OR current.source_kind = 'legacy')
           OR tasks.project_id = ?
         ) ${order}`,
         )
@@ -1264,11 +1285,9 @@ export class Taskboard {
   }
 
   #canonicalPath(path: string): string {
-    try {
-      return realpathSync(path);
-    } catch {
-      return resolve(path);
-    }
+    // Project roots may be on a remote SSH Host; this is only lexical path
+    // containment for database-backed project filtering, not filesystem access.
+    return resolve(path);
   }
 
   #validateAssignee(_projectId: string, identity: UserIdentityRef | null): void {
@@ -1390,6 +1409,14 @@ export class Taskboard {
     if (startAt && dueAt && new Date(startAt).getTime() > new Date(dueAt).getTime()) {
       throw new AppError("INVALID_REQUEST", 400, "任务截止时间不能早于开始时间");
     }
+  }
+
+  #validateMilestone(projectId: string, milestoneId: string | null): void {
+    if (milestoneId === null) return;
+    const exists = this.#database
+      .prepare("SELECT 1 FROM milestones WHERE id = ? AND project_id = ?")
+      .get(milestoneId, projectId);
+    if (!exists) throw new AppError("INVALID_REQUEST", 400, "Milestone 不属于当前项目");
   }
 
   #normalizedTimestamp(timestamp: string | null): string | null {

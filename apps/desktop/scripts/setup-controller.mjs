@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { runSetupChecks } from "./setup-checks.mjs";
 import { readFrpcOrigin, readFrpcDnsTarget } from "./frpc-config.mjs";
+import { PUBLIC_ACCESS_MODES } from "./public-access.mjs";
 
 const appPaths = () => [
   "/Applications/Codex.app",
@@ -58,10 +59,14 @@ function fingerprint(input) {
         input.appId,
         input.appSecret,
         input.frpc,
+        input.apiPort,
         input.caddyPort,
         input.codexPath,
         input.servicesRunning,
         input.restartRequired,
+        input.publicAccessMode,
+        input.publicOrigin,
+        input.listenAddress,
       ]),
     )
     .digest("hex");
@@ -101,6 +106,9 @@ export function createSetupController({
         const section = settings.section || "all";
         const limits = {
           accessMode: 16,
+          publicAccessMode: 32,
+          publicOrigin: 2048,
+          listenAddress: 253,
           appId: 256,
           appSecret: 4096,
           frpc: 262144,
@@ -108,6 +116,8 @@ export function createSetupController({
         };
         if (
           (settings.accessMode !== undefined && !["web", "feishu"].includes(settings.accessMode)) ||
+          (settings.publicAccessMode !== undefined &&
+            !PUBLIC_ACCESS_MODES.includes(settings.publicAccessMode)) ||
           !settings ||
           typeof settings !== "object" ||
           !["all", "feishu", "web", "tunnel", "dns", "codex"].includes(section) ||
@@ -124,11 +134,24 @@ export function createSetupController({
         }
         const saved = getConfiguration();
         const input = { ...saved, section };
-        for (const key of ["accessMode", "appId", "appSecret", "frpc"])
+        for (const key of [
+          "accessMode",
+          "publicAccessMode",
+          "publicOrigin",
+          "listenAddress",
+          "appId",
+          "appSecret",
+          "frpc",
+        ])
           if (settings[key] !== undefined) input[key] = settings[key];
         const currentInput = fingerprint(input);
         savedAtCheck = fingerprint(saved);
-        const checkKey = `${currentInput}:${input.accessMode || "feishu"}`;
+        const checkKey =
+          currentInput +
+          ":" +
+          (input.accessMode || "feishu") +
+          ":" +
+          (input.publicAccessMode || "builtin-frp");
         if (checkKey !== lastInput || section === "all") state.results = [];
         else state.results = state.results.filter((item) => item.section !== section);
         lastInput = checkKey;
@@ -142,19 +165,31 @@ export function createSetupController({
             : "";
         input.restartRequired ||= currentInput !== savedAtCheck;
         let origin = "";
+        const publicAccessMode = input.publicAccessMode || "builtin-frp";
         try {
-          origin = readFrpcOrigin(input.frpc, input.caddyPort);
+          if (publicAccessMode === "external-reverse-proxy")
+            origin = new URL(input.publicOrigin || "").origin;
+          else if (publicAccessMode === "local")
+            origin = "http://127.0.0.1:" + (input.apiPort || input.caddyPort);
+          else origin = readFrpcOrigin(input.frpc, input.caddyPort);
         } catch {
           // Incomplete drafts still receive actionable check results.
         }
-        state.context = {
-          ...readFrpcDnsTarget(input.frpc),
+        const context = {
+          ...(publicAccessMode === "builtin-frp" ? readFrpcDnsTarget(input.frpc) : {}),
           origin,
           domain: origin ? new URL(origin).hostname : "",
           protocol: origin ? new URL(origin).protocol : "",
           publicPort: origin ? new URL(origin).port : "",
           caddyPort: input.caddyPort,
         };
+        if (input.publicAccessMode !== undefined)
+          Object.assign(context, {
+            publicAccessMode,
+            publicOrigin: input.publicOrigin || "",
+            listenAddress: input.listenAddress || "127.0.0.1",
+          });
+        state.context = context;
         onChange();
         const onResult = (result) => {
           state.results = [...state.results.filter((item) => item.id !== result.id), result];

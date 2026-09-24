@@ -71,7 +71,7 @@ fn open_board(state: tauri::State<Controller>) -> Result<(), String> {
 #[tauri::command]
 fn open_release_page() -> Result<(), String> {
     let status = Command::new("/usr/bin/open")
-        .arg("https://github.com/RocYan98/CodexBoard/releases/latest")
+        .arg("https://github.com/404404/DevBoard/releases/latest")
         .status()
         .map_err(|_| "无法打开默认浏览器".to_string())?;
     if status.success() {
@@ -180,10 +180,10 @@ fn show_main_window(app: &tauri::AppHandle) {
 fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show-main", "显示主窗口", true, None::<&str>)?;
     let update = MenuItem::with_id(app, "check-updates", "检查更新…", true, None::<&str>)?;
-    let exit = MenuItem::with_id(app, "quit-app", "退出 CodexBoard", true, None::<&str>)?;
+    let exit = MenuItem::with_id(app, "quit-app", "退出 DevBoard", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &update, &exit])?;
     let tray = TrayIconBuilder::with_id("codexboard")
-        .tooltip("CodexBoard")
+        .tooltip("DevBoard")
         .menu(&menu)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show-main" => show_main_window(app),
@@ -208,7 +208,7 @@ fn main() {
         .and_then(|home| app_data::open(&PathBuf::from(home), attempts));
     let (data, lock) = prepared.unwrap_or_else(|message| {
         let _ = Command::new("/usr/bin/osascript")
-            .args(["-e", "on run argv\n display alert \"无法启动 CodexBoard\" message (item 1 of argv) as critical\nend run", &message])
+            .args(["-e", "on run argv\n display alert \"无法启动 DevBoard\" message (item 1 of argv) as critical\nend run", &message])
             .stdout(Stdio::null()).stderr(Stdio::null()).status();
         std::process::exit(1);
     });
@@ -224,7 +224,7 @@ fn main() {
   app.manage(Controller{child:Mutex::new(child),input:Mutex::new(input),snapshot,quitting:AtomicBool::new(false),installing:AtomicBool::new(false),update_stop_ack,_lock:lock});Ok(())
  }).invoke_handler(tauri::generate_handler![snapshot,control,open_board,open_release_page,updater::update_status,updater::check_updates,updater::download_update,updater::install_update,skills::skill_status,skills::install_skill,skills::dismiss_skill_offer]).on_window_event(|window,event|{if let tauri::WindowEvent::CloseRequested{api,..}=event{api.prevent_close();let _ = window.hide();
     #[cfg(target_os = "macos")]
-    let _ = window.app_handle().set_activation_policy(tauri::ActivationPolicy::Accessory);}}).build(tauri::generate_context!()).expect("无法启动 CodexBoard");
+    let _ = window.app_handle().set_activation_policy(tauri::ActivationPolicy::Accessory);}}).build(tauri::generate_context!()).expect("无法启动 DevBoard");
     app.run(|app, event| {
         #[cfg(target_os = "macos")]
         if let tauri::RunEvent::Reopen { .. } = &event {

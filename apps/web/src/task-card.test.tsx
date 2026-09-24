@@ -29,6 +29,7 @@ const base = {
   startAt: null,
   dueAt: null,
   recurrence: null,
+  milestoneId: null,
   developmentContextId: null,
   links: [],
   sortOrder: 1,

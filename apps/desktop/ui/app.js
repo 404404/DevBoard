@@ -53,7 +53,14 @@ const pageNames = {
   logs: "运行日志",
 };
 let guideAccessMode = "feishu";
-const connectionFields = ["app-id", "app-secret", "frpc-content"];
+const connectionFields = [
+  "app-id",
+  "app-secret",
+  "public-access-mode",
+  "public-origin",
+  "listen-address",
+  "frpc-content",
+];
 const portFields = [
   ["port-api", "api"],
   ["port-admin", "admin"],
@@ -67,7 +74,7 @@ const labels = {
   stopping: "正在停止",
   error: "需要处理",
 };
-const names = ["CodexBoard 后端", "Caddy", "公网隧道"];
+const names = ["DevBoard 后端", "Caddy", "公网隧道"];
 async function action(name, args = {}) {
   if (pending || !invoke) return false;
   pending = true;
@@ -95,8 +102,11 @@ $("connections-form").onsubmit = async (event) => {
     action: "deployment",
     settings: {
       appId: $("app-id").value,
-      appSecret: $("app-secret").value,
-      frpc: $("frpc-content").value,
+      appSecret: document.getElementById("app-secret").value,
+      publicAccessMode: document.getElementById("public-access-mode").value,
+      publicOrigin: document.getElementById("public-origin").value,
+      listenAddress: document.getElementById("listen-address").value,
+      frpc: document.getElementById("frpc-content").value,
     },
   });
 };
@@ -217,8 +227,12 @@ $("setup-configure-web").onclick = () => {
   action("control", { action: "web_accounts", settings: { operation: "list" } });
 };
 $("connections-web-accounts").onclick = $("setup-configure-web").onclick;
-$("setup-access-mode").onchange = () => {
-  guideAccessMode = $("setup-access-mode").value;
+document.getElementById("setup-access-mode").onchange = () => {
+  guideAccessMode = document.getElementById("setup-access-mode").value;
+  setupInputRevision++;
+  renderSetup();
+};
+document.getElementById("public-access-mode").onchange = () => {
   setupInputRevision++;
   renderSetup();
 };
@@ -276,8 +290,11 @@ for (const section of [...setupSections, "all"])
       requestKey,
       accessMode: guideAccessMode,
       appId: $("app-id").value,
-      appSecret: $("app-secret").value,
-      frpc: $("frpc-content").value,
+      appSecret: document.getElementById("app-secret").value,
+      publicAccessMode: document.getElementById("public-access-mode").value,
+      publicOrigin: document.getElementById("public-origin").value,
+      listenAddress: document.getElementById("listen-address").value,
+      frpc: document.getElementById("frpc-content").value,
     };
     renderSetup();
     if (!(await action("control", { action: "setup_check", settings }))) {
@@ -288,6 +305,21 @@ for (const section of [...setupSections, "all"])
   };
 function renderSetup() {
   const web = guideAccessMode === "web";
+  const publicMode =
+    document.getElementById("public-access-mode").value ||
+    snapshot.deployment?.publicAccessMode ||
+    "builtin-frp";
+  const externalPublic = publicMode === "external-reverse-proxy";
+  document.getElementById("public-origin").required = externalPublic;
+  document.getElementById("frpc-content").required = publicMode === "builtin-frp";
+  setText(
+    document.getElementById("public-access-help"),
+    publicMode === "builtin-frp"
+      ? "DevBoard 启动本机 Caddy 和 frpc；旧版 frpc.toml 可直接继续使用。"
+      : publicMode === "external-reverse-proxy"
+        ? "DevBoard 启动本机 HTTP Caddy，但不启动 frpc；外部代理终止 TLS 后转发到 Caddy 监听地址。"
+        : "仅启动本机后端，不启动 Caddy 或 frpc；Web 账号可通过本机地址使用。",
+  );
   $("setup-access-mode").value = web ? "web" : "feishu";
   $("setup-access-mode").disabled =
     pending || Boolean(snapshot.deploymentSaving || snapshot.setup?.checking);
@@ -493,6 +525,9 @@ function render(s) {
   for (const [id, key] of [
     ["app-id", "appId"],
     ["app-secret", "appSecret"],
+    ["public-access-mode", "publicAccessMode"],
+    ["public-origin", "publicOrigin"],
+    ["listen-address", "listenAddress"],
     ["frpc-content", "frpc"],
   ])
     if (!dirtyFields.has(id) && document.activeElement !== $(id))
@@ -502,7 +537,15 @@ function render(s) {
     initialPageChosen = true;
     if (!navigationTouched)
       showPage(
-        ["frpc-content"].some((id) => !$(id).value.trim()) ? "guide" : "overview",
+        (
+          deployment.publicAccessMode === "builtin-frp"
+            ? !document.getElementById("frpc-content").value.trim()
+            : deployment.publicAccessMode === "external-reverse-proxy"
+              ? !document.getElementById("public-origin").value.trim()
+              : false
+        )
+          ? "guide"
+          : "overview",
         undefined,
         true,
       );
@@ -517,11 +560,17 @@ function render(s) {
     ["frpc-hint", "frpc"],
   ])
     setText($(id), deployment.paths?.[key] ? "保存位置：" + deployment.paths[key] : "");
+  const serviceNames =
+    deployment.publicAccessMode === "local"
+      ? ["DevBoard 后端"]
+      : deployment.publicAccessMode === "external-reverse-proxy"
+        ? ["DevBoard 后端", "Caddy"]
+        : names;
   renderList(
-    $("services"),
-    names.map((name) => s.services?.find((x) => x.name === name)?.status || "stopped"),
+    document.getElementById("services"),
+    serviceNames.map((name) => s.services?.find((x) => x.name === name)?.status || "stopped"),
     () =>
-      names.map((name) => {
+      serviceNames.map((name) => {
         const st = s.services?.find((x) => x.name === name)?.status || "stopped";
         const row = document.createElement("div");
         row.className = "service";
@@ -603,7 +652,7 @@ async function poll() {
     else
       render({
         phase: "stopped",
-        message: "界面预览 · 请在 CodexBoard 应用中启动服务",
+        message: "界面预览 · 请在 DevBoard 应用中启动服务",
         services: [],
         logs: [],
       });

@@ -91,6 +91,10 @@ it("keeps partially answered questions accessible until every question is answer
   expect(parts.progress.map((i) => i.id)).toEqual(["progress"]);
   expect(parts.final.map((i) => i.id)).toEqual(["question"]);
 });
+it("keeps answered questions visible when an interrupted turn is reloaded", () => {
+  const html = render({ ...turn, status: "interrupted", items: [question] });
+  expect(html).toContain('<details class="remote-progress" open="">');
+});
 it("never promotes answered questions through legacy or explicit final-answer detection", () => {
   for (const phase of [undefined, "final_answer"]) {
     const parts = splitRemoteTurn({
