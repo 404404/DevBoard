@@ -500,9 +500,7 @@ async function mutateGlobalLabel(
 async function registerProject(prefix: string, displayName?: string): Promise<RegisteredProject> {
   const dataDirectory = process.env.CODEXBOARD_DATA_DIR as string;
   const codexProjectId = randomUUID();
-  const name = displayName
-    ? `${displayName}-${randomUUID().slice(0, 8)}`
-    : `界面验收 ${uniqueProjectKey(prefix)}`;
+  const name = displayName ?? `界面验收 ${uniqueProjectKey(prefix)}`;
   const rootPath = join(dataDirectory, `repository-${randomUUID()}`);
   mkdirSync(rootPath);
   updateProjectSnapshot((projects) => [
@@ -2518,7 +2516,10 @@ test("键盘筛选并选择临时项目后焦点返回项目触发器", async ({
 });
 
 test("长项目名在窄屏省略且右侧 Key 与目录保持两行可见", async ({ page }) => {
-  const project = await registerProject("LONGPROJECT", "codexboard-responsive-interactions");
+  const project = await registerProject(
+    "LONGPROJECT",
+    `codexboard-responsive-interactions-${randomUUID().slice(0, 8)}`,
+  );
   await openWorkspace(page);
   await selectProject(page, project);
 
