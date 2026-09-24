@@ -108,20 +108,18 @@ jobs:
           test "$(docker exec "$container" id -u)" != "0"
           test "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$container")" = "no"
           docker exec "$container" sh -ec 'for b in codex cursor opencode grok grok-build frpc caddy; do if command -v "$b" >/dev/null 2>&1; then echo "unexpected runtime binary: $b" >&2; exit 1; fi; done'
-          if docker port "$container" 47824/tcp | grep -q .; then echo 'Admin API must not be published' >&2; exit 1; fi
-          docker cp deploy/scripts/container-state-smoke.mjs "$container:/tmp/container-state-smoke.mjs"
-          docker cp deploy/scripts/proxy-sse-smoke.mjs "$container:/tmp/proxy-sse-smoke.mjs"
-          docker exec -e NODE_EXTRA_CA_CERTS=/tmp/ci-fullchain.pem "$container" node /tmp/proxy-sse-smoke.mjs
-          docker exec "$container" node /tmp/container-state-smoke.mjs seed
+          published_ports="$(docker inspect --format '{{json .HostConfig.PortBindings}}' "$container")"
+          if [[ "$published_ports" == *'"47824/tcp"'* ]]; then echo 'Admin API must not be published' >&2; exit 1; fi
+          docker exec -i -e NODE_EXTRA_CA_CERTS=/tmp/ci-fullchain.pem "$container" node --input-type=module - < deploy/scripts/proxy-sse-smoke.mjs
+          docker exec -i "$container" node --input-type=module - seed < deploy/scripts/container-state-smoke.mjs
           backup_output="$(docker exec "$container" node apps/server/dist/ops.js backup)"
           backup_directory="$(node -e 'const r=JSON.parse(process.argv[1]);if(!r.ok)process.exit(1);process.stdout.write(r.directory)' "$backup_output")"
           backup_id="${backup_directory##*/}"
           test -n "$backup_id"
           docker restart "$container" >/dev/null
           wait_healthy
-          docker cp deploy/scripts/container-state-smoke.mjs "$container:/tmp/container-state-smoke.mjs"
-          docker exec "$container" node /tmp/container-state-smoke.mjs verify
-          docker exec "$container" node /tmp/container-state-smoke.mjs mutate
+          docker exec -i "$container" node --input-type=module - verify < deploy/scripts/container-state-smoke.mjs
+          docker exec -i "$container" node --input-type=module - mutate < deploy/scripts/container-state-smoke.mjs
           docker stop --time 30 "$container" >/dev/null
           docker rm "$container" >/dev/null
           docker run --rm --name "$restore_container" \
@@ -135,9 +133,8 @@ jobs:
           run_app
           wait_healthy
           test "$(docker inspect --format '{{.RestartCount}}' "$container")" = "0"
-          docker cp deploy/scripts/container-state-smoke.mjs "$container:/tmp/container-state-smoke.mjs"
-          docker cp deploy/scripts/proxy-sse-smoke.mjs "$container:/tmp/proxy-sse-smoke.mjs"
-          docker exec "$container" node /tmp/container-state-smoke.mjs verify
+          docker exec -i "$container" node --input-type=module - verify < deploy/scripts/container-state-smoke.mjs
+          docker exec -i -e NODE_EXTRA_CA_CERTS=/tmp/ci-fullchain.pem "$container" node --input-type=module - < deploy/scripts/proxy-sse-smoke.mjs
           docker exec "$container" node apps/server/dist/ops.js verify "$backup_directory"
           echo "Container acceptance passed for $PLATFORM; business data survived restart and A→backup→mutate→restore→B verification."
 

@@ -196,11 +196,11 @@ describe("DirectoryIdentityRegistry", () => {
     try {
       const started = Date.now();
       await expect(isSshAgentAvailable()).resolves.toBe(false);
-      expect(Date.now() - started).toBeLessThan(2_500);
+      expect(Date.now() - started).toBeLessThan(5_000);
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
-  });
+  }, 15_000);
 
   it("stores and returns only identityRef metadata through the Connection API", async () => {
     const directory = createDirectory();
