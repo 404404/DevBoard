@@ -14,6 +14,13 @@ interface FixtureItem {
   status?: string;
 }
 
+interface FixtureAttachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+}
+
 interface FixtureTurn {
   id: string;
   status: string;
@@ -59,6 +66,7 @@ interface FixtureThread {
       pausedReason: string | null;
       canEdit: boolean;
       canSteer: boolean;
+      attachments?: FixtureAttachment[];
     }>;
   };
 }
@@ -82,7 +90,7 @@ function createThread(id: string): FixtureThread {
   };
 }
 
-function addTurn(thread: FixtureThread, text: string): FixtureTurn {
+function addTurn(thread: FixtureThread, text: string, remoteInput = false): FixtureTurn {
   const id = `turn-${randomUUID()}`;
   const turn: FixtureTurn = {
     id,
@@ -91,7 +99,14 @@ function addTurn(thread: FixtureThread, text: string): FixtureTurn {
     durationMs: null,
     diff: "",
     error: "",
-    items: [{ id: `user-${id}`, type: "userMessage", text, detail: "" }],
+    items: [
+      {
+        id: `${remoteInput ? "remote-input" : "user"}:${id}`,
+        type: "userMessage",
+        text,
+        detail: "",
+      },
+    ],
   };
   thread.turns.push(turn);
   thread.activeTurnId = id;
@@ -124,7 +139,19 @@ function requestFor(text: string, turnId: string): FixtureRequest {
   };
 }
 
-function applyAction(thread: FixtureThread, action: FixtureAction): void {
+function attachmentDescriptors(uploads: Map<string, FixtureAttachment>, value: unknown) {
+  if (!Array.isArray(value)) return undefined;
+  return value.flatMap((id) => {
+    const attachment = typeof id === "string" ? uploads.get(id) : undefined;
+    return attachment ? [attachment] : [];
+  });
+}
+
+function applyAction(
+  thread: FixtureThread,
+  action: FixtureAction,
+  uploads: Map<string, FixtureAttachment>,
+): void {
   if (action.type === "rename" && typeof action.name === "string") {
     thread.title = action.name;
     return;
@@ -132,10 +159,10 @@ function applyAction(thread: FixtureThread, action: FixtureAction): void {
   if (action.type === "send" || action.type === "steer") {
     const text = typeof action.text === "string" ? action.text : "";
     const turn = thread.status === "active" ? thread.turns.at(-1) : undefined;
-    const target = turn ?? addTurn(thread, text);
+    const target = turn ?? addTurn(thread, text, action.type === "send");
     if (turn)
       target.items.push({ id: `user-${randomUUID()}`, type: "userMessage", text, detail: "" });
-    thread.requests = [requestFor(text, target.id)];
+    thread.requests = text === "实时消息显示验收" ? [] : [requestFor(text, target.id)];
     return;
   }
   if (action.type === "respond") {
@@ -182,6 +209,7 @@ function applyAction(thread: FixtureThread, action: FixtureAction): void {
   if (action.type === "queue") {
     const id = typeof action.messageId === "string" ? action.messageId : `queue-${randomUUID()}`;
     if (action.operation === "append") {
+      const attachments = attachmentDescriptors(uploads, action.attachments);
       thread.queue.messages.push({
         id,
         text: typeof action.text === "string" ? action.text : "",
@@ -189,10 +217,15 @@ function applyAction(thread: FixtureThread, action: FixtureAction): void {
         pausedReason: null,
         canEdit: true,
         canSteer: true,
+        ...(attachments?.length ? { attachments } : {}),
       });
     } else if (action.operation === "edit") {
       const message = thread.queue.messages.find((item) => item.id === id);
-      if (message && typeof action.text === "string") message.text = action.text;
+      if (message) {
+        if (typeof action.text === "string") message.text = action.text;
+        const attachments = attachmentDescriptors(uploads, action.attachments);
+        if (attachments) message.attachments = attachments;
+      }
     } else if (action.operation === "cancel" || action.operation === "take") {
       thread.queue.messages = thread.queue.messages.filter((item) => item.id !== id);
     } else if (action.operation === "steer") {
@@ -213,6 +246,13 @@ function applyAction(thread: FixtureThread, action: FixtureAction): void {
 
 async function installRemoteApiFixture(page: Page): Promise<void> {
   const threads = new Map<string, FixtureThread>();
+  const pendingRemoteInputTransitions = new Map<string, string>();
+  const uploads = new Map<string, FixtureAttachment>();
+  const chunkUploads = new Map<
+    string,
+    { name: string; mimeType: string; size: number; received: Set<number> }
+  >();
+  const previews = new Map<string, { mimeType: string; bytes: Buffer }>();
   const fulfill = (route: Route, data: unknown, status = 200) =>
     route.fulfill({ status, contentType: "application/json", body: JSON.stringify({ data }) });
 
@@ -247,7 +287,17 @@ async function installRemoteApiFixture(page: Page): Promise<void> {
       ]);
     }
     if (pathname === "/api/v1/remote/usage" && method === "GET")
-      return fulfill(route, { windows: [] });
+      return fulfill(route, {
+        windows: [
+          {
+            id: "weekly",
+            name: "",
+            remainingPercent: 63,
+            windowDurationMins: 10080,
+            resetsAt: null,
+          },
+        ],
+      });
     if (pathname === "/api/v1/remote/threads" && method === "GET") {
       const search = searchParams.get("search") ?? "";
       return fulfill(route, {
@@ -293,10 +343,26 @@ async function installRemoteApiFixture(page: Page): Promise<void> {
         thread = createThread(threadMatch[1]!);
         threads.set(thread.id, thread);
       }
-      if (method === "GET") return fulfill(route, thread);
+      if (method === "GET") {
+        const snapshot = structuredClone(thread);
+        const transitionTurnId = pendingRemoteInputTransitions.get(thread.id);
+        await fulfill(route, snapshot);
+        if (transitionTurnId) {
+          const turn = thread.turns.find((candidate) => candidate.id === transitionTurnId);
+          const item = turn?.items.find((candidate) => candidate.id === `remote-input:${turn.id}`);
+          if (item) item.id = `user-${turn!.id}`;
+          pendingRemoteInputTransitions.delete(thread.id);
+        }
+        return;
+      }
       if (method === "PATCH" || method === "POST") {
         const body = request.postDataJSON() as FixtureAction;
-        applyAction(thread, body);
+        applyAction(thread, body, uploads);
+        if (body.type === "send" && thread.activeTurnId) {
+          const turn = thread.turns.find((candidate) => candidate.id === thread.activeTurnId);
+          if (turn?.items.some((item) => item.id === `remote-input:${turn.id}`))
+            pendingRemoteInputTransitions.set(thread.id, turn.id);
+        }
         return fulfill(route, {});
       }
     }
@@ -308,29 +374,56 @@ async function installRemoteApiFixture(page: Page): Promise<void> {
         thread = createThread(actionMatch[1]!);
         threads.set(thread.id, thread);
       }
-      applyAction(thread, request.postDataJSON() as FixtureAction);
+      const action = request.postDataJSON() as FixtureAction;
+      applyAction(thread, action, uploads);
+      if (action.type === "send" && thread.activeTurnId) {
+        const turn = thread.turns.find((candidate) => candidate.id === thread.activeTurnId);
+        if (turn?.items.some((item) => item.id === `remote-input:${turn.id}`))
+          pendingRemoteInputTransitions.set(thread.id, turn.id);
+      }
       return fulfill(route, {});
     }
 
     if (pathname === "/api/v1/remote/uploads" && method === "POST") {
       const upload = request.postDataJSON() as { name: string; mimeType: string; base64: string };
-      return fulfill(route, {
+      const descriptor = {
         id: randomUUID(),
         name: upload.name,
         mimeType: upload.mimeType,
         size: Buffer.from(upload.base64, "base64").byteLength,
-      });
+      };
+      const bytes = Buffer.from(upload.base64, "base64");
+      uploads.set(descriptor.id, descriptor);
+      previews.set(descriptor.id, { mimeType: descriptor.mimeType, bytes });
+      return fulfill(route, descriptor);
     }
     if (pathname === "/api/v1/remote/uploads/chunks" && method === "POST") {
       const index = Number(searchParams.get("index"));
-      const count = Number(searchParams.get("count"));
-      if (index + 1 < count) return fulfill(route, null);
-      return fulfill(route, {
-        id: randomUUID(),
-        name: searchParams.get("name") ?? "upload.bin",
-        mimeType: searchParams.get("mimeType") ?? "application/octet-stream",
-        size: Number(searchParams.get("size")) || 1,
-      });
+      const name = searchParams.get("name") ?? "upload.bin";
+      const mimeType = searchParams.get("mimeType") ?? "application/octet-stream";
+      const size = Number(searchParams.get("size")) || 1;
+      const uploadId = request.headers()["idempotency-key"];
+      if (!uploadId || !Number.isInteger(index) || index < 0) return fulfill(route, null);
+      const chunkUpload = chunkUploads.get(uploadId) ?? {
+        name,
+        mimeType,
+        size,
+        received: new Set<number>(),
+      };
+      chunkUpload.received.add(index);
+      chunkUploads.set(uploadId, chunkUpload);
+      const count = Math.ceil(size / (192 * 1024));
+      if (chunkUpload.received.size < count) return fulfill(route, null);
+      const descriptor = { id: randomUUID(), name, mimeType, size };
+      uploads.set(descriptor.id, descriptor);
+      chunkUploads.delete(uploadId);
+      return fulfill(route, descriptor);
+    }
+    const previewMatch = pathname.match(/^\/api\/v1\/remote\/uploads\/([0-9a-f-]+)\/preview$/i);
+    if (previewMatch && method === "GET") {
+      const preview = previews.get(previewMatch[1]!);
+      if (!preview) return route.fulfill({ status: 404 });
+      return route.fulfill({ status: 200, contentType: preview.mimeType, body: preview.bytes });
     }
 
     return route.continue();

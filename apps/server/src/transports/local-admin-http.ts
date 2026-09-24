@@ -639,15 +639,20 @@ export function createLocalAdminApp(options: CreateLocalAdminAppOptions): Fastif
 
   app.post("/api/v1/local/tasks", async (request, reply) => {
     const actor = requestActor(request);
-    if (!taskCreation) {
-      throw new AppError("UPSTREAM_ERROR", 503, "Codex App Server 当前不可用，无法创建任务");
-    }
     const command = CreateTaskCommandSchema.parse(request.body);
     if (command.assigneeIdentity && !sameIdentity(command.assigneeIdentity, actor.identity))
       throw new AppError("FORBIDDEN", 403, "CLI 创建任务的负责人必须是当前登录用户");
     command.assigneeIdentity = actor.identity;
     assertUserAssignee(options.database, identityKey(actor.identity));
-    const result = await taskCreation.create(command, mutationContext(request));
+    const context = mutationContext(request);
+    // taskctl is also used by container-side board/ops workflows. Creating a
+    // Task must not require a local Codex process or implicitly start a Thread.
+    // Preserve optional Thread provisioning only for explicitly injected
+    // embedded legacy callers.
+    const result =
+      taskCreation && taskboard.projectSourceKind(command.projectId, actor) !== "legacy"
+        ? await taskCreation.create(command, context)
+        : taskboard.createTask(command, context);
     await reply.code(201).send({ data: result.task, meta: { revision: result.revision } });
   });
 

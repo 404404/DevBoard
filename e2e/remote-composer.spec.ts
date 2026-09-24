@@ -1104,7 +1104,7 @@ test("a sent message appears before live activity without reopening and stays un
   await snapshot;
   const message = page.locator(".remote-user-message").filter({ hasText: "实时消息显示验收" });
   await expect(message).toHaveCount(1);
-  await expect(page.getByText("正在处理本次请求")).toBeVisible();
+  await expect(page.getByText("正在思考", { exact: true })).toBeVisible();
   expect(page.url()).toBe(url);
   await page.waitForResponse(async (response) => {
     if (!/\/remote\/threads\/[^/]+$/.test(new URL(response.url()).pathname) || !response.ok())

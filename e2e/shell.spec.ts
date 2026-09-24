@@ -1084,17 +1084,17 @@ test("新增任务弹窗按需选择关系并累计添加附件", async ({ page 
   );
   await page.mouse.up();
   await expect
-    .poll(() =>
-      dialog
-        .locator(".task-create-meta-strip")
-        .evaluate(
-          (element) =>
-            new Set(
-              Array.from(element.children, (child) =>
-                Math.round(child.getBoundingClientRect().top),
-              ),
-            ).size,
-        ),
+    .poll(async () =>
+      dialog.locator(".task-create-meta-strip").evaluate((element) => {
+        const tops = Array.from(
+          element.children,
+          (child) => child.getBoundingClientRect().top,
+        ).sort((left, right) => left - right);
+        return tops.reduce<number[]>((rows, top) => {
+          if (rows.length === 0 || top - rows.at(-1)! > 2) rows.push(top);
+          return rows;
+        }, []).length;
+      }),
     )
     .toBe(1);
   await expect(
@@ -1288,7 +1288,7 @@ test("新增任务弹窗按需选择关系并累计添加附件", async ({ page 
   });
   await expect(dialog.getByLabel("已添加附件")).toContainText("brief.txt");
   await expect(dialog.getByLabel("已添加附件")).toContainText("evidence.csv");
-  await expect(dialog.locator(".task-create-file-extension")).toHaveText(["TXT", "CSV"]);
+  await expect(dialog.locator(".attachment-card-icon")).toHaveText(["TXT", "CSV"]);
   await expect(dialog.getByRole("button", { name: "添加附件，已选择 2 个" })).toBeVisible();
   await dialog.getByLabel("任务标题").fill("胶囊换行附件测试");
   await create.click({ trial: true, timeout: 2_000 });
@@ -4806,7 +4806,8 @@ test("详情修复：相邻状态、活动实时更新、评论菜单和图片�
   await openWorkspace(page);
   await selectProject(page, project);
   const detail = await createTaskAndOpenDetail(page, "详情修复验收");
-  await expect(detail.getByRole("button", { name: "刷新", exact: true })).toHaveCount(0);
+  await expect(detail.getByRole("heading", { name: "Run 控制台" })).toBeVisible();
+  await expect(detail.getByRole("button", { name: "刷新", exact: true })).toBeVisible();
   await expect(detail.getByRole("button", { name: "复制链接", exact: true })).toHaveCount(0);
   await detail.getByRole("button", { name: "添加父任务", exact: true }).click();
   await expect(detail.getByText("暂无可绑定任务", { exact: true })).toBeVisible();

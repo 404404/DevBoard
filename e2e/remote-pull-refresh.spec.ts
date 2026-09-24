@@ -8,14 +8,21 @@ async function touch(page: Page, type: string, y: number, x = 100, count = 1) {
       const touches =
         args.type === "touchend" || args.type === "touchcancel"
           ? []
-          : Array.from({ length: args.count }, (_, identifier) => ({
-              identifier,
-              target: element,
-              clientX: args.x + identifier * 20,
-              clientY: args.y,
-            }));
-      const event = new Event(args.type, { bubbles: true, cancelable: true });
-      Object.defineProperty(event, "touches", { value: touches });
+          : Array.from(
+              { length: args.count },
+              (_, identifier) =>
+                new Touch({
+                  identifier,
+                  target: element,
+                  clientX: args.x + identifier * 20,
+                  clientY: args.y,
+                }),
+            );
+      const event = new TouchEvent(args.type, {
+        bubbles: true,
+        cancelable: true,
+        touches,
+      });
       element.dispatchEvent(event);
     },
     { type, y, x, count },
