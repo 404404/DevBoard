@@ -95,12 +95,13 @@ async function openEvents(lastEventId) {
     throw new Error(`proxied SSE endpoint returned HTTP ${response.status}`);
   }
   if (
-    !response.headers.get("cache-control")?.includes("no-cache") ||
-    response.headers.get("x-accel-buffering") !== "no"
+    !response.headers.get("cache-control")?.includes("no-cache")
   ) {
     controller.abort();
-    throw new Error("SSE response is missing no-cache/no-buffering headers");
+    throw new Error("SSE response is missing no-cache headers");
   }
+  // Nginx consumes X-Accel-Buffering as an upstream control header; delivery
+  // of the initial event, live event and heartbeat below verifies streaming.
   return { controller, reader: response.body.getReader() };
 }
 
