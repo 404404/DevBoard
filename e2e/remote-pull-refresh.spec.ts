@@ -3,6 +3,10 @@ import { expect, test, type Page } from "./helpers/remote-test";
 test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
 async function touch(page: Page, type: string, y: number, x = 100, count = 1) {
+  await expect(page.locator(".remote-list-body")).toHaveAttribute(
+    "data-pull-refresh-ready",
+    "true",
+  );
   await page.locator(".remote-list-body").evaluate(
     (element, args) => {
       const touches = Array.from({ length: args.count }, (_, identifier) => ({

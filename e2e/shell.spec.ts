@@ -682,8 +682,14 @@ async function createTaskAndOpenDetail(
   const createDialog = await openTaskCreateDialog(page);
   await configure?.(createDialog);
   await createDialog.getByLabel("任务标题").fill(title);
+  const taskCreated = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      new URL(response.url()).pathname === "/api/v1/tasks",
+  );
   await createDialog.getByRole("button", { name: "创建任务", exact: true }).click();
-  await expect(createDialog).toHaveCount(0);
+  expect((await taskCreated).status()).toBe(201);
+  await expect(createDialog).toHaveCount(0, { timeout: 10_000 });
   const detail = page.getByRole("region", { name: "任务详情", exact: true });
   await expect(detail).toBeVisible();
   await expect(detail.getByRole("button", { name: "返回看板", exact: true })).toBeFocused();
@@ -4252,8 +4258,14 @@ test("双客户端完成实时创建、冲突恢复、拖动迁移与断线补�
     await second.getByRole("tab", { name: "仪表盘" }).click();
     const unreadMetric = second.locator(".metric-card").filter({ hasText: "阻塞或未读" });
     await expect(unreadMetric.locator("strong")).toHaveText("1");
+    const markRead = first.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === `/api/v1/tasks/${created.id}/read`,
+    );
     await first.getByTestId(cardTestId).getByRole("button").first().click();
     await expect(first.getByRole("region", { name: "任务详情", exact: true })).toBeVisible();
+    expect((await markRead).status()).toBe(204);
     await first.getByRole("button", { name: "返回看板" }).click();
     await expect(unreadMetric.locator("strong")).toHaveText("0");
     await first.getByTestId(cardTestId).getByRole("button").first().click();
